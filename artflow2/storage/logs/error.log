@@ -1,0 +1,83 @@
+[2026-01-26 12:41:57] Error: Call to undefined method App\Repositories\VendaRepository::findByMes() in C:\xampp\htdocs\artflow2\src\Services\VendaService.php:297
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(49): App\Services\VendaService->getVendasMesAtual()
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#6 {main}
+
+[2026-01-26 12:42:12] Error: Call to undefined method App\Repositories\VendaRepository::findByMes() in C:\xampp\htdocs\artflow2\src\Services\VendaService.php:297
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(49): App\Services\VendaService->getVendasMesAtual()
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#6 {main}
+
+[2026-01-26 12:42:29] Error: Call to undefined method App\Repositories\VendaRepository::findByMes() in C:\xampp\htdocs\artflow2\src\Services\VendaService.php:297
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(49): App\Services\VendaService->getVendasMesAtual()
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 {main}
+
+[2026-01-26 12:42:32] Error: Call to undefined method App\Repositories\VendaRepository::findByMes() in C:\xampp\htdocs\artflow2\src\Services\VendaService.php:297
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(49): App\Services\VendaService->getVendasMesAtual()
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 {main}
+
+[2026-01-26 12:47:37] Error: Call to undefined method App\Repositories\ClienteRepository::getTopCompradores() in C:\xampp\htdocs\artflow2\src\Services\ClienteService.php:249
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(56): App\Services\ClienteService->getTopClientes(5)
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#6 {main}
+
+[2026-01-26 12:47:45] Error: Call to undefined method App\Repositories\ClienteRepository::getTopCompradores() in C:\xampp\htdocs\artflow2\src\Services\ClienteService.php:249
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(56): App\Services\ClienteService->getTopClientes(5)
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#6 {main}
+
+[2026-01-26 12:47:48] Error: Call to undefined method App\Repositories\ClienteRepository::getTopCompradores() in C:\xampp\htdocs\artflow2\src\Services\ClienteService.php:249
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(56): App\Services\ClienteService->getTopClientes(5)
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#5 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#6 {main}
+
+[2026-01-26 12:52:40] ArgumentCountError: Too few arguments to function flash(), 0 passed in C:\xampp\htdocs\artflow2\views\layouts\main.php on line 166 and exactly 1 expected in C:\xampp\htdocs\artflow2\src\Helpers\functions.php:304
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\views\layouts\main.php(166): flash()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(164): include('C:\\xampp\\htdocs...')
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(128): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\View.php(144): App\Core\View::render('dashboard/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('dashboard/index', Array, 'layouts/main')
+#5 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(83): App\Controllers\BaseController->view('dashboard/index', Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#9 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#10 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#11 {main}
+
