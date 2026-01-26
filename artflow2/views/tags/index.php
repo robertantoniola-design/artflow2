@@ -166,7 +166,7 @@ $currentPage = 'tags';
 <script>
 function confirmarExclusao(id, nome) {
     document.getElementById('nomeTagExcluir').textContent = nome;
-    document.getElementById('formExcluir').action = '/tags/' + id;
+    document.getElementById('formExcluir').action = '<?= url('/tags') ?>/' + id;
     new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }
 </script>

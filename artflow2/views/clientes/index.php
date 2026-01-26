@@ -180,7 +180,7 @@ $currentPage = 'clientes';
 <script>
 function confirmarExclusao(id, nome) {
     document.getElementById('nomeClienteExcluir').textContent = nome;
-    document.getElementById('formExcluir').action = '/clientes/' + id;
+    document.getElementById('formExcluir').action = '<?= url('/clientes') ?>/' + id;
     
     new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }

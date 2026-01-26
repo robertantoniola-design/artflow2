@@ -242,7 +242,7 @@ $currentPage = 'vendas';
 
 <script>
 function confirmarExclusao(id) {
-    document.getElementById('formExcluir').action = '/vendas/' + id;
+    document.getElementById('formExcluir').action = '<?= url('/vendas') ?>/' + id;
     new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }
 </script>

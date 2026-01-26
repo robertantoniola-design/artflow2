@@ -163,8 +163,14 @@ class View
         // Inicia buffer de saída
         ob_start();
         
-        // Inclui arquivo (executa PHP)
-        include $filePath;
+        try {
+            // Inclui arquivo (executa PHP)
+            include $filePath;
+        } catch (\Throwable $e) {
+            // Se houver erro, limpa o buffer e re-lança
+            ob_end_clean();
+            throw $e;
+        }
         
         // Retorna conteúdo do buffer
         return ob_get_clean();

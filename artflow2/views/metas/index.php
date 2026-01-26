@@ -245,7 +245,7 @@ $currentPage = 'metas';
 
 <script>
 function confirmarExclusao(id) {
-    document.getElementById('formExcluir').action = '/metas/' + id;
+    document.getElementById('formExcluir').action = '<?= url('/metas') ?>/' + id;
     new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }
 </script>
