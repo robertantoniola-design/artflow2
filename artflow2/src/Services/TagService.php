@@ -61,6 +61,17 @@ class TagService
     }
     
     /**
+     * Lista todas as tags com contagem de artes associadas
+     * Alias para listar(['com_contagem' => true])
+     * 
+     * @return array
+     */
+    public function listarComContagem(): array
+    {
+        return $this->tagRepository->allWithCount();
+    }
+    
+    /**
      * Busca tag por ID
      * 
      * @param int $id

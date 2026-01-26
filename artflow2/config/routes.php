@@ -59,37 +59,33 @@ $router->post('/artes/{id}/horas', [ArteController::class, 'adicionarHoras']);
 // ============================================
 // ROTAS DE CLIENTES
 // ============================================
-$router->resource('/clientes', ClienteController::class);
-
-// API de clientes para autocomplete
+// IMPORTANTE: Rotas específicas ANTES do resource
 $router->get('/clientes/buscar', [ClienteController::class, 'buscar']);
+$router->resource('/clientes', ClienteController::class);
 
 // ============================================
 // ROTAS DE VENDAS
 // ============================================
-$router->resource('/vendas', VendaController::class);
-
-// Relatório de vendas
+// IMPORTANTE: Rotas específicas ANTES do resource
 $router->get('/vendas/relatorio', [VendaController::class, 'relatorio']);
+$router->resource('/vendas', VendaController::class);
 
 // ============================================
 // ROTAS DE METAS
 // ============================================
-$router->resource('/metas', MetaController::class);
-
-// Rotas adicionais de metas
+// IMPORTANTE: Rotas específicas ANTES do resource
 $router->get('/metas/resumo', [MetaController::class, 'resumo']);
 $router->post('/metas/{id}/recalcular', [MetaController::class, 'recalcular']);
+$router->resource('/metas', MetaController::class);
 
 // ============================================
 // ROTAS DE TAGS
 // ============================================
-$router->resource('/tags', TagController::class);
-
-// API de tags
+// IMPORTANTE: Rotas específicas ANTES do resource
 $router->get('/tags/buscar', [TagController::class, 'buscar']);
 $router->get('/tags/select', [TagController::class, 'select']);
 $router->post('/tags/rapida', [TagController::class, 'criarRapida']);
+$router->resource('/tags', TagController::class);
 
 // ============================================
 // ROTAS DE BUSCA GLOBAL

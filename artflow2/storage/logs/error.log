@@ -81,3 +81,197 @@ Stack trace:
 #10 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #11 {main}
 
+[2026-01-26 14:04:34] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\create.php:160
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 14:04:42] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 14:05:38] Error: Call to undefined method App\Services\TagService::listarComContagem() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:44
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\TagController->index(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-26 14:05:49] Error: Call to undefined method App\Services\TagService::listarComContagem() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:44
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\TagController->index(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-26 14:05:57] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 14:08:41] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 14:08:52] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 14:11:49] TypeError: App\Controllers\VendaController::show(): Argument #2 ($id) must be of type int, string given, called in C:\xampp\htdocs\artflow2\src\Core\Router.php on line 283 in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:125
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\VendaController->show(Object(App\Core\Request), 'relatorio')
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-26 14:11:53] Error: Call to undefined method App\Services\TagService::listarComContagem() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:44
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\TagController->index(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-26 14:12:02] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 14:13:43] Error: Call to undefined method App\Services\TagService::listarComContagem() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:44
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\TagController->index(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-26 14:15:13] TypeError: App\Controllers\VendaController::show(): Argument #2 ($id) must be of type int, string given, called in C:\xampp\htdocs\artflow2\src\Core\Router.php on line 283 in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:125
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(283): App\Controllers\VendaController->show(Object(App\Core\Request), 'relatorio')
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(220): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-26 15:08:01] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 15:08:08] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 15:09:44] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\tags\index.php:84
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('tags/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('tags/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(58): App\Controllers\BaseController->view('tags/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\TagController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 15:10:09] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\index.php:61
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(167): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/index', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/index', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(70): App\Controllers\BaseController->view('artes/index', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->index(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+

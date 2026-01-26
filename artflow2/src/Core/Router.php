@@ -173,8 +173,8 @@ class Router
      * POST   /artes           -> store
      * GET    /artes/{id}      -> show
      * GET    /artes/{id}/editar -> edit
-     * POST   /artes/{id}      -> update
-     * POST   /artes/{id}/deletar -> destroy
+     * PUT    /artes/{id}      -> update (via POST com _method=PUT)
+     * DELETE /artes/{id}      -> destroy (via POST com _method=DELETE)
      * 
      * @param string $uri
      * @param string $controller
@@ -188,7 +188,13 @@ class Router
         $this->post($uri, [$controller, 'store']);
         $this->get("{$uri}/{id}", [$controller, 'show']);
         $this->get("{$uri}/{id}/editar", [$controller, 'edit']);
-        $this->post("{$uri}/{id}", [$controller, 'update']);
+        
+        // Update: aceita tanto PUT quanto POST (para compatibilidade)
+        $this->put("{$uri}/{id}", [$controller, 'update']);
+        $this->post("{$uri}/{id}/atualizar", [$controller, 'update']);
+        
+        // Delete: aceita tanto DELETE quanto POST (para compatibilidade)
+        $this->delete("{$uri}/{id}", [$controller, 'destroy']);
         $this->post("{$uri}/{id}/deletar", [$controller, 'destroy']);
     }
     
