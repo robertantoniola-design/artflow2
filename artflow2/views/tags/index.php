@@ -28,11 +28,11 @@ $currentPage = 'tags';
         <div class="card-body">
             <div class="d-flex flex-wrap gap-2">
                 <?php foreach ($maisUsadas as $tag): ?>
-                    <a href="<?= url("/tags/{$tag['id']}") ?>" 
+                    <a href="<?= url("/tags/{$tag->getId()}") ?>" 
                        class="badge fs-6 text-decoration-none"
-                       style="background-color: <?= e($tag['cor']) ?>;">
-                        <?= e($tag['nome']) ?>
-                        <span class="badge bg-dark ms-1"><?= $tag['total_artes'] ?></span>
+                       style="background-color: <?= e($tag->getCor()) ?>;">
+                        <?= e($tag->getNome()) ?>
+                        <span class="badge bg-dark ms-1"><?= $tag->getArtesCount() ?></span>
                     </a>
                 <?php endforeach; ?>
             </div>
@@ -81,8 +81,8 @@ $currentPage = 'tags';
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-3">
-                            <span class="badge fs-5" style="background-color: <?= e($tag['cor']) ?>;">
-                                <?= e($tag['nome']) ?>
+                            <span class="badge fs-5" style="background-color: <?= e($tag->getCor()) ?>;">
+                                <?= e($tag->getNome()) ?>
                             </span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
@@ -90,19 +90,19 @@ $currentPage = 'tags';
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
-                                        <a href="<?= url("/tags/{$tag['id']}") ?>" class="dropdown-item">
+                                        <a href="<?= url("/tags/{$tag->getId()}") ?>" class="dropdown-item">
                                             <i class="bi bi-eye"></i> Ver Artes
                                         </a>
                                     </li>
                                     <li>
-                                        <a href="<?= url("/tags/{$tag['id']}/editar") ?>" class="dropdown-item">
+                                        <a href="<?= url("/tags/{$tag->getId()}/editar") ?>" class="dropdown-item">
                                             <i class="bi bi-pencil"></i> Editar
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <button class="dropdown-item text-danger" 
-                                                onclick="confirmarExclusao(<?= $tag['id'] ?>, '<?= e($tag['nome']) ?>')">
+                                                onclick="confirmarExclusao(<?= $tag->getId() ?>, '<?= e($tag->getNome()) ?>')">
                                             <i class="bi bi-trash"></i> Excluir
                                         </button>
                                     </li>
@@ -112,19 +112,19 @@ $currentPage = 'tags';
                         
                         <div class="d-flex align-items-center text-muted">
                             <i class="bi bi-brush me-2"></i>
-                            <span><?= $tag['total_artes'] ?? 0 ?> arte(s)</span>
+                            <span><?= $tag->getArtesCount() ?> arte(s)</span>
                         </div>
                         
                         <!-- Preview da cor -->
                         <div class="mt-3">
-                            <small class="text-muted">Cor: <?= e($tag['cor']) ?></small>
+                            <small class="text-muted">Cor: <?= e($tag->getCor()) ?></small>
                             <div class="progress mt-1" style="height: 5px;">
-                                <div class="progress-bar" style="width: 100%; background-color: <?= e($tag['cor']) ?>;"></div>
+                                <div class="progress-bar" style="width: 100%; background-color: <?= e($tag->getCor()) ?>;"></div>
                             </div>
                         </div>
                     </div>
                     <div class="card-footer bg-transparent">
-                        <a href="<?= url("/artes?tag_id={$tag['id']}") ?>" class="btn btn-sm btn-outline-primary w-100">
+                        <a href="<?= url("/artes?tag_id={$tag->getId()}") ?>" class="btn btn-sm btn-outline-primary w-100">
                             <i class="bi bi-filter"></i> Ver Artes com esta Tag
                         </a>
                     </div>

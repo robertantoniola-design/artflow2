@@ -58,8 +58,8 @@ $currentPage = 'artes';
                 <select name="tag_id" class="form-select">
                     <option value="">Todas</option>
                     <?php foreach ($tags ?? [] as $tag): ?>
-                        <option value="<?= $tag['id'] ?>" <?= ($filtros['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
-                            <?= e($tag['nome']) ?>
+                        <option value="<?= $tag->getId() ?>" <?= ($filtros['tag_id'] ?? '') == $tag->getId() ? 'selected' : '' ?>>
+                            <?= e($tag->getNome()) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>

@@ -230,7 +230,7 @@ class TagRepository extends BaseRepository
         $tags = [];
         foreach ($results as $row) {
             $tag = $this->hydrate($row);
-            $tag->total_artes = (int) $row['total_artes'];
+            $tag->setArtesCount((int) $row['total_artes']);
             $tags[] = $tag;
         }
         
@@ -261,7 +261,7 @@ class TagRepository extends BaseRepository
         $tags = [];
         foreach ($results as $row) {
             $tag = $this->hydrate($row);
-            $tag->total_artes = (int) $row['total_artes'];
+            $tag->setArtesCount((int) $row['total_artes']);
             $tags[] = $tag;
         }
         
