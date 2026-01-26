@@ -4,10 +4,10 @@ Sistema profissional de gestão artística desenvolvido em PHP 8.0+ com arquitet
 
 ## 📋 Requisitos
 
-- **PHP** 8.0 ou superior
+- **PHP** 8.1 ou superior
 - **MySQL** 5.7+ ou **MariaDB** 10.3+
-- **Composer** (gerenciador de dependências PHP)
-- **XAMPP** ou servidor web com Apache/Nginx
+- **XAMPP** ou servidor web com Apache + mod_rewrite
+- **Composer** (opcional - sistema inclui autoloader manual)
 
 ## 🚀 Instalação Rápida
 
@@ -17,23 +17,23 @@ Sistema profissional de gestão artística desenvolvido em PHP 8.0+ com arquitet
 C:\xampp\htdocs\artflow2
 ```
 
-### 2. Instale as dependências
+### 2. Configure o ambiente
 ```bash
-cd C:\xampp\htdocs\artflow2
-composer install
-```
-
-### 3. Configure o ambiente
-```bash
-# Copie o arquivo de exemplo
+# Copie o arquivo de exemplo (se necessário)
 copy .env.example .env
 
 # Edite o .env com suas configurações de banco
 ```
 
-### 4. Execute a instalação
-```bash
-php install.php
+### 3. Verifique o Apache
+No arquivo `C:\xampp\apache\conf\httpd.conf`:
+- Descomente: `LoadModule rewrite_module modules/mod_rewrite.so`
+- Em `<Directory "C:/xampp/htdocs">`: mude `AllowOverride None` para `AllowOverride All`
+- Reinicie o Apache
+
+### 4. Execute a instalação via navegador
+```
+http://localhost/artflow2/install.php
 ```
 
 ### 5. Acesse o sistema
@@ -181,6 +181,16 @@ php database/migrate.php rollback
 ## 📝 Licença
 
 Projeto desenvolvido para fins educacionais e uso pessoal.
+
+## 📋 Estado Atual
+
+Para informações detalhadas sobre:
+- Status de cada módulo
+- Correções realizadas
+- Problemas conhecidos
+- Próximos passos
+
+Consulte: **[ESTADO_ATUAL.md](ESTADO_ATUAL.md)**
 
 ---
 
