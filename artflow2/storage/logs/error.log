@@ -668,3 +668,148 @@ Stack trace:
 #8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #9 {main}
 
+[2026-01-30 17:31:27] ErrorException: Undefined variable $router in C:\xampp\htdocs\artflow2\config\routes.php:31
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\config\routes.php(31): App\Core\Application->handleError(2, 'Undefined varia...', 'C:\\xampp\\htdocs...', 31)
+#1 C:\xampp\htdocs\artflow2\src\Core\Application.php(427): require('C:\\xampp\\htdocs...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(70): App\Core\Application->loadRoutes()
+#3 C:\xampp\htdocs\artflow2\public\index.php(39): App\Core\Application->__construct('C:\\xampp\\htdocs...')
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-30 17:40:06] Error: Call to private App\Core\Database::__construct() from scope App\Core\Application in C:\xampp\htdocs\artflow2\src\Core\Application.php:393
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Container.php(107): App\Core\Application->App\Core\{closure}(Object(App\Core\Container))
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Core\\Databa...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(110): App\Core\Container->resolve('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(110): App\Core\Container->resolve('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#9 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(286): App\Core\Container->make('App\\Controllers...')
+#11 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#12 C:\xampp\htdocs\artflow2\src\Core\Application.php(452): App\Core\Router->dispatch(Object(App\Core\Request))
+#13 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#14 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#15 {main}
+
+[2026-01-30 19:13:23] Error: Call to undefined function date_br() in C:\xampp\htdocs\artflow2\views\clientes\index.php:120
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('clientes/index', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\ClienteController.php(46): App\Controllers\BaseController->view('clientes/index', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ClienteController->index(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:26] Error: Call to undefined function date_br() in C:\xampp\htdocs\artflow2\views\clientes\index.php:120
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('clientes/index', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\ClienteController.php(46): App\Controllers\BaseController->view('clientes/index', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ClienteController->index(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:40] Error: Call to undefined function old() in C:\xampp\htdocs\artflow2\views\vendas\edit.php:58
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('vendas/edit', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(195): App\Controllers\BaseController->view('vendas/edit', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->edit(Object(App\Core\Request), 1)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:43] Error: Call to undefined function old() in C:\xampp\htdocs\artflow2\views\vendas\edit.php:58
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('vendas/edit', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(195): App\Controllers\BaseController->view('vendas/edit', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->edit(Object(App\Core\Request), 1)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:46] Error: Call to undefined function date_br() in C:\xampp\htdocs\artflow2\views\vendas\index.php:144
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('vendas/index', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(91): App\Controllers\BaseController->view('vendas/index', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->index(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:50] Error: Call to undefined function datetime_br() in C:\xampp\htdocs\artflow2\views\metas\show.php:227
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('metas/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\MetaController.php(122): App\Controllers\BaseController->view('metas/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\MetaController->show(Object(App\Core\Request), 1)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:51] Error: Call to undefined function has_error() in C:\xampp\htdocs\artflow2\views\metas\edit.php:93
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('metas/edit', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\MetaController.php(143): App\Controllers\BaseController->view('metas/edit', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\MetaController->edit(Object(App\Core\Request), 1)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-30 19:13:58] Error: Call to undefined function date_br() in C:\xampp\htdocs\artflow2\views\clientes\index.php:120
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('clientes/index', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\ClienteController.php(46): App\Controllers\BaseController->view('clientes/index', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ClienteController->index(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-31 00:12:38] Error: Call to undefined function has_error() in C:\xampp\htdocs\artflow2\views\artes\create.php:44
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(37): App\Core\View::render('artes/create', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(473): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
