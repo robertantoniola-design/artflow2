@@ -1,197 +1,162 @@
-# 🎨 ArtFlow 2.0
+# 🔧 ArtFlow 2.0 - Correções v4 (30/01/2026)
 
-Sistema profissional de gestão artística desenvolvido em PHP 8.0+ com arquitetura em camadas.
+## 📋 Erros Corrigidos
 
-## 📋 Requisitos
+### Erro #4: `View não encontrada: metas/show`
+**Arquivo:** `views/metas/show.php` (NÃO EXISTIA)
 
-- **PHP** 8.1 ou superior
-- **MySQL** 5.7+ ou **MariaDB** 10.3+
-- **XAMPP** ou servidor web com Apache + mod_rewrite
-- **Composer** (opcional - sistema inclui autoloader manual)
+**Causa:** 
+- A view `metas/show.php` não foi criada no projeto
+- MetaController::show() tenta renderizar uma view inexistente
 
-## 🚀 Instalação Rápida
-
-### 1. Copie os arquivos para o XAMPP
-```bash
-# Copie a pasta artflow2 para:
-C:\xampp\htdocs\artflow2
-```
-
-### 2. Configure o ambiente
-```bash
-# Copie o arquivo de exemplo (se necessário)
-copy .env.example .env
-
-# Edite o .env com suas configurações de banco
-```
-
-### 3. Verifique o Apache
-No arquivo `C:\xampp\apache\conf\httpd.conf`:
-- Descomente: `LoadModule rewrite_module modules/mod_rewrite.so`
-- Em `<Directory "C:/xampp/htdocs">`: mude `AllowOverride None` para `AllowOverride All`
-- Reinicie o Apache
-
-### 4. Execute a instalação via navegador
-```
-http://localhost/artflow2/install.php
-```
-
-### 5. Acesse o sistema
-```
-http://localhost/artflow2/
-```
-
-## 📁 Estrutura do Projeto
-
-```
-artflow2/
-├── config/              # Configurações
-│   └── routes.php       # Definição de rotas
-├── database/
-│   ├── migrations/      # Migrations do banco
-│   └── migrate.php      # Executor de migrations
-├── public/              # Arquivos públicos (DocumentRoot)
-│   ├── assets/          # CSS, JS, imagens
-│   └── index.php        # Ponto de entrada
-├── src/                 # Código-fonte
-│   ├── Controllers/     # Controllers (apresentação)
-│   ├── Core/            # Núcleo do sistema
-│   ├── Exceptions/      # Exceções customizadas
-│   ├── Helpers/         # Funções auxiliares
-│   ├── Models/          # Entidades do domínio
-│   ├── Repositories/    # Acesso a dados
-│   ├── Services/        # Lógica de negócio
-│   └── Validators/      # Validação de dados
-├── storage/             # Logs e cache
-├── tests/               # Testes automatizados
-├── views/               # Templates HTML
-├── .env                 # Configurações locais
-├── composer.json        # Dependências PHP
-└── install.php          # Script de instalação
-```
-
-## 🏗️ Arquitetura
-
-O ArtFlow 2.0 segue uma arquitetura em camadas:
-
-```
-Request → Router → Controller → Service → Repository → Database
-                        ↓            ↓
-                    Validator      Model
-                        ↓
-                    Response → View
-```
-
-### Camadas:
-- **Controllers**: Recebem requisições e retornam respostas
-- **Services**: Contêm lógica de negócio
-- **Repositories**: Acessam banco de dados
-- **Models**: Representam entidades
-- **Validators**: Validam dados de entrada
-
-## 📊 Módulos
-
-### 🎨 Artes
-- CRUD completo de artes
-- Controle de status (disponível, em produção, vendida)
-- Rastreamento de horas trabalhadas
-- Associação com tags
-
-### 👥 Clientes
-- Cadastro de clientes
-- Histórico de compras
-- Estatísticas por cliente
-
-### 💰 Vendas
-- Registro de vendas
-- Cálculo automático de lucro
-- Rentabilidade por hora
-- Relatórios de faturamento
-
-### 🎯 Metas
-- Definição de metas mensais
-- Acompanhamento de progresso
-- Projeções e análises
-
-### 🏷️ Tags
-- Organização por categorias
-- Sistema de cores
-- Filtros rápidos
-
-## 🔧 Comandos Úteis
-
-```bash
-# Instalar/reinstalar sistema
-php install.php
-
-# Executar migrations
-php database/migrate.php
-
-# Resetar banco (CUIDADO: apaga dados!)
-php database/migrate.php fresh
-
-# Reverter última migration
-php database/migrate.php rollback
-```
-
-## 📱 Rotas Principais
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | `/` | Dashboard |
-| GET | `/artes` | Listar artes |
-| GET | `/artes/criar` | Formulário nova arte |
-| POST | `/artes` | Salvar arte |
-| GET | `/artes/{id}` | Detalhes da arte |
-| GET | `/clientes` | Listar clientes |
-| GET | `/vendas` | Listar vendas |
-| GET | `/vendas/relatorio` | Relatórios |
-| GET | `/metas` | Listar metas |
-| GET | `/tags` | Listar tags |
-
-## 🎨 Tecnologias
-
-- **Backend**: PHP 8.0+, PSR-4 Autoload
-- **Banco**: MySQL/MariaDB
-- **Frontend**: Bootstrap 5, Chart.js
-- **Icons**: Bootstrap Icons
-- **Fonts**: Inter (Google Fonts)
-
-## 📈 Features
-
-- ✅ Arquitetura MVC + Repository + Service Layer
-- ✅ Dependency Injection Container
-- ✅ Sistema de Migrations
-- ✅ Validação em camadas
-- ✅ Flash Messages
-- ✅ CSRF Protection
-- ✅ Dark Mode
-- ✅ Responsivo (Mobile-first)
-- ✅ AJAX updates no Dashboard
-- ✅ Gráficos com Chart.js
-
-## 🔒 Segurança
-
-- Prepared Statements (proteção SQL Injection)
-- CSRF Tokens em formulários
-- Sanitização de inputs
-- Validação server-side
-- XSS Protection (escape de output)
-
-## 📝 Licença
-
-Projeto desenvolvido para fins educacionais e uso pessoal.
-
-## 📋 Estado Atual
-
-Para informações detalhadas sobre:
-- Status de cada módulo
-- Correções realizadas
-- Problemas conhecidos
-- Próximos passos
-
-Consulte: **[ESTADO_ATUAL.md](ESTADO_ATUAL.md)**
+**Solução:** Criar a view completa com:
+- Exibição do progresso da meta
+- Detalhes (valor, porcentagem, horas, dias)
+- Projeções (média diária, dias restantes)
+- Ações (editar, ver vendas, excluir)
 
 ---
 
-**ArtFlow 2.0** - Desenvolvido com ❤️ para artistas
+### Erro #1: `MetaRepository::atualizarProgresso() Return value must be bool`
+**Arquivo:** `MetaRepository.php:152`
+
+**Causa:** 
+- O método estava declarado para retornar `bool`
+- Mas o método `update()` do BaseRepository retorna um objeto `Meta`
+
+**Solução:**
+```php
+// ANTES (ERRADO)
+return $this->update($id, [
+    'valor_realizado' => $valorRealizado,
+    'porcentagem_atingida' => $porcentagem
+]);
+
+// DEPOIS (CORRETO) - SQL direto retorna bool
+$sql = "UPDATE {$this->table} SET valor_realizado = :valor...";
+$stmt = $this->getConnection()->prepare($sql);
+$stmt->execute([...]);
+return $stmt->rowCount() > 0;
+```
+
+---
+
+### Erro #2: `Call to getValor() on array`
+**Arquivo:** `VendaController.php:62`
+
+**Causa:** 
+- O código fazia `array_map(fn($v) => $v->getValor(), $vendas)`
+- Mas em alguns casos `$vendas` retorna arrays, não objetos
+
+**Solução:**
+```php
+// ANTES (ERRADO)
+'valor_total' => array_sum(array_map(fn($v) => $v->getValor(), $vendas))
+
+// DEPOIS (CORRETO) - Verifica tipo
+foreach ($vendas as $venda) {
+    if (is_object($venda)) {
+        $valorTotal += $venda->getValor();
+    } elseif (is_array($venda)) {
+        $valorTotal += $venda['valor'] ?? 0;
+    }
+}
+```
+
+---
+
+### Erro #3: `Cannot use Cliente object as array`
+**Arquivo:** `views/dashboard/index.php:160`
+
+**Causa:** 
+- A view acessava `$cliente['nome']` com sintaxe de array
+- Mas `$topClientes` contém objetos `Cliente`
+
+**Solução:**
+```php
+// ANTES (ERRADO)
+<?= e($cliente['nome']) ?>
+
+// DEPOIS (CORRETO) - Verifica tipo
+<?php
+if (is_object($cliente)) {
+    $nomeCliente = $cliente->getNome();
+} elseif (is_array($cliente)) {
+    $nomeCliente = $cliente['nome'] ?? '';
+}
+?>
+<?= e($nomeCliente) ?>
+```
+
+---
+
+## 📁 Arquivos Incluídos
+
+```
+artflow2_correcoes/
+├── src/
+│   ├── Controllers/
+│   │   └── VendaController.php      ← index() corrigido
+│   └── Repositories/
+│       └── MetaRepository.php       ← atualizarProgresso() corrigido
+└── views/
+    ├── dashboard/
+    │   └── index.php                ← topClientes corrigido
+    ├── metas/
+    │   └── show.php                 ← NOVA (não existia!)
+    └── vendas/
+        ├── create.php               ← clientesSelect corrigido
+        └── index.php                ← clientesSelect + vendas corrigido
+```
+
+---
+
+## 🚀 Como Aplicar
+
+```batch
+cd C:\xampp\htdocs\artflow2
+
+REM MetaRepository
+copy /Y "artflow2_correcoes\src\Repositories\MetaRepository.php" "src\Repositories\"
+
+REM VendaController
+copy /Y "artflow2_correcoes\src\Controllers\VendaController.php" "src\Controllers\"
+
+REM Views
+copy /Y "artflow2_correcoes\views\dashboard\index.php" "views\dashboard\"
+copy /Y "artflow2_correcoes\views\vendas\*.php" "views\vendas\"
+copy /Y "artflow2_correcoes\views\metas\show.php" "views\metas\"
+```
+
+---
+
+## ✅ Checklist de Teste
+
+| Teste | URL | Esperado |
+|-------|-----|----------|
+| ⬜ Dashboard | `/` | Carrega sem erro |
+| ⬜ Lista vendas | `/vendas` | Lista carrega |
+| ⬜ Criar venda | `/vendas/criar` | Formulário funciona |
+| ⬜ Registrar venda | POST `/vendas` | Venda é salva e meta atualizada |
+| ⬜ Ver meta | `/metas/1` | Detalhes da meta exibidos |
+
+---
+
+## 💡 Padrão de Compatibilidade
+
+Todas as correções seguem o padrão defensivo:
+
+```php
+// Verifica se é objeto ou array antes de acessar
+if (is_object($item)) {
+    $valor = $item->getValor();
+} elseif (is_array($item)) {
+    $valor = $item['valor'] ?? 0;
+}
+```
+
+Isso garante que o código funcione independente de como o Repository retorna os dados.
+
+---
+
+*Correções geradas em 29/01/2026 - Claude AI*

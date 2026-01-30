@@ -576,3 +576,95 @@ Stack trace:
 #8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #9 {main}
 
+[2026-01-29 22:21:35] Error: Call to undefined method App\Services\VendaService::gerarRelatorio() in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:266
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->relatorio(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-29 22:23:08] TypeError: Cannot access offset of type string on string in C:\xampp\htdocs\artflow2\views\vendas\create.php:68
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('vendas/create', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(91): App\Controllers\BaseController->view('vendas/create', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->create(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-29 22:35:14] TypeError: App\Repositories\MetaRepository::atualizarProgresso(): Return value must be of type bool, App\Models\Meta returned in C:\xampp\htdocs\artflow2\src\Repositories\MetaRepository.php:152
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Repositories\MetaRepository.php(171): App\Repositories\MetaRepository->atualizarProgresso(1, 70.0)
+#1 C:\xampp\htdocs\artflow2\src\Services\VendaService.php(273): App\Repositories\MetaRepository->incrementarRealizado('2026-01-01', 70.0)
+#2 C:\xampp\htdocs\artflow2\src\Services\VendaService.php(141): App\Services\VendaService->atualizarMeta('2026-01-29', 70.0)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(128): App\Services\VendaService->registrar(Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->store(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-29 22:36:08] Error: Call to a member function getValor() on array in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:62
+Stack trace:
+#0 [internal function]: App\Controllers\VendaController->App\Controllers\{closure}(Array)
+#1 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(62): array_map(Object(Closure), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->index(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#6 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#7 {main}
+
+[2026-01-29 22:36:13] Error: Call to a member function getValor() on array in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:62
+Stack trace:
+#0 [internal function]: App\Controllers\VendaController->App\Controllers\{closure}(Array)
+#1 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(62): array_map(Object(Closure), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->index(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#6 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#7 {main}
+
+[2026-01-29 22:36:19] Error: Call to a member function getValor() on array in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:62
+Stack trace:
+#0 [internal function]: App\Controllers\VendaController->App\Controllers\{closure}(Array)
+#1 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(62): array_map(Object(Closure), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->index(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#6 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#7 {main}
+
+[2026-01-29 22:40:37] Error: Call to a member function getValor() on array in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:62
+Stack trace:
+#0 [internal function]: App\Controllers\VendaController->App\Controllers\{closure}(Array)
+#1 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(62): array_map(Object(Closure), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->index(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#6 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#7 {main}
+
+[2026-01-29 22:40:42] Error: Cannot use object of type App\Models\Cliente as array in C:\xampp\htdocs\artflow2\views\dashboard\index.php:160
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('dashboard/index', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\DashboardController.php(83): App\Controllers\BaseController->view('dashboard/index', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\DashboardController->index(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+

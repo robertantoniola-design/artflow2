@@ -4,11 +4,10 @@
  * GET /vendas/relatorio
  * 
  * Variáveis:
- * - $faturamento: Total faturado no período
  * - $vendasMensais: Array com vendas por mês
- * - $ranking: Ranking de rentabilidade
- * - $dataInicio: Data início do filtro
- * - $dataFim: Data fim do filtro
+ * - $estatisticas: Estatísticas gerais
+ * - $rankingRentabilidade: Top artes mais rentáveis
+ * - $filtros: Filtros aplicados
  */
 $currentPage = 'vendas';
 ?>
@@ -17,7 +16,7 @@ $currentPage = 'vendas';
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-1">
-            <i class="bi bi-bar-chart-line text-primary"></i> Relatório de Vendas
+            <i class="bi bi-graph-up text-primary"></i> Relatório de Vendas
         </h2>
         <p class="text-muted mb-0">Análise de performance e rentabilidade</p>
     </div>
@@ -26,174 +25,157 @@ $currentPage = 'vendas';
     </a>
 </div>
 
-<!-- Filtro de Período -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form action="<?= url('/vendas/relatorio') ?>" method="GET" class="row g-3 align-items-end">
-            <div class="col-md-4">
-                <label class="form-label">Data Início</label>
-                <input type="date" name="data_inicio" class="form-control" 
-                       value="<?= e($dataInicio) ?>">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Data Fim</label>
-                <input type="date" name="data_fim" class="form-control" 
-                       value="<?= e($dataFim) ?>">
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-funnel"></i> Filtrar
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <!-- Cards de Resumo -->
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="mb-1">Faturamento</h6>
-                        <h3 class="mb-0"><?= money($faturamento['total'] ?? 0) ?></h3>
-                    </div>
-                    <i class="bi bi-currency-dollar fs-1 opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
         <div class="card bg-primary text-white">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="mb-1">Total de Vendas</h6>
-                        <h3 class="mb-0"><?= $faturamento['quantidade'] ?? 0 ?></h3>
+                        <h6 class="opacity-75">Total Vendas</h6>
+                        <h3 class="mb-0"><?= $estatisticas['total'] ?? 0 ?></h3>
                     </div>
-                    <i class="bi bi-receipt fs-1 opacity-50"></i>
+                    <i class="bi bi-cart-check display-6 opacity-50"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="opacity-75">Faturamento</h6>
+                        <h3 class="mb-0"><?= money($estatisticas['valor_total'] ?? 0) ?></h3>
+                    </div>
+                    <i class="bi bi-currency-dollar display-6 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
         <div class="card bg-info text-white">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="mb-1">Ticket Médio</h6>
-                        <h3 class="mb-0"><?= money($faturamento['ticket_medio'] ?? 0) ?></h3>
+                        <h6 class="opacity-75">Lucro Total</h6>
+                        <h3 class="mb-0"><?= money($estatisticas['lucro_total'] ?? 0) ?></h3>
                     </div>
-                    <i class="bi bi-calculator fs-1 opacity-50"></i>
+                    <i class="bi bi-piggy-bank display-6 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="opacity-75">Ticket Médio</h6>
+                        <h3 class="mb-0"><?= money($estatisticas['ticket_medio'] ?? 0) ?></h3>
+                    </div>
+                    <i class="bi bi-receipt display-6 opacity-50"></i>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row g-4">
+<div class="row">
     <!-- Gráfico de Vendas Mensais -->
-    <div class="col-lg-8">
+    <div class="col-lg-8 mb-4">
         <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-graph-up text-primary"></i> Evolução Mensal
-                </h5>
+                <h6 class="mb-0">
+                    <i class="bi bi-bar-chart"></i> Vendas por Mês
+                </h6>
             </div>
             <div class="card-body">
                 <?php if (!empty($vendasMensais)): ?>
-                    <canvas id="vendasChart" height="300"></canvas>
-                <?php else: ?>
-                    <div class="text-center text-muted py-5">
-                        <i class="bi bi-bar-chart fs-1"></i>
-                        <p class="mt-2">Sem dados para exibir</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Mês</th>
+                                    <th class="text-center">Qtd</th>
+                                    <th class="text-end">Valor</th>
+                                    <th class="text-end">Lucro</th>
+                                    <th style="width: 40%">Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $maxValor = max(array_column($vendasMensais, 'total') ?: [1]);
+                                foreach ($vendasMensais as $mes): 
+                                    $percentual = $maxValor > 0 ? ($mes['total'] / $maxValor) * 100 : 0;
+                                ?>
+                                    <tr>
+                                        <td><?= $mes['mes_nome'] ?? $mes['mes'] ?? '-' ?></td>
+                                        <td class="text-center"><?= $mes['quantidade'] ?? 0 ?></td>
+                                        <td class="text-end"><?= money($mes['total'] ?? 0) ?></td>
+                                        <td class="text-end"><?= money($mes['lucro'] ?? 0) ?></td>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-success" 
+                                                     style="width: <?= $percentual ?>%">
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
                     </div>
+                <?php else: ?>
+                    <p class="text-muted text-center py-5">Nenhum dado de vendas disponível</p>
                 <?php endif; ?>
             </div>
         </div>
     </div>
     
     <!-- Ranking de Rentabilidade -->
-    <div class="col-lg-4">
+    <div class="col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="bi bi-trophy text-warning"></i> Mais Rentáveis
-                </h5>
+                <h6 class="mb-0">
+                    <i class="bi bi-trophy"></i> Top Artes Rentáveis
+                </h6>
             </div>
-            <div class="card-body p-0">
-                <?php if (!empty($ranking)): ?>
-                    <ul class="list-group list-group-flush">
-                        <?php foreach ($ranking as $index => $item): ?>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge bg-<?= $index < 3 ? 'warning' : 'secondary' ?> rounded-pill">
-                                        <?= $index + 1 ?>º
-                                    </span>
-                                    <span><?= e($item['nome'] ?? 'N/A') ?></span>
+            <div class="card-body">
+                <?php if (!empty($rankingRentabilidade)): ?>
+                    <ol class="list-group list-group-numbered">
+                        <?php foreach ($rankingRentabilidade as $item): ?>
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-bold">
+                                        <?= e($item['arte_nome'] ?? $item['nome'] ?? 'Arte') ?>
+                                    </div>
+                                    <small class="text-muted">
+                                        Vendida por <?= money($item['valor'] ?? 0) ?>
+                                    </small>
                                 </div>
-                                <div class="text-end">
-                                    <div class="text-success fw-bold"><?= money($item['lucro'] ?? 0) ?></div>
-                                    <small class="text-muted"><?= money($item['rentabilidade_hora'] ?? 0) ?>/h</small>
-                                </div>
+                                <span class="badge bg-success rounded-pill">
+                                    <?= money($item['rentabilidade_hora'] ?? 0) ?>/h
+                                </span>
                             </li>
                         <?php endforeach; ?>
-                    </ul>
+                    </ol>
                 <?php else: ?>
-                    <div class="text-center text-muted py-4">
-                        <i class="bi bi-trophy fs-1"></i>
-                        <p class="mt-2 mb-0">Nenhuma venda registrada</p>
-                    </div>
+                    <p class="text-muted text-center py-3">Nenhuma venda registrada</p>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Script do Gráfico -->
-<?php if (!empty($vendasMensais)): ?>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('vendasChart').getContext('2d');
-    const dados = <?= json_encode($vendasMensais) ?>;
-    
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: dados.map(d => d.mes),
-            datasets: [{
-                label: 'Faturamento',
-                data: dados.map(d => d.total),
-                backgroundColor: 'rgba(13, 110, 253, 0.7)',
-                borderColor: 'rgb(13, 110, 253)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return 'R$ ' + value.toLocaleString('pt-BR');
-                        }
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return 'R$ ' + context.raw.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                        }
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
-<?php endif; ?>
+<!-- Dicas -->
+<div class="card">
+    <div class="card-body">
+        <h6><i class="bi bi-lightbulb text-warning"></i> Dicas de Análise</h6>
+        <ul class="mb-0">
+            <li><strong>Rentabilidade/Hora</strong>: Indica quanto você ganha por hora trabalhada. Artes com alta rentabilidade são mais lucrativas.</li>
+            <li><strong>Ticket Médio</strong>: Valor médio por venda. Tente aumentá-lo oferecendo artes de maior valor.</li>
+            <li><strong>Lucro</strong>: Considere seus custos de material ao definir preços.</li>
+        </ul>
+    </div>
+</div>

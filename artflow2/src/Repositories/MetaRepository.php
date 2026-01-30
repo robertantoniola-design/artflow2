@@ -12,29 +12,15 @@ use PDO;
  * ============================================
  * 
  * Gerencia acesso a dados de metas mensais.
- * Metas são objetivos financeiros por mês/ano.
  * 
- * Principais operações:
- * - CRUD padrão (herdado)
- * - Busca por mês/ano
- * - Atualização de progresso
- * - Estatísticas de desempenho
+ * CORREÇÃO (29/01/2026):
+ * - Método atualizarProgresso() agora retorna bool corretamente
+ * - update() do BaseRepository retorna objeto, então convertemos para bool
  */
 class MetaRepository extends BaseRepository
 {
-    /**
-     * Tabela do banco de dados
-     */
     protected string $table = 'metas';
-    
-    /**
-     * Classe do Model
-     */
     protected string $model = Meta::class;
-    
-    /**
-     * Campos permitidos para mass assignment
-     */
     protected array $fillable = [
         'mes_ano',
         'valor_meta',
@@ -50,47 +36,33 @@ class MetaRepository extends BaseRepository
     
     /**
      * Busca meta por mês/ano
-     * 
-     * @param string $mesAno Formato: 'YYYY-MM-01' ou 'YYYY-MM'
-     * @return Meta|null
      */
     public function findByMesAno(string $mesAno): ?Meta
     {
-        // Normaliza formato para YYYY-MM-01
         if (strlen($mesAno) === 7) {
             $mesAno .= '-01';
         }
-        
         return $this->findFirstBy('mes_ano', $mesAno);
     }
     
     /**
      * Busca meta do mês atual
-     * 
-     * @return Meta|null
      */
     public function findMesAtual(): ?Meta
     {
-        $mesAno = date('Y-m-01');
-        return $this->findByMesAno($mesAno);
+        return $this->findByMesAno(date('Y-m-01'));
     }
     
     /**
      * Busca meta do mês anterior
-     * 
-     * @return Meta|null
      */
     public function findMesAnterior(): ?Meta
     {
-        $mesAno = date('Y-m-01', strtotime('-1 month'));
-        return $this->findByMesAno($mesAno);
+        return $this->findByMesAno(date('Y-m-01', strtotime('-1 month')));
     }
     
     /**
      * Lista metas de um ano específico
-     * 
-     * @param int $ano
-     * @return array
      */
     public function findByAno(int $ano): array
     {
@@ -105,10 +77,7 @@ class MetaRepository extends BaseRepository
     }
     
     /**
-     * Lista últimas N metas (mais recentes primeiro)
-     * 
-     * @param int $limit
-     * @return array
+     * Lista últimas N metas
      */
     public function getRecentes(int $limit = 12): array
     {
@@ -130,6 +99,10 @@ class MetaRepository extends BaseRepository
     /**
      * Atualiza valor realizado e recalcula porcentagem
      * 
+     * CORREÇÃO: Retorna bool explicitamente, não o resultado de update()
+     * O método update() do BaseRepository retorna o objeto Meta,
+     * mas a assinatura deste método promete retornar bool.
+     * 
      * @param int $id
      * @param float $valorRealizado
      * @return bool
@@ -147,18 +120,30 @@ class MetaRepository extends BaseRepository
             ? ($valorRealizado / $meta->getValorMeta()) * 100 
             : 0;
         
-        return $this->update($id, [
-            'valor_realizado' => $valorRealizado,
-            'porcentagem_atingida' => round($porcentagem, 2)
-        ]);
+        // CORREÇÃO: Usa SQL direto para garantir retorno bool
+        // Isso evita conflito com o return type do update() herdado
+        try {
+            $sql = "UPDATE {$this->table} 
+                    SET valor_realizado = :valor, 
+                        porcentagem_atingida = :porcentagem,
+                        updated_at = NOW()
+                    WHERE id = :id";
+            
+            $stmt = $this->getConnection()->prepare($sql);
+            $stmt->execute([
+                'valor' => round($valorRealizado, 2),
+                'porcentagem' => round($porcentagem, 2),
+                'id' => $id
+            ]);
+            
+            return $stmt->rowCount() > 0;
+        } catch (\PDOException $e) {
+            return false;
+        }
     }
     
     /**
      * Incrementa valor realizado (adiciona venda à meta)
-     * 
-     * @param string $mesAno
-     * @param float $valor
-     * @return bool
      */
     public function incrementarRealizado(string $mesAno, float $valor): bool
     {
@@ -173,10 +158,6 @@ class MetaRepository extends BaseRepository
     
     /**
      * Decrementa valor realizado (remove venda da meta)
-     * 
-     * @param string $mesAno
-     * @param float $valor
-     * @return bool
      */
     public function decrementarRealizado(string $mesAno, float $valor): bool
     {
@@ -190,13 +171,11 @@ class MetaRepository extends BaseRepository
     }
     
     // ==========================================
-    // ESTATÍSTICAS E ANÁLISES
+    // ESTATÍSTICAS
     // ==========================================
     
     /**
      * Retorna estatísticas gerais de metas
-     * 
-     * @return array
      */
     public function getEstatisticas(): array
     {
@@ -212,13 +191,13 @@ class MetaRepository extends BaseRepository
         $result = $this->getConnection()->query($sql)->fetch(PDO::FETCH_ASSOC);
         
         return [
-            'total_metas' => (int) $result['total_metas'],
-            'metas_atingidas' => (int) $result['metas_atingidas'],
-            'metas_nao_atingidas' => (int) $result['metas_nao_atingidas'],
-            'media_porcentagem' => round((float) $result['media_porcentagem'], 2),
-            'soma_metas' => (float) $result['soma_metas'],
-            'soma_realizado' => (float) $result['soma_realizado'],
-            'taxa_sucesso' => $result['total_metas'] > 0 
+            'total_metas' => (int) ($result['total_metas'] ?? 0),
+            'metas_atingidas' => (int) ($result['metas_atingidas'] ?? 0),
+            'metas_nao_atingidas' => (int) ($result['metas_nao_atingidas'] ?? 0),
+            'media_porcentagem' => round((float) ($result['media_porcentagem'] ?? 0), 2),
+            'soma_metas' => (float) ($result['soma_metas'] ?? 0),
+            'soma_realizado' => (float) ($result['soma_realizado'] ?? 0),
+            'taxa_sucesso' => ($result['total_metas'] ?? 0) > 0 
                 ? round(($result['metas_atingidas'] / $result['total_metas']) * 100, 2) 
                 : 0
         ];
@@ -226,9 +205,6 @@ class MetaRepository extends BaseRepository
     
     /**
      * Retorna desempenho mensal para gráfico
-     * 
-     * @param int $meses Quantidade de meses
-     * @return array
      */
     public function getDesempenhoMensal(int $meses = 12): array
     {
@@ -245,17 +221,11 @@ class MetaRepository extends BaseRepository
         $stmt->bindValue(':meses', $meses, PDO::PARAM_INT);
         $stmt->execute();
         
-        $resultados = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Inverte para ordem cronológica (mais antigo primeiro)
-        return array_reverse($resultados);
+        return array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
     
     /**
      * Verifica se existe meta para determinado mês/ano
-     * 
-     * @param string $mesAno
-     * @return bool
      */
     public function existsMesAno(string $mesAno): bool
     {
@@ -272,10 +242,6 @@ class MetaRepository extends BaseRepository
     
     /**
      * Cria meta se não existir, ou retorna existente
-     * 
-     * @param string $mesAno
-     * @param array $dados Dados padrão caso precise criar
-     * @return Meta
      */
     public function findOrCreate(string $mesAno, array $dados = []): Meta
     {
@@ -285,12 +251,10 @@ class MetaRepository extends BaseRepository
             return $meta;
         }
         
-        // Normaliza formato
         if (strlen($mesAno) === 7) {
             $mesAno .= '-01';
         }
         
-        // Dados padrão se não fornecidos
         $dadosPadrao = [
             'mes_ano' => $mesAno,
             'valor_meta' => $dados['valor_meta'] ?? 0,

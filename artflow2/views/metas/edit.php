@@ -5,14 +5,25 @@
  * 
  * Variáveis:
  * - $meta: Objeto Meta para edição
- * - $mesAno: Data no formato Y-m-d para o mês
  * 
  * CORREÇÃO (29/01/2026): 
  * - Campo CSRF padronizado para _token
  * - URLs usando helper url()
+ * - Verificação de métodos do Model
  */
 $currentPage = 'metas';
+
+// Obtém mês/ano da meta
 $mesAno = $meta->getMesAno();
+$mesFormatado = date('F/Y', strtotime($mesAno));
+
+// Calcula porcentagem
+$porcentagem = 0;
+if (method_exists($meta, 'getPorcentagemAtingida')) {
+    $porcentagem = $meta->getPorcentagemAtingida();
+} elseif ($meta->getValorMeta() > 0) {
+    $porcentagem = ($meta->getValorRealizado() / $meta->getValorMeta()) * 100;
+}
 ?>
 
 <!-- Header -->
@@ -21,7 +32,7 @@ $mesAno = $meta->getMesAno();
         <h2 class="mb-1">
             <i class="bi bi-pencil text-primary"></i> Editar Meta
         </h2>
-        <p class="text-muted mb-0"><?= date('F/Y', strtotime($mesAno)) ?></p>
+        <p class="text-muted mb-0"><?= $mesFormatado ?></p>
     </div>
     <a href="<?= url('/metas') ?>" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Voltar
@@ -34,10 +45,10 @@ $mesAno = $meta->getMesAno();
         <div class="card mb-4">
             <div class="card-body">
                 <h6 class="text-muted mb-2">Progresso Atual</h6>
-                <div class="progress mb-2" style="height: 20px;">
-                    <div class="progress-bar bg-<?= $meta->getPorcentagemAtingida() >= 100 ? 'success' : 'primary' ?>" 
-                         style="width: <?= min($meta->getPorcentagemAtingida(), 100) ?>%">
-                        <?= number_format($meta->getPorcentagemAtingida(), 1) ?>%
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar <?= $porcentagem >= 100 ? 'bg-success' : 'bg-primary' ?>" 
+                         style="width: <?= min($porcentagem, 100) ?>%">
+                        <?= number_format($porcentagem, 1) ?>%
                     </div>
                 </div>
                 <div class="d-flex justify-content-between small text-muted">
@@ -64,7 +75,9 @@ $mesAno = $meta->getMesAno();
                     <div class="mb-3">
                         <label class="form-label">Mês/Ano</label>
                         <input type="text" class="form-control" 
-                               value="<?= date('m/Y', strtotime($mesAno)) ?>" readonly disabled>
+                               value="<?= date('m/Y', strtotime($mesAno)) ?>" 
+                               readonly 
+                               disabled>
                         <small class="text-muted">O período não pode ser alterado</small>
                     </div>
                     
@@ -163,18 +176,21 @@ $mesAno = $meta->getMesAno();
                 </div>
                 <div class="mb-3">
                     <label class="text-muted small">Falta para Meta</label>
-                    <h5 class="<?= $meta->getValorFaltante() <= 0 ? 'text-success' : 'text-warning' ?>">
-                        <?= money(max(0, $meta->getValorFaltante())) ?>
+                    <?php 
+                    $faltante = $meta->getValorMeta() - $meta->getValorRealizado();
+                    ?>
+                    <h5 class="<?= $faltante <= 0 ? 'text-success' : 'text-warning' ?>">
+                        <?= money(max(0, $faltante)) ?>
                     </h5>
                 </div>
                 <div>
                     <label class="text-muted small">Status</label>
                     <p class="mb-0">
-                        <?php if ($meta->getPorcentagemAtingida() >= 100): ?>
+                        <?php if ($porcentagem >= 100): ?>
                             <span class="badge bg-success">Meta Atingida! 🎉</span>
-                        <?php elseif ($meta->getPorcentagemAtingida() >= 75): ?>
+                        <?php elseif ($porcentagem >= 75): ?>
                             <span class="badge bg-info">Quase lá!</span>
-                        <?php elseif ($meta->getPorcentagemAtingida() >= 50): ?>
+                        <?php elseif ($porcentagem >= 50): ?>
                             <span class="badge bg-primary">Em progresso</span>
                         <?php else: ?>
                             <span class="badge bg-secondary">Iniciando</span>
@@ -195,7 +211,7 @@ $mesAno = $meta->getMesAno();
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Tem certeza que deseja excluir a meta de <strong><?= date('F/Y', strtotime($mesAno)) ?></strong>?</p>
+                <p>Tem certeza que deseja excluir a meta de <strong><?= $mesFormatado ?></strong>?</p>
                 <p class="text-muted mb-0">As vendas do período não serão afetadas.</p>
             </div>
             <div class="modal-footer">

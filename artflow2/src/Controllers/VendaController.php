@@ -15,11 +15,10 @@ use App\Exceptions\NotFoundException;
  * VENDA CONTROLLER
  * ============================================
  * 
- * Controller responsável pelas operações de Vendas.
- * 
- * CORREÇÃO (29/01/2026):
- * - Método create() agora passa variáveis com nomes corretos
- *   para a view (artesDisponiveis, clientesSelect)
+ * CORREÇÕES (29/01/2026):
+ * - index(): Verificação segura se $vendas são objetos ou arrays
+ * - create(): Passa variáveis corretas para a view
+ * - relatorio(): Usa métodos existentes do Service
  */
 class VendaController extends BaseController
 {
@@ -40,6 +39,8 @@ class VendaController extends BaseController
     /**
      * Lista todas as vendas
      * GET /vendas
+     * 
+     * CORREÇÃO: Verificação segura ao calcular resumo
      */
     public function index(Request $request): Response
     {
@@ -53,10 +54,36 @@ class VendaController extends BaseController
         $vendas = $this->vendaService->listar($filtros);
         $estatisticas = $this->vendaService->getEstatisticas();
         
+        // Clientes para filtro
+        $clientesSelect = $this->clienteService->getParaSelect();
+        
+        // CORREÇÃO: Verificação segura - $vendas pode conter objetos ou arrays
+        $valorTotal = 0;
+        $lucroTotal = 0;
+        
+        foreach ($vendas as $venda) {
+            // Verifica se é objeto ou array
+            if (is_object($venda)) {
+                $valorTotal += $venda->getValor();
+                $lucroTotal += $venda->getLucroCalculado() ?? 0;
+            } elseif (is_array($venda)) {
+                $valorTotal += $venda['valor'] ?? 0;
+                $lucroTotal += $venda['lucro_calculado'] ?? 0;
+            }
+        }
+        
+        $resumo = [
+            'total_vendas' => count($vendas),
+            'valor_total' => $valorTotal,
+            'lucro_total' => $lucroTotal
+        ];
+        
         if ($request->wantsJson()) {
             return $this->json([
                 'success' => true,
-                'data' => array_map(fn($v) => $v->toArray(), $vendas),
+                'data' => array_map(function($v) {
+                    return is_object($v) ? $v->toArray() : $v;
+                }, $vendas),
                 'estatisticas' => $estatisticas
             ]);
         }
@@ -65,6 +92,8 @@ class VendaController extends BaseController
             'titulo' => 'Vendas',
             'vendas' => $vendas,
             'estatisticas' => $estatisticas,
+            'clientesSelect' => $clientesSelect,
+            'resumo' => $resumo,
             'filtros' => $filtros
         ]);
     }
@@ -72,32 +101,21 @@ class VendaController extends BaseController
     /**
      * Formulário de nova venda
      * GET /vendas/criar
-     * 
-     * CORREÇÃO: Variáveis passadas com nomes que a view espera:
-     * - artesDisponiveis (antes: artes)
-     * - clientesSelect (antes: clientes)
      */
     public function create(Request $request): Response
     {
-        // Artes disponíveis para venda (status = disponivel)
         $artesDisponiveis = $this->arteService->getDisponiveisParaVenda();
-        
-        // Clientes para o select (formato id => nome)
         $clientesSelect = $this->clienteService->getParaSelect();
         
-        // Se veio de uma arte específica (link "vender" na lista de artes)
         $arteSelecionada = $request->get('arte_id');
+        $clienteSelecionado = $request->get('cliente_id');
         
         return $this->view('vendas/create', [
             'titulo' => 'Registrar Venda',
-            // CORREÇÃO: Nomes das variáveis conforme a view espera
             'artesDisponiveis' => $artesDisponiveis,
             'clientesSelect' => $clientesSelect,
             'arteSelecionada' => $arteSelecionada,
-            // Também mantém os nomes antigos para compatibilidade
-            'artes' => $artesDisponiveis,
-            'clientes' => $clientesSelect,
-            'arteIdSelecionada' => $arteSelecionada
+            'clienteSelecionado' => $clienteSelecionado
         ]);
     }
     
@@ -112,7 +130,6 @@ class VendaController extends BaseController
         try {
             $dados = $request->only(['arte_id', 'cliente_id', 'valor', 'data_venda']);
             
-            // Data padrão = hoje
             if (empty($dados['data_venda'])) {
                 $dados['data_venda'] = date('Y-m-d');
             }
@@ -127,7 +144,7 @@ class VendaController extends BaseController
                 ]);
             }
             
-            $this->flashSuccess('Venda registrada com sucesso! Lucro: R$ ' . number_format($venda->getLucroCalculado(), 2, ',', '.'));
+            $this->flashSuccess('Venda registrada! Lucro: R$ ' . number_format($venda->getLucroCalculado(), 2, ',', '.'));
             return $this->redirectTo('/vendas');
             
         } catch (ValidationException $e) {
@@ -135,7 +152,6 @@ class VendaController extends BaseController
                 return $this->error('Erro de validação', 422, $e->getErrors());
             }
             
-            // Salva erros e input antigo na sessão
             $_SESSION['_errors'] = $e->getErrors();
             $_SESSION['_old_input'] = $request->all();
             
@@ -157,7 +173,7 @@ class VendaController extends BaseController
             }
             
             return $this->view('vendas/show', [
-                'titulo' => 'Detalhes da Venda #' . $id,
+                'titulo' => 'Venda #' . $id,
                 'venda' => $venda
             ]);
             
@@ -179,8 +195,7 @@ class VendaController extends BaseController
             return $this->view('vendas/edit', [
                 'titulo' => 'Editar Venda #' . $id,
                 'venda' => $venda,
-                'clientesSelect' => $clientesSelect,
-                'clientes' => $clientesSelect // compatibilidade
+                'clientesSelect' => $clientesSelect
             ]);
             
         } catch (NotFoundException $e) {
@@ -205,7 +220,7 @@ class VendaController extends BaseController
                 return $this->success('Venda atualizada!');
             }
             
-            $this->flashSuccess('Venda atualizada com sucesso!');
+            $this->flashSuccess('Venda atualizada!');
             return $this->redirectTo('/vendas/' . $id);
             
         } catch (ValidationException $e) {
@@ -239,7 +254,7 @@ class VendaController extends BaseController
                 return $this->success('Venda excluída!');
             }
             
-            $this->flashSuccess('Venda excluída com sucesso!');
+            $this->flashSuccess('Venda excluída!');
             return $this->redirectTo('/vendas');
             
         } catch (NotFoundException $e) {
@@ -255,15 +270,23 @@ class VendaController extends BaseController
     /**
      * Relatório de vendas
      * GET /vendas/relatorio
+     * 
+     * CORREÇÃO: Usa métodos existentes do Service
      */
     public function relatorio(Request $request): Response
     {
-        $filtros = [
-            'mes' => $request->get('mes', date('Y-m')),
-            'ano' => $request->get('ano', date('Y'))
-        ];
+        $mes = $request->get('mes', date('Y-m'));
+        $ano = $request->get('ano', date('Y'));
         
-        $relatorio = $this->vendaService->gerarRelatorio($filtros);
+        $vendasMensais = $this->vendaService->getVendasMensais(12);
+        $estatisticas = $this->vendaService->getEstatisticas();
+        $rankingRentabilidade = $this->vendaService->getRankingRentabilidade(10);
+        
+        $relatorio = [
+            'vendas_mensais' => $vendasMensais,
+            'estatisticas' => $estatisticas,
+            'ranking_rentabilidade' => $rankingRentabilidade
+        ];
         
         if ($request->wantsJson()) {
             return $this->json(['success' => true, 'data' => $relatorio]);
@@ -272,7 +295,10 @@ class VendaController extends BaseController
         return $this->view('vendas/relatorio', [
             'titulo' => 'Relatório de Vendas',
             'relatorio' => $relatorio,
-            'filtros' => $filtros
+            'vendasMensais' => $vendasMensais,
+            'estatisticas' => $estatisticas,
+            'rankingRentabilidade' => $rankingRentabilidade,
+            'filtros' => ['mes' => $mes, 'ano' => $ano]
         ]);
     }
 }
