@@ -1,17 +1,21 @@
 <?php
-
 /**
  * ============================================
- * FUNÇÕES HELPERS GLOBAIS
+ * FUNÇÕES AUXILIARES GLOBAIS
  * ============================================
  * 
- * Funções utilitárias disponíveis em qualquer lugar da aplicação.
- * Carregadas automaticamente via composer (autoload files).
+ * Funções helper disponíveis em toda a aplicação.
+ * Carregadas automaticamente pelo Composer (autoload.files)
+ * 
+ * CORREÇÃO (29/01/2026):
+ * - csrf_field() agora usa _token (padronizado)
+ * - Mantém compatibilidade com o BaseController corrigido
  */
 
 use App\Core\Application;
-use App\Core\View;
 use App\Core\Response;
+use App\Core\View;
+use App\Core\Request;
 
 // ==========================================
 // HELPERS DE APLICAÇÃO
@@ -19,9 +23,9 @@ use App\Core\Response;
 
 if (!function_exists('app')) {
     /**
-     * Obtém instância da aplicação ou resolve do container
+     * Obtém instância da aplicação ou serviço do container
      * 
-     * @param string|null $abstract Classe a resolver
+     * @param string|null $abstract
      * @return mixed
      */
     function app(?string $abstract = null)
@@ -46,28 +50,15 @@ if (!function_exists('env')) {
      */
     function env(string $key, $default = null)
     {
-        $value = $_ENV[$key] ?? getenv($key);
-        
-        if ($value === false) {
-            return $default;
-        }
-        
-        // Converte valores especiais
-        return match (strtolower($value)) {
-            'true', '(true)' => true,
-            'false', '(false)' => false,
-            'null', '(null)' => null,
-            'empty', '(empty)' => '',
-            default => $value
-        };
+        return $_ENV[$key] ?? $default;
     }
 }
 
 if (!function_exists('config')) {
     /**
-     * Obtém valor de configuração
+     * Obtém configuração
      * 
-     * @param string $key Chave no formato 'arquivo.chave'
+     * @param string $key Formato: 'arquivo.chave' ou 'arquivo'
      * @param mixed $default
      * @return mixed
      */
@@ -75,13 +66,13 @@ if (!function_exists('config')) {
     {
         static $configs = [];
         
-        $parts = explode('.', $key, 2);
+        $parts = explode('.', $key);
         $file = $parts[0];
         $configKey = $parts[1] ?? null;
         
-        // Carrega arquivo de configuração se ainda não carregado
+        // Carrega arquivo se não estiver em cache
         if (!isset($configs[$file])) {
-            $path = app()->getBasePath() . "/config/{$file}.php";
+            $path = base_path("config/{$file}.php");
             $configs[$file] = file_exists($path) ? require $path : [];
         }
         
@@ -303,6 +294,10 @@ if (!function_exists('flash')) {
      */
     function flash(?string $key = null)
     {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
         // Se não passou key, retorna todas as flash messages
         if ($key === null) {
             $flash = $_SESSION['_flash'] ?? null;
@@ -319,7 +314,7 @@ if (!function_exists('flash')) {
 
 if (!function_exists('old')) {
     /**
-     * Obtém valor antigo do input (para repopular forms)
+     * Obtém valor antigo do formulário (após erro de validação)
      * 
      * @param string $key
      * @param mixed $default
@@ -327,128 +322,45 @@ if (!function_exists('old')) {
      */
     function old(string $key, $default = '')
     {
-        return $_SESSION['_flash']['old'][$key] ?? $default;
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        return $_SESSION['_old_input'][$key] ?? $default;
     }
 }
 
 if (!function_exists('errors')) {
     /**
-     * Obtém erros de validação
+     * Obtém erro de validação para um campo
      * 
-     * @param string|null $key
-     * @return mixed
+     * @param string $key
+     * @return string|null
      */
-    function errors(?string $key = null)
+    function errors(string $key): ?string
     {
-        $errors = $_SESSION['_flash']['errors'] ?? [];
-        
-        if ($key === null) {
-            return $errors;
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
         }
         
-        return $errors[$key] ?? null;
+        return $_SESSION['_errors'][$key] ?? null;
     }
 }
 
 if (!function_exists('has_error')) {
     /**
-     * Verifica se campo tem erro
+     * Verifica se campo tem erro de validação
      * 
      * @param string $key
      * @return bool
      */
     function has_error(string $key): bool
     {
-        return isset($_SESSION['_flash']['errors'][$key]);
-    }
-}
-
-// ==========================================
-// HELPERS DE DEBUG
-// ==========================================
-
-if (!function_exists('dd')) {
-    /**
-     * Dump and die - imprime e para execução
-     * 
-     * @param mixed ...$vars
-     */
-    function dd(...$vars): void
-    {
-        echo "<pre style='background:#1e1e1e;color:#d4d4d4;padding:20px;margin:10px;border-radius:8px;font-size:14px;'>";
-        foreach ($vars as $var) {
-            var_dump($var);
-            echo "\n";
-        }
-        echo "</pre>";
-        exit;
-    }
-}
-
-if (!function_exists('dump')) {
-    /**
-     * Dump - imprime sem parar execução
-     * 
-     * @param mixed ...$vars
-     */
-    function dump(...$vars): void
-    {
-        echo "<pre style='background:#1e1e1e;color:#d4d4d4;padding:20px;margin:10px;border-radius:8px;font-size:14px;'>";
-        foreach ($vars as $var) {
-            var_dump($var);
-            echo "\n";
-        }
-        echo "</pre>";
-    }
-}
-
-// ==========================================
-// HELPERS DE STRING
-// ==========================================
-
-if (!function_exists('str_slug')) {
-    /**
-     * Converte string para slug (URL amigável)
-     * 
-     * @param string $text
-     * @param string $separator
-     * @return string
-     */
-    function str_slug(string $text, string $separator = '-'): string
-    {
-        // Remove acentos
-        $text = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-        
-        // Converte para minúsculas
-        $text = strtolower($text);
-        
-        // Remove caracteres especiais
-        $text = preg_replace('/[^a-z0-9\-\s]/', '', $text);
-        
-        // Substitui espaços por separador
-        $text = preg_replace('/[\s\-]+/', $separator, $text);
-        
-        // Remove separadores do início e fim
-        return trim($text, $separator);
-    }
-}
-
-if (!function_exists('str_limit')) {
-    /**
-     * Limita tamanho da string
-     * 
-     * @param string $text
-     * @param int $limit
-     * @param string $end
-     * @return string
-     */
-    function str_limit(string $text, int $limit = 100, string $end = '...'): string
-    {
-        if (mb_strlen($text) <= $limit) {
-            return $text;
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
         }
         
-        return mb_substr($text, 0, $limit) . $end;
+        return isset($_SESSION['_errors'][$key]);
     }
 }
 
@@ -480,11 +392,15 @@ if (!function_exists('csrf_field')) {
     /**
      * Gera campo hidden com token CSRF
      * 
+     * CORREÇÃO: Agora usa _token (padrão) em vez de _csrf
+     * Isso garante compatibilidade total com o BaseController
+     * 
      * @return string
      */
     function csrf_field(): string
     {
-        return '<input type="hidden" name="_csrf" value="' . csrf_token() . '">';
+        // CORREÇÃO: Usa _token como nome do campo (padrão)
+        return '<input type="hidden" name="_token" value="' . csrf_token() . '">';
     }
 }
 
@@ -502,5 +418,116 @@ if (!function_exists('verify_csrf')) {
         }
         
         return isset($_SESSION['_csrf_token']) && hash_equals($_SESSION['_csrf_token'], $token);
+    }
+}
+
+// ==========================================
+// HELPERS DE DEBUG
+// ==========================================
+
+if (!function_exists('dd')) {
+    /**
+     * Dump and die - para debug
+     * 
+     * @param mixed ...$vars
+     */
+    function dd(...$vars): void
+    {
+        echo '<pre style="background:#1e1e1e;color:#dcdcdc;padding:15px;margin:10px;border-radius:5px;font-family:monospace;">';
+        foreach ($vars as $var) {
+            var_dump($var);
+            echo "\n---\n";
+        }
+        echo '</pre>';
+        die();
+    }
+}
+
+if (!function_exists('dump')) {
+    /**
+     * Dump sem die - para debug
+     * 
+     * @param mixed ...$vars
+     */
+    function dump(...$vars): void
+    {
+        echo '<pre style="background:#1e1e1e;color:#dcdcdc;padding:15px;margin:10px;border-radius:5px;font-family:monospace;">';
+        foreach ($vars as $var) {
+            var_dump($var);
+            echo "\n---\n";
+        }
+        echo '</pre>';
+    }
+}
+
+if (!function_exists('logger')) {
+    /**
+     * Log simples para arquivo
+     * 
+     * @param string $message
+     * @param string $level
+     */
+    function logger(string $message, string $level = 'info'): void
+    {
+        $logFile = storage_path('logs/app.log');
+        $logDir = dirname($logFile);
+        
+        if (!is_dir($logDir)) {
+            mkdir($logDir, 0755, true);
+        }
+        
+        $timestamp = date('Y-m-d H:i:s');
+        $formattedMessage = "[{$timestamp}] [{$level}] {$message}" . PHP_EOL;
+        
+        file_put_contents($logFile, $formattedMessage, FILE_APPEND);
+    }
+}
+
+// ==========================================
+// HELPERS DE TEXTO
+// ==========================================
+
+if (!function_exists('str_limit')) {
+    /**
+     * Limita string a um número de caracteres
+     * 
+     * @param string|null $value
+     * @param int $limit
+     * @param string $end
+     * @return string
+     */
+    function str_limit(?string $value, int $limit = 100, string $end = '...'): string
+    {
+        if ($value === null) {
+            return '';
+        }
+        
+        if (mb_strlen($value) <= $limit) {
+            return $value;
+        }
+        
+        return mb_substr($value, 0, $limit) . $end;
+    }
+}
+
+if (!function_exists('slug')) {
+    /**
+     * Gera slug a partir de string
+     * 
+     * @param string $value
+     * @return string
+     */
+    function slug(string $value): string
+    {
+        // Remove acentos
+        $slug = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+        // Converte para minúsculas
+        $slug = strtolower($slug);
+        // Remove caracteres especiais
+        $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
+        // Substitui espaços por hífens
+        $slug = preg_replace('/[\s-]+/', '-', $slug);
+        // Remove hífens do início e fim
+        return trim($slug, '-');
     }
 }

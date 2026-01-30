@@ -443,3 +443,136 @@ Stack trace:
 #9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #10 {main}
 
+[2026-01-26 22:30:42] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\create.php:160
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 22:30:42] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\create.php:160
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 22:33:23] Error: Cannot use object of type App\Models\Tag as array in C:\xampp\htdocs\artflow2\views\artes\create.php:160
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 22:41:49] Error: Cannot use object of type Closure as array in C:\xampp\htdocs\artflow2\views\artes\create.php:98
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-26 22:41:58] Error: Cannot use object of type Closure as array in C:\xampp\htdocs\artflow2\views\artes\create.php:98
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-27 10:18:43] Error: Cannot use object of type Closure as array in C:\xampp\htdocs\artflow2\views\artes\create.php:98
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-27 10:19:20] Error: Cannot use object of type Closure as array in C:\xampp\htdocs\artflow2\views\artes\create.php:98
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\View.php(147): App\Core\View::render('artes/create', Array, 'layouts/main')
+#3 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(41): App\Core\View::make('artes/create', Array, 'layouts/main')
+#4 C:\xampp\htdocs\artflow2\src\Controllers\ArteController.php(91): App\Controllers\BaseController->view('artes/create', Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\ArteController->create(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#7 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#8 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#9 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#10 {main}
+
+[2026-01-29 22:12:44] TypeError: Cannot access offset of type string on string in C:\xampp\htdocs\artflow2\views\vendas\create.php:68
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('vendas/create', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(91): App\Controllers\BaseController->view('vendas/create', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->create(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-01-29 22:14:28] Error: Call to undefined method App\Services\VendaService::gerarRelatorio() in C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php:266
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->relatorio(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-01-29 22:15:18] TypeError: Cannot access offset of type string on string in C:\xampp\htdocs\artflow2\views\vendas\create.php:68
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('vendas/create', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\VendaController.php(91): App\Controllers\BaseController->view('vendas/create', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\VendaController->create(Object(App\Core\Request))
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+

@@ -11,20 +11,15 @@ use App\Core\View;
  * BASE CONTROLLER
  * ============================================
  * 
- * Classe base para todos os controllers.
- * Fornece métodos auxiliares para renderização,
- * redirecionamento e respostas JSON.
+ * Controller base com métodos utilitários.
+ * Todos os controllers herdam desta classe.
  * 
- * Controllers específicos herdam desta classe:
- * class ArteController extends BaseController { ... }
+ * CORREÇÃO (29/01/2026):
+ * - validateCsrf() agora aceita _csrf, _token e csrf_token
+ * - Garante compatibilidade com todas as views
  */
 abstract class BaseController
 {
-    /**
-     * Layout padrão para views
-     */
-    protected ?string $layout = 'layouts/main';
-    
     // ==========================================
     // MÉTODOS DE RENDERIZAÇÃO
     // ==========================================
@@ -32,41 +27,25 @@ abstract class BaseController
     /**
      * Renderiza uma view
      * 
-     * @param string $view Caminho da view (ex: 'artes/index')
+     * @param string $view Nome da view (ex: 'artes/index')
      * @param array $data Dados para a view
      * @return Response
      */
     protected function view(string $view, array $data = []): Response
     {
-        return View::make($view, $data, $this->layout);
+        $content = View::render($view, $data);
+        return new Response($content);
     }
-    
-    /**
-     * Renderiza view sem layout
-     * 
-     * @param string $view
-     * @param array $data
-     * @return Response
-     */
-    protected function partial(string $view, array $data = []): Response
-    {
-        return View::make($view, $data, false);
-    }
-    
-    // ==========================================
-    // MÉTODOS DE REDIRECIONAMENTO
-    // ==========================================
     
     /**
      * Redireciona para URL
      * 
      * @param string $url
-     * @param int $status
      * @return Response
      */
-    protected function redirect(string $url, int $status = 302): Response
+    protected function redirect(string $url): Response
     {
-        return (new Response())->redirect($url, $status);
+        return (new Response())->redirect($url);
     }
     
     /**
@@ -78,7 +57,7 @@ abstract class BaseController
      */
     protected function redirectTo(string $path, array $params = []): Response
     {
-        $url = View::url($path);
+        $url = url($path);
         
         if (!empty($params)) {
             $url .= '?' . http_build_query($params);
@@ -163,6 +142,16 @@ abstract class BaseController
     }
     
     /**
+     * Define mensagem de aviso
+     * 
+     * @param string $message
+     */
+    protected function flashWarning(string $message): void
+    {
+        $this->flash('warning', $message);
+    }
+    
+    /**
      * Define flash message genérica
      * 
      * @param string $key
@@ -195,14 +184,26 @@ abstract class BaseController
     /**
      * Valida CSRF token
      * 
+     * CORREÇÃO: Agora aceita múltiplos nomes de campo para compatibilidade:
+     * - _token (padrão recomendado)
+     * - _csrf (usado em algumas views)
+     * - csrf_token (alternativo)
+     * 
      * @param Request $request
      * @return bool
      */
     protected function validateCsrf(Request $request): bool
     {
-        $token = $request->get('_token') ?? $request->get('csrf_token');
+        // CORREÇÃO: Busca token em múltiplos campos possíveis
+        // Ordem de prioridade: _token > _csrf > csrf_token
+        $token = $request->get('_token') 
+              ?? $request->get('_csrf') 
+              ?? $request->get('csrf_token');
+        
+        // Obtém token da sessão
         $sessionToken = $_SESSION['_csrf_token'] ?? null;
         
+        // Valida: ambos devem existir e ser iguais (timing-safe)
         return $token && $sessionToken && hash_equals($sessionToken, $token);
     }
     
@@ -213,6 +214,10 @@ abstract class BaseController
      */
     protected function generateCsrfToken(): string
     {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
         $token = bin2hex(random_bytes(32));
         $_SESSION['_csrf_token'] = $token;
         
@@ -226,6 +231,10 @@ abstract class BaseController
      */
     protected function getCsrfToken(): string
     {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
         if (!isset($_SESSION['_csrf_token'])) {
             return $this->generateCsrfToken();
         }
@@ -253,5 +262,16 @@ abstract class BaseController
     protected function forbidden(string $message = 'Acesso negado'): Response
     {
         return (new Response())->forbidden($message);
+    }
+    
+    /**
+     * Retorna resposta 500
+     * 
+     * @param string $message
+     * @return Response
+     */
+    protected function serverError(string $message = 'Erro interno do servidor'): Response
+    {
+        return (new Response())->serverError($message);
     }
 }

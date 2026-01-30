@@ -1,13 +1,24 @@
 <?php
 /**
- * Artes - Editar
+ * VIEW: Editar Arte
+ * GET /artes/{id}/editar
  * 
  * Variáveis:
  * - $arte: Objeto Arte para edição
  * - $tags: Tags disponíveis
- * - $arteTags: Tags da arte atual
+ * - $arteTags: IDs das tags da arte atual
+ * 
+ * CORREÇÃO (29/01/2026): Campo CSRF padronizado para _token
  */
 $currentPage = 'artes';
+
+// Obtém IDs das tags da arte (para pré-selecionar)
+$arteTagIds = [];
+if (!empty($arteTags)) {
+    foreach ($arteTags as $tag) {
+        $arteTagIds[] = is_object($tag) ? $tag->getId() : $tag;
+    }
+}
 ?>
 
 <!-- Breadcrumb -->
@@ -33,8 +44,8 @@ $currentPage = 'artes';
             </div>
             <div class="card-body">
                 <form action="<?= url('/artes/' . $arte->getId()) ?>" method="POST" id="formArte">
-                    <!-- Token CSRF e método PUT -->
-                    <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
+                    <!-- CORREÇÃO: Token CSRF e método PUT padronizados -->
+                    <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     <input type="hidden" name="_method" value="PUT">
                     
                     <!-- Nome -->
@@ -47,6 +58,7 @@ $currentPage = 'artes';
                                id="nome" 
                                name="nome" 
                                value="<?= old('nome', $arte->getNome()) ?>"
+                               maxlength="100"
                                required>
                         <?php if (has_error('nome')): ?>
                             <div class="invalid-feedback"><?= errors('nome') ?></div>
@@ -59,25 +71,27 @@ $currentPage = 'artes';
                         <textarea class="form-control <?= has_error('descricao') ? 'is-invalid' : '' ?>"
                                   id="descricao" 
                                   name="descricao" 
-                                  rows="3"><?= old('descricao', $arte->getDescricao()) ?></textarea>
+                                  rows="3"
+                                  maxlength="1000"><?= old('descricao', $arte->getDescricao()) ?></textarea>
                         <?php if (has_error('descricao')): ?>
                             <div class="invalid-feedback"><?= errors('descricao') ?></div>
                         <?php endif; ?>
                     </div>
                     
                     <div class="row">
-                        <!-- Tempo Médio -->
-                        <div class="col-md-6 mb-3">
+                        <!-- Tempo Médio (horas) -->
+                        <div class="col-md-4 mb-3">
                             <label for="tempo_medio_horas" class="form-label">
-                                Tempo Estimado (horas) <span class="text-danger">*</span>
+                                Tempo Médio (horas) <span class="text-danger">*</span>
                             </label>
                             <input type="number" 
                                    class="form-control <?= has_error('tempo_medio_horas') ? 'is-invalid' : '' ?>"
                                    id="tempo_medio_horas" 
                                    name="tempo_medio_horas" 
                                    value="<?= old('tempo_medio_horas', $arte->getTempoMedioHoras()) ?>"
-                                   step="0.5"
                                    min="0.5"
+                                   max="1000"
+                                   step="0.5"
                                    required>
                             <?php if (has_error('tempo_medio_horas')): ?>
                                 <div class="invalid-feedback"><?= errors('tempo_medio_horas') ?></div>
@@ -85,7 +99,7 @@ $currentPage = 'artes';
                         </div>
                         
                         <!-- Complexidade -->
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="complexidade" class="form-label">
                                 Complexidade <span class="text-danger">*</span>
                             </label>
@@ -93,38 +107,36 @@ $currentPage = 'artes';
                                     id="complexidade" 
                                     name="complexidade"
                                     required>
-                                <option value="baixa" <?= old('complexidade', $arte->getComplexidade()) === 'baixa' ? 'selected' : '' ?>>
-                                    Baixa
-                                </option>
-                                <option value="media" <?= old('complexidade', $arte->getComplexidade()) === 'media' ? 'selected' : '' ?>>
-                                    Média
-                                </option>
-                                <option value="alta" <?= old('complexidade', $arte->getComplexidade()) === 'alta' ? 'selected' : '' ?>>
-                                    Alta
-                                </option>
+                                <option value="">Selecione...</option>
+                                <option value="baixa" <?= old('complexidade', $arte->getComplexidade()) === 'baixa' ? 'selected' : '' ?>>Baixa</option>
+                                <option value="media" <?= old('complexidade', $arte->getComplexidade()) === 'media' ? 'selected' : '' ?>>Média</option>
+                                <option value="alta" <?= old('complexidade', $arte->getComplexidade()) === 'alta' ? 'selected' : '' ?>>Alta</option>
                             </select>
                             <?php if (has_error('complexidade')): ?>
                                 <div class="invalid-feedback"><?= errors('complexidade') ?></div>
                             <?php endif; ?>
                         </div>
-                    </div>
-                    
-                    <div class="row">
+                        
                         <!-- Preço de Custo -->
-                        <div class="col-md-6 mb-3">
-                            <label for="preco_custo" class="form-label">Preço de Custo (R$)</label>
-                            <input type="number" 
-                                   class="form-control <?= has_error('preco_custo') ? 'is-invalid' : '' ?>"
-                                   id="preco_custo" 
-                                   name="preco_custo" 
-                                   value="<?= old('preco_custo', $arte->getPrecoCusto()) ?>"
-                                   step="0.01"
-                                   min="0">
+                        <div class="col-md-4 mb-3">
+                            <label for="preco_custo" class="form-label">Preço de Custo</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" 
+                                       class="form-control <?= has_error('preco_custo') ? 'is-invalid' : '' ?>"
+                                       id="preco_custo" 
+                                       name="preco_custo" 
+                                       value="<?= old('preco_custo', $arte->getPrecoCusto()) ?>"
+                                       min="0"
+                                       step="0.01">
+                            </div>
                             <?php if (has_error('preco_custo')): ?>
                                 <div class="invalid-feedback"><?= errors('preco_custo') ?></div>
                             <?php endif; ?>
                         </div>
-                        
+                    </div>
+                    
+                    <div class="row">
                         <!-- Horas Trabalhadas -->
                         <div class="col-md-6 mb-3">
                             <label for="horas_trabalhadas" class="form-label">Horas Trabalhadas</label>
@@ -133,91 +145,80 @@ $currentPage = 'artes';
                                    id="horas_trabalhadas" 
                                    name="horas_trabalhadas" 
                                    value="<?= old('horas_trabalhadas', $arte->getHorasTrabalhadas()) ?>"
-                                   step="0.5"
-                                   min="0">
+                                   min="0"
+                                   step="0.5">
                             <?php if (has_error('horas_trabalhadas')): ?>
                                 <div class="invalid-feedback"><?= errors('horas_trabalhadas') ?></div>
                             <?php endif; ?>
-                            <div class="form-text">Total de horas já investidas</div>
+                        </div>
+                        
+                        <!-- Status -->
+                        <div class="col-md-6 mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select <?= has_error('status') ? 'is-invalid' : '' ?>"
+                                    id="status" 
+                                    name="status"
+                                    <?= $arte->getStatus() === 'vendida' ? 'disabled' : '' ?>>
+                                <option value="disponivel" <?= old('status', $arte->getStatus()) === 'disponivel' ? 'selected' : '' ?>>
+                                    Disponível
+                                </option>
+                                <option value="em_producao" <?= old('status', $arte->getStatus()) === 'em_producao' ? 'selected' : '' ?>>
+                                    Em Produção
+                                </option>
+                                <?php if ($arte->getStatus() === 'vendida'): ?>
+                                    <option value="vendida" selected>Vendida</option>
+                                <?php endif; ?>
+                            </select>
+                            <?php if ($arte->getStatus() === 'vendida'): ?>
+                                <small class="text-muted">Artes vendidas não podem ter status alterado</small>
+                            <?php endif; ?>
+                            <?php if (has_error('status')): ?>
+                                <div class="invalid-feedback"><?= errors('status') ?></div>
+                            <?php endif; ?>
                         </div>
                     </div>
                     
-                    <!-- Status (só se não vendida) -->
-                    <?php if ($arte->getStatus() !== 'vendida'): ?>
-                    <div class="mb-3">
-                        <label for="status" class="form-label">Status</label>
-                        <select class="form-select <?= has_error('status') ? 'is-invalid' : '' ?>"
-                                id="status" 
-                                name="status">
-                            <option value="disponivel" <?= old('status', $arte->getStatus()) === 'disponivel' ? 'selected' : '' ?>>
-                                Disponível para venda
-                            </option>
-                            <option value="em_producao" <?= old('status', $arte->getStatus()) === 'em_producao' ? 'selected' : '' ?>>
-                                Em Produção
-                            </option>
-                        </select>
-                        <?php if (has_error('status')): ?>
-                            <div class="invalid-feedback"><?= errors('status') ?></div>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-                    
                     <!-- Tags -->
-                    <?php if (!empty($tags)): ?>
                     <div class="mb-4">
                         <label class="form-label">Tags</label>
                         <div class="d-flex flex-wrap gap-2">
-                            <?php 
-                            $selectedTags = old('tags', array_column($arteTags ?? [], 'id'));
-                            foreach ($tags as $tag): 
-                            ?>
-                                <div class="form-check">
-                                    <input type="checkbox" 
-                                           class="form-check-input" 
-                                           id="tag_<?= $tag['id'] ?>"
-                                           name="tags[]"
-                                           value="<?= $tag['id'] ?>"
-                                           <?= in_array($tag['id'], $selectedTags) ? 'checked' : '' ?>>
-                                    <label class="form-check-label" for="tag_<?= $tag['id'] ?>">
-                                        <span class="badge" style="background-color: <?= $tag['cor'] ?>">
-                                            <?= e($tag['nome']) ?>
-                                        </span>
-                                    </label>
-                                </div>
-                            <?php endforeach; ?>
+                            <?php if (!empty($tags)): ?>
+                                <?php foreach ($tags as $tag): ?>
+                                    <div class="form-check">
+                                        <input type="checkbox" 
+                                               class="btn-check" 
+                                               name="tags[]" 
+                                               value="<?= $tag->getId() ?>"
+                                               id="tag_<?= $tag->getId() ?>"
+                                               <?= in_array($tag->getId(), old('tags', $arteTagIds)) ? 'checked' : '' ?>>
+                                        <label class="btn btn-outline-secondary btn-sm" 
+                                               for="tag_<?= $tag->getId() ?>"
+                                               style="border-color: <?= e($tag->getCor()) ?>; color: <?= e($tag->getCor()) ?>;">
+                                            <?= e($tag->getNome()) ?>
+                                        </label>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="text-muted mb-0">
+                                    Nenhuma tag cadastrada. 
+                                    <a href="<?= url('/tags/criar') ?>" target="_blank">Criar tag</a>
+                                </p>
+                            <?php endif; ?>
                         </div>
-                    </div>
-                    <?php endif; ?>
-                    
-                    <!-- Informações -->
-                    <div class="alert alert-light mb-4">
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Criada em: <?= date_br($arte->getDataCadastro()) ?>
-                        </small>
                     </div>
                     
                     <!-- Botões -->
-                    <div class="d-flex justify-content-between">
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-lg me-1"></i> Salvar Alterações
-                            </button>
-                            <a href="<?= url('/artes/' . $arte->getId()) ?>" class="btn btn-outline-secondary">
-                                Cancelar
-                            </a>
-                        </div>
-                        
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Salvar Alterações
+                        </button>
+                        <a href="<?= url('/artes/' . $arte->getId()) ?>" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
                         <?php if ($arte->getStatus() !== 'vendida'): ?>
-                        <form action="<?= url('/artes/' . $arte->getId()) ?>" method="POST" class="d-inline">
-                            <input type="hidden" name="_csrf" value="<?= csrf_token() ?>">
-                            <input type="hidden" name="_method" value="DELETE">
-                            <button type="submit" 
-                                    class="btn btn-outline-danger"
-                                    data-confirm="Tem certeza que deseja excluir esta arte?">
-                                <i class="bi bi-trash me-1"></i> Excluir
+                            <button type="button" class="btn btn-outline-danger ms-auto" data-bs-toggle="modal" data-bs-target="#modalExcluir">
+                                <i class="bi bi-trash"></i> Excluir
                             </button>
-                        </form>
                         <?php endif; ?>
                     </div>
                 </form>
@@ -225,3 +226,31 @@ $currentPage = 'artes';
         </div>
     </div>
 </div>
+
+<!-- Modal de Exclusão -->
+<?php if ($arte->getStatus() !== 'vendida'): ?>
+<div class="modal fade" id="modalExcluir" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Exclusão</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja excluir a arte <strong><?= e($arte->getNome()) ?></strong>?</p>
+                <p class="text-danger mb-0">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form action="<?= url('/artes/' . $arte->getId()) ?>" method="POST" class="d-inline">
+                    <input type="hidden" name="_token" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Excluir
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>

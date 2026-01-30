@@ -16,6 +16,10 @@ use App\Exceptions\NotFoundException;
  * ============================================
  * 
  * Controller responsável pelas operações de Vendas.
+ * 
+ * CORREÇÃO (29/01/2026):
+ * - Método create() agora passa variáveis com nomes corretos
+ *   para a view (artesDisponiveis, clientesSelect)
  */
 class VendaController extends BaseController
 {
@@ -68,21 +72,32 @@ class VendaController extends BaseController
     /**
      * Formulário de nova venda
      * GET /vendas/criar
+     * 
+     * CORREÇÃO: Variáveis passadas com nomes que a view espera:
+     * - artesDisponiveis (antes: artes)
+     * - clientesSelect (antes: clientes)
      */
     public function create(Request $request): Response
     {
-        // Artes disponíveis para venda
-        $artes = $this->arteService->getDisponiveisParaVenda();
-        $clientes = $this->clienteService->getParaSelect();
+        // Artes disponíveis para venda (status = disponivel)
+        $artesDisponiveis = $this->arteService->getDisponiveisParaVenda();
         
-        // Se veio de uma arte específica
-        $arteId = $request->get('arte_id');
+        // Clientes para o select (formato id => nome)
+        $clientesSelect = $this->clienteService->getParaSelect();
+        
+        // Se veio de uma arte específica (link "vender" na lista de artes)
+        $arteSelecionada = $request->get('arte_id');
         
         return $this->view('vendas/create', [
             'titulo' => 'Registrar Venda',
-            'artes' => $artes,
-            'clientes' => $clientes,
-            'arteIdSelecionada' => $arteId
+            // CORREÇÃO: Nomes das variáveis conforme a view espera
+            'artesDisponiveis' => $artesDisponiveis,
+            'clientesSelect' => $clientesSelect,
+            'arteSelecionada' => $arteSelecionada,
+            // Também mantém os nomes antigos para compatibilidade
+            'artes' => $artesDisponiveis,
+            'clientes' => $clientesSelect,
+            'arteIdSelecionada' => $arteSelecionada
         ]);
     }
     
@@ -96,6 +111,12 @@ class VendaController extends BaseController
         
         try {
             $dados = $request->only(['arte_id', 'cliente_id', 'valor', 'data_venda']);
+            
+            // Data padrão = hoje
+            if (empty($dados['data_venda'])) {
+                $dados['data_venda'] = date('Y-m-d');
+            }
+            
             $venda = $this->vendaService->registrar($dados);
             
             if ($request->wantsJson()) {
@@ -111,10 +132,14 @@ class VendaController extends BaseController
             
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
-                return $this->error('Erro de validação', $e->getErrors(), 422);
+                return $this->error('Erro de validação', 422, $e->getErrors());
             }
             
-            return $this->back()->withErrors($e->getErrors())->withInput();
+            // Salva erros e input antigo na sessão
+            $_SESSION['_errors'] = $e->getErrors();
+            $_SESSION['_old_input'] = $request->all();
+            
+            return $this->back();
         }
     }
     
@@ -149,12 +174,13 @@ class VendaController extends BaseController
     {
         try {
             $venda = $this->vendaService->buscar($id);
-            $clientes = $this->clienteService->getParaSelect();
+            $clientesSelect = $this->clienteService->getParaSelect();
             
             return $this->view('vendas/edit', [
                 'titulo' => 'Editar Venda #' . $id,
                 'venda' => $venda,
-                'clientes' => $clientes
+                'clientesSelect' => $clientesSelect,
+                'clientes' => $clientesSelect // compatibilidade
             ]);
             
         } catch (NotFoundException $e) {
@@ -184,18 +210,22 @@ class VendaController extends BaseController
             
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
-                return $this->error('Erro de validação', $e->getErrors(), 422);
+                return $this->error('Erro de validação', 422, $e->getErrors());
             }
             
-            return $this->back()->withErrors($e->getErrors())->withInput();
+            $_SESSION['_errors'] = $e->getErrors();
+            $_SESSION['_old_input'] = $request->all();
+            
+            return $this->back();
             
         } catch (NotFoundException $e) {
-            return $this->notFound('Venda não encontrada');
+            $this->flashError('Venda não encontrada');
+            return $this->redirectTo('/vendas');
         }
     }
     
     /**
-     * Remove venda
+     * Exclui venda
      * DELETE /vendas/{id}
      */
     public function destroy(Request $request, int $id): Response
@@ -203,17 +233,22 @@ class VendaController extends BaseController
         $this->validateCsrf($request);
         
         try {
-            $this->vendaService->remover($id);
+            $this->vendaService->excluir($id);
             
             if ($request->wantsJson()) {
-                return $this->success('Venda removida!');
+                return $this->success('Venda excluída!');
             }
             
-            $this->flashSuccess('Venda removida com sucesso!');
+            $this->flashSuccess('Venda excluída com sucesso!');
             return $this->redirectTo('/vendas');
             
         } catch (NotFoundException $e) {
-            return $this->notFound('Venda não encontrada');
+            if ($request->wantsJson()) {
+                return $this->error('Venda não encontrada', 404);
+            }
+            
+            $this->flashError('Venda não encontrada');
+            return $this->redirectTo('/vendas');
         }
     }
     
@@ -223,29 +258,21 @@ class VendaController extends BaseController
      */
     public function relatorio(Request $request): Response
     {
-        $dataInicio = $request->get('data_inicio', date('Y-m-01'));
-        $dataFim = $request->get('data_fim', date('Y-m-d'));
+        $filtros = [
+            'mes' => $request->get('mes', date('Y-m')),
+            'ano' => $request->get('ano', date('Y'))
+        ];
         
-        $faturamento = $this->vendaService->getFaturamentoPeriodo($dataInicio, $dataFim);
-        $vendasMensais = $this->vendaService->getVendasMensais(12);
-        $ranking = $this->vendaService->getRankingRentabilidade(10);
+        $relatorio = $this->vendaService->gerarRelatorio($filtros);
         
         if ($request->wantsJson()) {
-            return $this->json([
-                'success' => true,
-                'faturamento' => $faturamento,
-                'vendas_mensais' => $vendasMensais,
-                'ranking' => $ranking
-            ]);
+            return $this->json(['success' => true, 'data' => $relatorio]);
         }
         
         return $this->view('vendas/relatorio', [
             'titulo' => 'Relatório de Vendas',
-            'faturamento' => $faturamento,
-            'vendasMensais' => $vendasMensais,
-            'ranking' => $ranking,
-            'dataInicio' => $dataInicio,
-            'dataFim' => $dataFim
+            'relatorio' => $relatorio,
+            'filtros' => $filtros
         ]);
     }
 }

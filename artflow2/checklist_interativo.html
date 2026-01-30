@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArtFlow 2.0 - Checklist de Testes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6f42c1;
+            --success-color: #198754;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+            color: white;
+            border-radius: 16px 16px 0 0 !important;
+            padding: 20px;
+        }
+        
+        .card-header h5 {
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .progress-container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        
+        .progress {
+            height: 30px;
+            border-radius: 15px;
+        }
+        
+        .progress-bar {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .test-item {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .test-item:last-child {
+            border-bottom: none;
+        }
+        
+        .test-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .test-item.passed {
+            background: #d4edda;
+        }
+        
+        .test-item.failed {
+            background: #f8d7da;
+        }
+        
+        .test-item.skipped {
+            background: #fff3cd;
+        }
+        
+        .form-check-input:checked {
+            background-color: var(--success-color);
+            border-color: var(--success-color);
+        }
+        
+        .btn-status {
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-left: 5px;
+        }
+        
+        .btn-pass { background: var(--success-color); color: white; }
+        .btn-fail { background: var(--danger-color); color: white; }
+        .btn-skip { background: var(--warning-color); color: #000; }
+        
+        .notes-input {
+            font-size: 12px;
+            border: 1px dashed #dee2e6;
+            padding: 8px;
+            border-radius: 8px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .stats-card {
+            text-align: center;
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .stats-card.passed { background: var(--success-color); }
+        .stats-card.failed { background: var(--danger-color); }
+        .stats-card.pending { background: #6c757d; }
+        .stats-card.skipped { background: var(--warning-color); color: #000; }
+        
+        .stats-number {
+            font-size: 36px;
+            font-weight: 700;
+        }
+        
+        .module-badge {
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+        }
+        
+        #exportBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            border-radius: 50px;
+            padding: 15px 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        
+        .header-info {
+            background: rgba(255,255,255,0.9);
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .header-info h1 {
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+        
+        @media print {
+            body { background: white; }
+            .btn, #exportBtn { display: none; }
+            .card { box-shadow: none; border: 1px solid #dee2e6; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header-info">
+            <h1><i class="bi bi-clipboard-check"></i> ArtFlow 2.0 - Checklist de Testes</h1>
+            <p class="text-muted mb-0">Marque cada teste conforme for executando. Os dados são salvos automaticamente no navegador.</p>
+            <small class="text-muted">Data: <span id="currentDate"></span></small>
+        </div>
+        
+        <!-- Progress -->
+        <div class="progress-container">
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <div class="stats-card passed">
+                        <div class="stats-number" id="statsPassed">0</div>
+                        <div>Passou</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card failed">
+                        <div class="stats-number" id="statsFailed">0</div>
+                        <div>Falhou</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card skipped">
+                        <div class="stats-number" id="statsSkipped">0</div>
+                        <div>Pulou</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card pending">
+                        <div class="stats-number" id="statsPending">0</div>
+                        <div>Pendente</div>
+                    </div>
+                </div>
+            </div>
+            <div class="progress">
+                <div class="progress-bar bg-success" id="progressPassed" style="width: 0%"></div>
+                <div class="progress-bar bg-danger" id="progressFailed" style="width: 0%"></div>
+                <div class="progress-bar bg-warning" id="progressSkipped" style="width: 0%"></div>
+            </div>
+            <div class="text-center mt-2">
+                <span id="progressText">0%</span> concluído
+            </div>
+        </div>
+        
+        <!-- Módulo Artes -->
+        <div class="card" data-module="artes">
+            <div class="card-header">
+                <h5><i class="bi bi-palette"></i> Módulo Artes
+                    <span class="badge bg-light text-dark module-badge">0/8</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="test-item" data-test="artes-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.1</strong> Acessar listagem de artes
+                            <br><small class="text-muted">GET /artes - Página carrega sem erros</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.2</strong> Acessar formulário de criação
+                            <br><small class="text-muted">GET /artes/criar - Form carrega com campos corretos</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.3</strong> Criar arte válida
+                            <br><small class="text-muted">POST /artes - Nome: "Teste Arte", Status: disponível</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.4</strong> Criar arte com nome vazio
+                            <br><small class="text-muted">POST /artes - Deve mostrar erro de validação</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-5">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.5</strong> Editar arte existente
+                            <br><small class="text-muted">PUT /artes/{id} - Alterar nome e status</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-6">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.6</strong> Excluir arte
+                            <br><small class="text-muted">DELETE /artes/{id} - Modal + confirmação</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-7">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.7</strong> Filtros funcionam
+                            <br><small class="text-muted">Filtrar por status, tag e busca por nome</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="artes-8">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>1.8</strong> Associar tags à arte
+                            <br><small class="text-muted">Selecionar múltiplas tags no form</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Módulo Tags -->
+        <div class="card" data-module="tags">
+            <div class="card-header">
+                <h5><i class="bi bi-tags"></i> Módulo Tags
+                    <span class="badge bg-light text-dark module-badge">0/5</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="test-item" data-test="tags-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>2.1</strong> Acessar listagem de tags
+                            <br><small class="text-muted">GET /tags - Mostra tags com contagem de artes</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="tags-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>2.2</strong> Criar tag com seletor de cores
+                            <br><small class="text-muted">POST /tags - Nome + cor hex (#3498db)</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="tags-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>2.3</strong> Criar tag com nome vazio
+                            <br><small class="text-muted">Deve mostrar erro de validação</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="tags-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>2.4</strong> Editar tag
+                            <br><small class="text-muted">PUT /tags/{id} - Alterar nome e cor</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="tags-5">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>2.5</strong> Excluir tag
+                            <br><small class="text-muted">DELETE /tags/{id} - Não deve excluir artes</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Módulo Vendas -->
+        <div class="card" data-module="vendas">
+            <div class="card-header">
+                <h5><i class="bi bi-cash-coin"></i> Módulo Vendas
+                    <span class="badge bg-light text-dark module-badge">0/6</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="test-item" data-test="vendas-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>3.1</strong> Acessar listagem de vendas
+                            <br><small class="text-muted">GET /vendas - Mostra vendas com detalhes</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="vendas-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>3.2</strong> Registrar venda válida
+                            <br><small class="text-muted">POST /vendas - Arte + Cliente + Valor</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="vendas-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>3.3</strong> Verificar status da arte após venda
+                            <br><small class="text-muted">Arte deve mudar para "vendida"</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="vendas-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>3.4</strong> Cálculo de lucro correto
+                            <br><small class="text-muted">Lucro = Valor Venda - Preço Custo</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="vendas-5">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>3.5</strong> Excluir venda
+                            <br><small class="text-muted">DELETE /vendas/{id}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="vendas-6">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>3.6</strong> Acessar relatório de vendas
+                            <br><small class="text-muted">GET /vendas/relatorio - Filtros e totais</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Módulo Metas -->
+        <div class="card" data-module="metas">
+            <div class="card-header">
+                <h5><i class="bi bi-bullseye"></i> Módulo Metas
+                    <span class="badge bg-light text-dark module-badge">0/4</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="test-item" data-test="metas-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>4.1</strong> Acessar listagem de metas
+                            <br><small class="text-muted">GET /metas - Mostra metas com progresso</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="metas-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>4.2</strong> Criar meta
+                            <br><small class="text-muted">POST /metas - Mês + Ano + Tipo + Valor</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="metas-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>4.3</strong> Editar meta
+                            <br><small class="text-muted">PUT /metas/{id}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="metas-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>4.4</strong> Excluir meta
+                            <br><small class="text-muted">DELETE /metas/{id}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Segurança -->
+        <div class="card" data-module="seguranca">
+            <div class="card-header bg-danger">
+                <h5><i class="bi bi-shield-check"></i> Segurança
+                    <span class="badge bg-light text-dark module-badge">0/4</span>
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="test-item" data-test="seg-1">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>5.1</strong> CSRF em todos os formulários
+                            <br><small class="text-muted">Verificar input _token em todos os forms</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="seg-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>5.2</strong> XSS escapado
+                            <br><small class="text-muted">Testar: &lt;script&gt;alert(1)&lt;/script&gt;</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="seg-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>5.3</strong> SQL Injection protegido
+                            <br><small class="text-muted">Testar: '; DROP TABLE artes; --</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+                
+                <div class="test-item" data-test="seg-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>5.4</strong> Validação server-side
+                            <br><small class="text-muted">Desabilitar JS e testar validação</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-pass btn-status" onclick="setStatus(this, 'passed')">✓</button>
+                            <button class="btn btn-sm btn-fail btn-status" onclick="setStatus(this, 'failed')">✗</button>
+                            <button class="btn btn-sm btn-skip btn-status" onclick="setStatus(this, 'skipped')">⊘</button>
+                        </div>
+                    </div>
+                    <input type="text" class="notes-input" placeholder="Observações..." onchange="saveNotes(this)">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botões de ação -->
+        <div class="d-flex justify-content-between mb-5">
+            <button class="btn btn-secondary" onclick="resetAll()">
+                <i class="bi bi-arrow-counterclockwise"></i> Resetar Tudo
+            </button>
+            <button class="btn btn-primary" onclick="exportResults()">
+                <i class="bi bi-download"></i> Exportar Relatório
+            </button>
+        </div>
+    </div>
+    
+    <!-- Botão flutuante -->
+    <button id="exportBtn" class="btn btn-success" onclick="exportResults()">
+        <i class="bi bi-file-earmark-text"></i> Exportar
+    </button>
+    
+    <script>
+        // Estado dos testes
+        let testData = JSON.parse(localStorage.getItem('artflow_tests') || '{}');
+        
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('pt-BR');
+            loadState();
+            updateProgress();
+        });
+        
+        // Define status de um teste
+        function setStatus(btn, status) {
+            const testItem = btn.closest('.test-item');
+            const testId = testItem.dataset.test;
+            
+            // Remove classes anteriores
+            testItem.classList.remove('passed', 'failed', 'skipped');
+            
+            // Adiciona nova classe
+            testItem.classList.add(status);
+            
+            // Salva estado
+            if (!testData[testId]) testData[testId] = {};
+            testData[testId].status = status;
+            saveState();
+            
+            updateProgress();
+        }
+        
+        // Salva notas
+        function saveNotes(input) {
+            const testItem = input.closest('.test-item');
+            const testId = testItem.dataset.test;
+            
+            if (!testData[testId]) testData[testId] = {};
+            testData[testId].notes = input.value;
+            saveState();
+        }
+        
+        // Salva estado no localStorage
+        function saveState() {
+            localStorage.setItem('artflow_tests', JSON.stringify(testData));
+        }
+        
+        // Carrega estado do localStorage
+        function loadState() {
+            document.querySelectorAll('.test-item').forEach(item => {
+                const testId = item.dataset.test;
+                if (testData[testId]) {
+                    if (testData[testId].status) {
+                        item.classList.add(testData[testId].status);
+                    }
+                    if (testData[testId].notes) {
+                        item.querySelector('.notes-input').value = testData[testId].notes;
+                    }
+                }
+            });
+        }
+        
+        // Atualiza progress
+        function updateProgress() {
+            const items = document.querySelectorAll('.test-item');
+            const total = items.length;
+            
+            let passed = 0, failed = 0, skipped = 0;
+            
+            items.forEach(item => {
+                if (item.classList.contains('passed')) passed++;
+                else if (item.classList.contains('failed')) failed++;
+                else if (item.classList.contains('skipped')) skipped++;
+            });
+            
+            const pending = total - passed - failed - skipped;
+            const completed = passed + failed + skipped;
+            const percentage = Math.round((completed / total) * 100);
+            
+            // Atualiza stats
+            document.getElementById('statsPassed').textContent = passed;
+            document.getElementById('statsFailed').textContent = failed;
+            document.getElementById('statsSkipped').textContent = skipped;
+            document.getElementById('statsPending').textContent = pending;
+            
+            // Atualiza barra
+            document.getElementById('progressPassed').style.width = (passed / total * 100) + '%';
+            document.getElementById('progressFailed').style.width = (failed / total * 100) + '%';
+            document.getElementById('progressSkipped').style.width = (skipped / total * 100) + '%';
+            
+            document.getElementById('progressText').textContent = percentage + '%';
+            
+            // Atualiza badges dos módulos
+            document.querySelectorAll('.card[data-module]').forEach(card => {
+                const moduleItems = card.querySelectorAll('.test-item');
+                const moduleTotal = moduleItems.length;
+                let moduleDone = 0;
+                
+                moduleItems.forEach(item => {
+                    if (item.classList.contains('passed') || 
+                        item.classList.contains('failed') || 
+                        item.classList.contains('skipped')) {
+                        moduleDone++;
+                    }
+                });
+                
+                card.querySelector('.module-badge').textContent = moduleDone + '/' + moduleTotal;
+            });
+        }
+        
+        // Reseta tudo
+        function resetAll() {
+            if (confirm('Tem certeza que deseja resetar todos os testes?')) {
+                testData = {};
+                localStorage.removeItem('artflow_tests');
+                document.querySelectorAll('.test-item').forEach(item => {
+                    item.classList.remove('passed', 'failed', 'skipped');
+                    item.querySelector('.notes-input').value = '';
+                });
+                updateProgress();
+            }
+        }
+        
+        // Exporta resultados
+        function exportResults() {
+            const items = document.querySelectorAll('.test-item');
+            let report = '# ArtFlow 2.0 - Relatório de Testes\n\n';
+            report += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`;
+            
+            let passed = 0, failed = 0, skipped = 0, pending = 0;
+            
+            items.forEach(item => {
+                if (item.classList.contains('passed')) passed++;
+                else if (item.classList.contains('failed')) failed++;
+                else if (item.classList.contains('skipped')) skipped++;
+                else pending++;
+            });
+            
+            report += `## Resumo\n`;
+            report += `- ✅ Passou: ${passed}\n`;
+            report += `- ❌ Falhou: ${failed}\n`;
+            report += `- ⊘ Pulou: ${skipped}\n`;
+            report += `- ⏳ Pendente: ${pending}\n\n`;
+            
+            report += `## Detalhes\n\n`;
+            
+            let currentModule = '';
+            items.forEach(item => {
+                const module = item.closest('.card').dataset.module;
+                if (module !== currentModule) {
+                    currentModule = module;
+                    report += `### ${module.toUpperCase()}\n\n`;
+                }
+                
+                const testId = item.dataset.test;
+                const testName = item.querySelector('strong').textContent;
+                const testDesc = item.querySelector('small').textContent;
+                const status = item.classList.contains('passed') ? '✅' :
+                              item.classList.contains('failed') ? '❌' :
+                              item.classList.contains('skipped') ? '⊘' : '⏳';
+                const notes = testData[testId]?.notes || '';
+                
+                report += `${status} **${testName}** - ${testDesc}\n`;
+                if (notes) report += `   > ${notes}\n`;
+                report += '\n';
+            });
+            
+            // Download
+            const blob = new Blob([report], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `artflow2_testes_${new Date().toISOString().slice(0,10)}.md`;
+            a.click();
+        }
+    </script>
+</body>
+</html>
