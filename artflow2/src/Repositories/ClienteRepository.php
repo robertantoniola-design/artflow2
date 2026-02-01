@@ -5,6 +5,11 @@ use App\Models\Cliente;
 
 /**
  * REPOSITORY: CLIENTES
+ * 
+ * CORREÇÃO (31/01/2026):
+ * - topClientes(): Retorna arrays ao invés de objetos hydrated
+ *   para preservar campos calculados (total_compras, valor_total_compras)
+ * - getTopCompradores(): Alias atualizado
  */
 class ClienteRepository extends BaseRepository
 {
@@ -71,20 +76,35 @@ class ClienteRepository extends BaseRepository
     
     /**
      * Retorna top clientes por valor de compras
+     * 
+     * CORREÇÃO: Retorna ARRAYS (não objetos) para preservar
+     * os campos calculados total_compras e valor_total_compras.
+     * O hydrateMany() descartava esses campos extras.
+     * 
+     * @param int $limit
+     * @return array Array de arrays associativos
      */
     public function topClientes(int $limit = 10): array
     {
-        $sql = "SELECT c.*,
+        $sql = "SELECT c.id,
+                    c.nome,
+                    c.email,
+                    c.telefone,
+                    c.cidade,
+                    c.estado,
                     COUNT(v.id) as total_compras,
                     COALESCE(SUM(v.valor), 0) as valor_total_compras
                 FROM {$this->table} c
                 INNER JOIN vendas v ON c.id = v.cliente_id
-                GROUP BY c.id
+                GROUP BY c.id, c.nome, c.email, c.telefone, c.cidade, c.estado
                 ORDER BY valor_total_compras DESC
-                LIMIT {$limit}";
+                LIMIT :limite";
         
-        $stmt = $this->getConnection()->query($sql);
-        return $this->hydrateMany($stmt->fetchAll(\PDO::FETCH_ASSOC));
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->bindValue(':limite', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
     
     /**
@@ -166,7 +186,7 @@ class ClienteRepository extends BaseRepository
         $sql = "SELECT COUNT(*) FROM {$this->table} WHERE email = ?";
         $params = [$email];
         
-        if ($exceptId !== null) {
+        if ($exceptId) {
             $sql .= " AND id != ?";
             $params[] = $exceptId;
         }
