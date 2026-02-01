@@ -9,16 +9,19 @@ use App\Services\ArteService;
 use App\Services\ClienteService;
 use App\Exceptions\ValidationException;
 use App\Exceptions\NotFoundException;
+use App\Exceptions\DatabaseException;
 
 /**
  * ============================================
  * VENDA CONTROLLER
  * ============================================
  * 
- * CORREÇÕES (29/01/2026):
- * - index(): Verificação segura se $vendas são objetos ou arrays
- * - create(): Passa variáveis corretas para a view
- * - relatorio(): Usa métodos existentes do Service
+ * Controla o fluxo de vendas.
+ * 
+ * CORREÇÕES (01/02/2026):
+ * - store(): Agora extrai forma_pagamento e observacoes do form
+ * - store(): Adicionado catch para DatabaseException (antes propagava erro 500 genérico)
+ * - store(): Sanitização de campos vazios antes de enviar ao Service
  */
 class VendaController extends BaseController
 {
@@ -36,35 +39,32 @@ class VendaController extends BaseController
         $this->clienteService = $clienteService;
     }
     
+    // ==========================================
+    // LISTAGEM
+    // ==========================================
+    
     /**
-     * Lista todas as vendas
+     * Lista vendas com filtros
      * GET /vendas
-     * 
-     * CORREÇÃO: Verificação segura ao calcular resumo
      */
     public function index(Request $request): Response
     {
-        $filtros = [
-            'mes_ano' => $request->get('mes'),
-            'data_inicio' => $request->get('data_inicio'),
-            'data_fim' => $request->get('data_fim'),
-            'cliente_id' => $request->get('cliente_id')
-        ];
+        // Filtros opcionais
+        $filtros = $request->only(['cliente_id', 'data_inicio', 'data_fim', 'mes_ano']);
+        
+        // Remove filtros vazios
+        $filtros = array_filter($filtros, fn($v) => $v !== '' && $v !== null);
         
         $vendas = $this->vendaService->listar($filtros);
         $estatisticas = $this->vendaService->getEstatisticas();
-        
-        // Clientes para filtro
         $clientesSelect = $this->clienteService->getParaSelect();
         
-        // CORREÇÃO: Verificação segura - $vendas pode conter objetos ou arrays
+        // Calcula resumo
         $valorTotal = 0;
         $lucroTotal = 0;
-        
         foreach ($vendas as $venda) {
-            // Verifica se é objeto ou array
             if (is_object($venda)) {
-                $valorTotal += $venda->getValor();
+                $valorTotal += $venda->getValor() ?? 0;
                 $lucroTotal += $venda->getLucroCalculado() ?? 0;
             } elseif (is_array($venda)) {
                 $valorTotal += $venda['valor'] ?? 0;
@@ -98,6 +98,10 @@ class VendaController extends BaseController
         ]);
     }
     
+    // ==========================================
+    // CRIAR
+    // ==========================================
+    
     /**
      * Formulário de nova venda
      * GET /vendas/criar
@@ -122,16 +126,48 @@ class VendaController extends BaseController
     /**
      * Registra nova venda
      * POST /vendas
+     * 
+     * CORREÇÃO (01/02/2026):
+     * - Agora extrai TODOS os campos do form, incluindo forma_pagamento e observacoes
+     * - Converte strings vazias para null em campos opcionais (evita FK violation)
+     * - Catch para DatabaseException com mensagem útil ao invés de erro 500 genérico
      */
     public function store(Request $request): Response
     {
         $this->validateCsrf($request);
         
         try {
-            $dados = $request->only(['arte_id', 'cliente_id', 'valor', 'data_venda']);
+            // CORREÇÃO: Extrair TODOS os campos do formulário
+            // Antes só extraía: ['arte_id', 'cliente_id', 'valor', 'data_venda']
+            // Faltavam: forma_pagamento, observacoes
+            $dados = $request->only([
+                'arte_id', 
+                'cliente_id', 
+                'valor', 
+                'data_venda',
+                'forma_pagamento',  // ADICIONADO - campo do form
+                'observacoes'       // ADICIONADO - campo do form
+            ]);
             
+            // CORREÇÃO: Converte strings vazias para null em campos opcionais
+            // O form envia cliente_id="" quando nenhum cliente é selecionado
+            // O operador ?? só trata null, não converte "" para null
+            // MySQL strict mode rejeita "" em coluna INT UNSIGNED (FK violation)
+            $dados['cliente_id'] = !empty($dados['cliente_id']) ? $dados['cliente_id'] : null;
+            
+            // Data padrão = hoje se não informada
             if (empty($dados['data_venda'])) {
                 $dados['data_venda'] = date('Y-m-d');
+            }
+            
+            // Forma de pagamento padrão = pix se não informada
+            if (empty($dados['forma_pagamento'])) {
+                $dados['forma_pagamento'] = 'pix';
+            }
+            
+            // Observações: string vazia → null
+            if (empty($dados['observacoes'])) {
+                $dados['observacoes'] = null;
             }
             
             $venda = $this->vendaService->registrar($dados);
@@ -144,10 +180,14 @@ class VendaController extends BaseController
                 ]);
             }
             
-            $this->flashSuccess('Venda registrada! Lucro: R$ ' . number_format($venda->getLucroCalculado(), 2, ',', '.'));
+            $this->flashSuccess(
+                'Venda registrada! Lucro: R$ ' . 
+                number_format($venda->getLucroCalculado(), 2, ',', '.')
+            );
             return $this->redirectTo('/vendas');
             
         } catch (ValidationException $e) {
+            // Erro de validação → volta ao form com erros
             if ($request->wantsJson()) {
                 return $this->error('Erro de validação', 422, $e->getErrors());
             }
@@ -156,8 +196,43 @@ class VendaController extends BaseController
             $_SESSION['_old_input'] = $request->all();
             
             return $this->back();
+            
+        } catch (DatabaseException $e) {
+            // ADICIONADO: Catch para erro de banco de dados
+            // Antes, DatabaseException não era capturada aqui e propagava 
+            // até Application::handleException() com mensagem genérica "Erro ao criar registro"
+            
+            // Monta mensagem útil para o usuário
+            $mensagemOriginal = $e->getPrevious() ? $e->getPrevious()->getMessage() : $e->getMessage();
+            
+            // Log do erro completo para debug
+            error_log("[VendaController::store] DatabaseException: {$mensagemOriginal}");
+            error_log("[VendaController::store] Query: " . ($e->getQuery() ?? 'N/A'));
+            error_log("[VendaController::store] Params: " . json_encode($e->getParams()));
+            
+            if ($request->wantsJson()) {
+                return $this->error('Erro ao registrar venda: ' . $mensagemOriginal, 500);
+            }
+            
+            $this->flashError('Erro ao registrar venda. Verifique os dados e tente novamente.');
+            $_SESSION['_old_input'] = $request->all();
+            
+            return $this->back();
+            
+        } catch (NotFoundException $e) {
+            // ADICIONADO: Catch para arte/cliente não encontrado
+            if ($request->wantsJson()) {
+                return $this->error($e->getMessage(), 404);
+            }
+            
+            $this->flashError($e->getMessage());
+            return $this->back();
         }
     }
+    
+    // ==========================================
+    // VISUALIZAR
+    // ==========================================
     
     /**
      * Exibe detalhes da venda
@@ -181,6 +256,10 @@ class VendaController extends BaseController
             return $this->notFound('Venda não encontrada');
         }
     }
+    
+    // ==========================================
+    // EDITAR
+    // ==========================================
     
     /**
      * Formulário de edição
@@ -213,7 +292,14 @@ class VendaController extends BaseController
         $this->validateCsrf($request);
         
         try {
-            $dados = $request->only(['cliente_id', 'valor', 'data_venda']);
+            $dados = $request->only(['cliente_id', 'valor', 'data_venda', 'forma_pagamento', 'observacoes']);
+            
+            // CORREÇÃO: Mesma sanitização do store()
+            $dados['cliente_id'] = !empty($dados['cliente_id']) ? $dados['cliente_id'] : null;
+            if (empty($dados['observacoes'])) {
+                $dados['observacoes'] = null;
+            }
+            
             $venda = $this->vendaService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
@@ -236,8 +322,17 @@ class VendaController extends BaseController
         } catch (NotFoundException $e) {
             $this->flashError('Venda não encontrada');
             return $this->redirectTo('/vendas');
+            
+        } catch (DatabaseException $e) {
+            $this->flashError('Erro ao atualizar venda. Verifique os dados.');
+            $_SESSION['_old_input'] = $request->all();
+            return $this->back();
         }
     }
+    
+    // ==========================================
+    // EXCLUIR
+    // ==========================================
     
     /**
      * Exclui venda
@@ -267,11 +362,13 @@ class VendaController extends BaseController
         }
     }
     
+    // ==========================================
+    // RELATÓRIO
+    // ==========================================
+    
     /**
      * Relatório de vendas
      * GET /vendas/relatorio
-     * 
-     * CORREÇÃO: Usa métodos existentes do Service
      */
     public function relatorio(Request $request): Response
     {

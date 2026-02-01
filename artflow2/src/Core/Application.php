@@ -279,36 +279,81 @@ class Application
     
     /**
      * Trata exceções não capturadas
-     * 
+     * CORREÇÃO: Agora exibe mensagem da exceção anterior (previous exception)
+        * para que erros como PDOException dentro de DatabaseException sejam visíveis.
+        * 
      * @param \Throwable $e
      */
-    private function handleException(\Throwable $e): void
+        private function handleException(\Throwable $e): void
     {
         $debug = filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN);
         
-        // Log do erro
+        // Log do erro (MELHORADO: inclui previous exception)
         $logFile = $this->basePath . '/storage/logs/error.log';
         $logMessage = sprintf(
-            "[%s] %s: %s in %s:%d\nStack trace:\n%s\n\n",
+            "[%s] %s: %s in %s:%d\n",
             date('Y-m-d H:i:s'),
             get_class($e),
             $e->getMessage(),
             $e->getFile(),
-            $e->getLine(),
-            $e->getTraceAsString()
+            $e->getLine()
         );
+        
+        // ADICIONADO: Log da exceção anterior (ex: PDOException dentro de DatabaseException)
+        if ($e->getPrevious()) {
+            $logMessage .= sprintf(
+                "  Caused by: %s: %s\n",
+                get_class($e->getPrevious()),
+                $e->getPrevious()->getMessage()
+            );
+        }
+        
+        // ADICIONADO: Log de info extra do DatabaseException
+        if (method_exists($e, 'getDebugInfo')) {
+            $debugInfo = $e->getDebugInfo();
+            if (!empty($debugInfo['query'])) {
+                $logMessage .= "  Query: {$debugInfo['query']}\n";
+            }
+            if (!empty($debugInfo['params'])) {
+                $logMessage .= "  Params: " . json_encode($debugInfo['params']) . "\n";
+            }
+        }
+        
+        $logMessage .= "Stack trace:\n" . $e->getTraceAsString() . "\n\n";
         
         @file_put_contents($logFile, $logMessage, FILE_APPEND);
         
         // Resposta de erro
-        http_response_code(500);
+        http_response_code($e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500);
         
         if ($debug) {
-            echo "<h1>❌ Erro Fatal</h1>";
+            echo "<div style='font-family: monospace; max-width: 900px; margin: 20px auto; padding: 20px;'>";
+            echo "<h1 style='color: #dc3545;'>❌ Erro Fatal</h1>";
+            echo "<div style='background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 15px; margin-bottom: 15px;'>";
             echo "<p><strong>" . get_class($e) . ":</strong> " . htmlspecialchars($e->getMessage()) . "</p>";
+            
+            // ADICIONADO: Mostra causa original (ex: PDOException)
+            if ($e->getPrevious()) {
+                echo "<p style='color: #721c24; margin-top: 10px;'>";
+                echo "<strong>Causa original (" . get_class($e->getPrevious()) . "):</strong><br>";
+                echo htmlspecialchars($e->getPrevious()->getMessage());
+                echo "</p>";
+            }
+            
+            echo "</div>";
+            
+            // ADICIONADO: Mostra query SQL se disponível
+            if (method_exists($e, 'getQuery') && $e->getQuery()) {
+                echo "<div style='background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin-bottom: 15px;'>";
+                echo "<strong>Query SQL:</strong><br>";
+                echo "<code>" . htmlspecialchars($e->getQuery()) . "</code>";
+                echo "</div>";
+            }
+            
             echo "<p><strong>Arquivo:</strong> " . $e->getFile() . ":" . $e->getLine() . "</p>";
             echo "<h3>Stack Trace:</h3>";
-            echo "<pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+            echo "<pre style='background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+            echo "</div>";
         } else {
             echo "<h1>Erro do Servidor</h1>";
             echo "<p>Ocorreu um erro inesperado. Por favor, tente novamente mais tarde.</p>";

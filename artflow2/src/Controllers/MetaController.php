@@ -14,6 +14,12 @@ use App\Exceptions\NotFoundException;
  * ============================================
  * 
  * Controller responsável pelas operações de Metas Mensais.
+ * 
+ * ATUALIZAÇÃO (01/02/2026):
+ * - index(): Agora auto-finaliza metas passadas ao carregar
+ * - index(): Anos dinâmicos vindos do banco (não mais fixos)
+ * - index(): Default é ano atual (não 'todos')
+ * - getAnosDisponiveis(): Usa MetaService em vez de gerar fixo
  */
 class MetaController extends BaseController
 {
@@ -27,11 +33,37 @@ class MetaController extends BaseController
     /**
      * Lista todas as metas
      * GET /metas
+     * GET /metas?ano=2025
+     * 
+     * ATUALIZADO:
+     * - Auto-finaliza metas de meses passados
+     * - Busca anos reais do banco para navegação
+     * - Default: ano atual
      */
     public function index(Request $request): Response
     {
+        // NOVO: Auto-finaliza metas de meses passados
+        // Garante que metas antigas tenham status = 'finalizado'
+        $this->metaService->finalizarMetasPassadas();
+        
+        // Busca anos disponíveis (do banco + ano atual)
+        $anosDisponiveis = $this->metaService->getAnosDisponiveis();
+        
+        // Determina o ano selecionado
+        // - Se veio ?ano=XXXX na URL, usa esse
+        // - Se não, usa o ano atual como padrão
+        $anoSelecionado = $request->get('ano');
+        
+        if (empty($anoSelecionado) || !is_numeric($anoSelecionado)) {
+            // Default: ano atual
+            $anoSelecionado = (int) date('Y');
+        } else {
+            $anoSelecionado = (int) $anoSelecionado;
+        }
+        
+        // Filtros para o service
         $filtros = [
-            'ano' => $request->get('ano', date('Y')),
+            'ano' => $anoSelecionado,
             'limite' => $request->get('limite', 12)
         ];
         
@@ -42,7 +74,9 @@ class MetaController extends BaseController
             return $this->json([
                 'success' => true,
                 'data' => array_map(fn($m) => $m->toArray(), $metas),
-                'estatisticas' => $estatisticas
+                'estatisticas' => $estatisticas,
+                'ano_selecionado' => $anoSelecionado,
+                'anos_disponiveis' => $anosDisponiveis
             ]);
         }
         
@@ -50,8 +84,8 @@ class MetaController extends BaseController
             'titulo' => 'Metas Mensais',
             'metas' => $metas,
             'estatisticas' => $estatisticas,
-            'anoSelecionado' => $filtros['ano'],
-            'anos' => $this->getAnosDisponiveis()
+            'anoSelecionado' => $anoSelecionado,
+            'anos' => $anosDisponiveis   // Agora é array de inteiros do banco
         ]);
     }
     
@@ -87,7 +121,7 @@ class MetaController extends BaseController
                 return $this->success('Meta criada!', ['id' => $meta->getId()]);
             }
             
-            $this->flashSuccess('Meta de R$ ' . number_format($meta->getValorMeta(), 2, ',', '.') . ' criada!');
+            $this->flashSuccess('Meta de R$ ' . number_format($meta->getValorMeta(), 2, ',', '.') . ' criada com sucesso!');
             return $this->redirectTo('/metas');
             
         } catch (ValidationException $e) {
@@ -100,7 +134,7 @@ class MetaController extends BaseController
     }
     
     /**
-     * Exibe detalhes da meta com projeções
+     * Detalhes da meta
      * GET /metas/{id}
      */
     public function show(Request $request, int $id): Response
@@ -108,22 +142,19 @@ class MetaController extends BaseController
         try {
             $meta = $this->metaService->buscar($id);
             $projecao = $this->metaService->calcularProjecao($meta);
-            $horasNecessarias = $this->metaService->calcularHorasNecessarias($meta);
             
             if ($request->wantsJson()) {
                 return $this->json([
                     'success' => true,
                     'data' => $meta->toArray(),
-                    'projecao' => $projecao,
-                    'horas_necessarias' => $horasNecessarias
+                    'projecao' => $projecao
                 ]);
             }
             
             return $this->view('metas/show', [
-                'titulo' => 'Meta: ' . $this->formatarMesAno($meta->getMesAno()),
+                'titulo' => 'Meta - ' . $meta->getMesAnoFormatado(),
                 'meta' => $meta,
-                'projecao' => $projecao,
-                'horasNecessarias' => $horasNecessarias
+                'projecao' => $projecao
             ]);
             
         } catch (NotFoundException $e) {
@@ -146,8 +177,7 @@ class MetaController extends BaseController
             ]);
             
         } catch (NotFoundException $e) {
-            $this->flashError('Meta não encontrada');
-            return $this->redirectTo('/metas');
+            return $this->notFound('Meta não encontrada');
         }
     }
     
@@ -167,7 +197,7 @@ class MetaController extends BaseController
             $meta = $this->metaService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
-                return $this->success('Meta atualizada!');
+                return $this->success('Meta atualizada!', $meta->toArray());
             }
             
             $this->flashSuccess('Meta atualizada com sucesso!');
@@ -220,7 +250,8 @@ class MetaController extends BaseController
             if ($request->wantsJson()) {
                 return $this->success('Valor recalculado!', [
                     'valor_realizado' => $meta->getValorRealizado(),
-                    'porcentagem' => $meta->getPorcentagemAtingida()
+                    'porcentagem' => $meta->getPorcentagemAtingida(),
+                    'status' => $meta->getStatus()
                 ]);
             }
             
@@ -246,17 +277,10 @@ class MetaController extends BaseController
     // HELPERS
     // ==========================================
     
-    private function getAnosDisponiveis(): array
-    {
-        $anoAtual = (int) date('Y');
-        $anos = [];
-        
-        for ($i = $anoAtual - 2; $i <= $anoAtual + 1; $i++) {
-            $anos[$i] = $i;
-        }
-        
-        return $anos;
-    }
+    /**
+     * REMOVIDO: getAnosDisponiveis() antigo que gerava anos fixos
+     * Agora usa MetaService::getAnosDisponiveis() que consulta o banco
+     */
     
     private function getMesesDisponiveis(): array
     {
