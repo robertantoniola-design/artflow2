@@ -17,17 +17,11 @@ use App\Exceptions\NotFoundException;
  * 
  * Camada de lógica de negócio para Vendas.
  * 
- * Responsabilidades:
- * - Validar dados de entrada
- * - Calcular lucro e rentabilidade
- * - Atualizar status da arte vendida
- * - Atualizar progresso da meta mensal
- * - Coordenar operações entre repositories
- * 
- * CORREÇÕES (01/02/2026):
- * - registrar(): Agora inclui forma_pagamento e observacoes nos dados da venda
- * - registrar(): Converte strings vazias para null em campos FK (evita erro MySQL)
- * - Adicionado helper sanitizarDados() para limpar campos de entrada
+ * CORREÇÕES (05/02/2026):
+ * - getVendasMensais(): Agora usa vendaRepository->getVendasPorMes() (método correto)
+ * - getRankingRentabilidade(): Agora usa vendaRepository->getMaisRentaveis() (método correto)
+ * - Sanitização de dados (cliente_id vazio → null)
+ * - Inclui forma_pagamento e observacoes no INSERT
  */
 class VendaService
 {
@@ -106,20 +100,14 @@ class VendaService
      * 6. Atualiza status da arte
      * 7. Atualiza meta do mês
      * 
-     * CORREÇÃO (01/02/2026):
-     * - Agora inclui forma_pagamento e observacoes nos $dadosVenda
-     * - Sanitiza cliente_id: string vazia → null (evita FK violation no MySQL)
-     * - Antes, $dadosVenda só tinha 6 campos, agora tem 8
-     * 
      * @param array $dados
      * @return Venda
      * @throws ValidationException
      */
     public function registrar(array $dados): Venda
     {
-        // 1. CORREÇÃO: Sanitiza dados ANTES da validação
+        // 1. Sanitiza dados ANTES da validação
         // Converte strings vazias para null em campos que aceitam null
-        // Sem isso, cliente_id="" causa PDOException: "Incorrect integer value"
         $dados = $this->sanitizarDados($dados);
         
         // 2. Validação básica
@@ -137,10 +125,7 @@ class VendaService
         $lucro = $this->calcularLucro((float) $dados['valor'], $arte);
         $rentabilidadeHora = $this->calcularRentabilidadePorHora($lucro, $arte);
         
-        // 5. CORREÇÃO: Prepara dados COMPLETOS para INSERT
-        // Antes faltavam: forma_pagamento, observacoes
-        // Isso causava INSERT sem forma_pagamento → MySQL rejeitava se coluna 
-        // não tivesse DEFAULT (ou se DB estava em strict mode sem DEFAULT)
+        // 5. Prepara dados COMPLETOS para INSERT
         $dadosVenda = [
             'arte_id'            => (int) $dados['arte_id'],
             'cliente_id'         => $dados['cliente_id'],  // já sanitizado: null ou int
@@ -148,8 +133,8 @@ class VendaService
             'data_venda'         => $dados['data_venda'],
             'lucro_calculado'    => $lucro,
             'rentabilidade_hora' => $rentabilidadeHora,
-            'forma_pagamento'    => $dados['forma_pagamento'] ?? 'pix',       // ADICIONADO
-            'observacoes'        => $dados['observacoes'] ?? null,            // ADICIONADO
+            'forma_pagamento'    => $dados['forma_pagamento'] ?? 'pix',
+            'observacoes'        => $dados['observacoes'] ?? null,
         ];
         
         // 6. Registra a venda no banco
@@ -177,7 +162,7 @@ class VendaService
         // Busca venda atual
         $venda = $this->vendaRepository->findOrFail($id);
         
-        // CORREÇÃO: Sanitiza dados antes de validar
+        // Sanitiza dados antes de validar
         $dados = $this->sanitizarDados($dados);
         
         // Validação
@@ -185,11 +170,10 @@ class VendaService
             throw new ValidationException($this->validator->getErrors());
         }
         
-        // Se mudou o valor, recalcula e atualiza meta
+        // Se mudou o valor, recalcula lucro
         $valorAntigo = $venda->getValor();
         $valorNovo = isset($dados['valor']) ? (float) $dados['valor'] : $valorAntigo;
         
-        // Se valor mudou, recalcula lucro
         if (abs($valorNovo - $valorAntigo) > 0.01) {
             $arte = $this->arteRepository->find($venda->getArteId());
             if ($arte) {
@@ -248,15 +232,9 @@ class VendaService
     /**
      * Sanitiza dados de entrada
      * 
-     * NOVO (01/02/2026):
      * Converte strings vazias para null em campos que aceitam NULL no banco.
      * Isso é necessário porque forms HTML enviam "" para selects não selecionados,
      * e MySQL strict mode rejeita "" em colunas INT (FK violation).
-     * 
-     * Exemplo do problema:
-     *   Form: <option value="">Selecione...</option>  → envia cliente_id=""
-     *   PHP:  $dados['cliente_id'] ?? null             → NÃO converte "" para null (?? só atua em null)
-     *   MySQL: INSERT ... cliente_id = ''              → ERRO: Incorrect integer value
      * 
      * @param array $dados
      * @return array Dados sanitizados
@@ -341,7 +319,6 @@ class VendaService
         $mesAno = date('Y-m-01', strtotime($dataVenda));
         
         // Tenta incrementar. Se não existir meta, não faz nada.
-        // (A meta precisa ser criada previamente pelo usuário)
         $this->metaRepository->incrementarRealizado($mesAno, $valor);
     }
     
@@ -437,23 +414,33 @@ class VendaService
     /**
      * Retorna dados de vendas mensais para gráficos
      * 
+     * CORREÇÃO (05/02/2026): 
+     * Usa getVendasPorMes() que é o método que existe no VendaRepository.
+     * Antes chamava getVendasMensais() que não existe.
+     * 
      * @param int $meses Quantidade de meses para retornar
      * @return array
      */
     public function getVendasMensais(int $meses = 6): array
     {
-        return $this->vendaRepository->getVendasMensais($meses);
+        // CORREÇÃO: Método correto é getVendasPorMes() ou vendasPorMes()
+        return $this->vendaRepository->getVendasPorMes($meses);
     }
     
     /**
      * Retorna ranking de rentabilidade
+     * 
+     * CORREÇÃO (05/02/2026):
+     * Usa getMaisRentaveis() que é o método que existe no VendaRepository.
+     * Antes chamava getRankingRentabilidade() que não existe.
      * 
      * @param int $limite
      * @return array
      */
     public function getRankingRentabilidade(int $limite = 10): array
     {
-        return $this->vendaRepository->getRankingRentabilidade($limite);
+        // CORREÇÃO: Método correto é getMaisRentaveis()
+        return $this->vendaRepository->getMaisRentaveis($limite);
     }
     
     /**
