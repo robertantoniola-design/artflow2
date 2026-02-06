@@ -992,3 +992,15 @@ Stack trace:
 #5 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #6 {main}
 
+[2026-02-06 16:32:13] ParseError: syntax error, unexpected token "<", expecting "elseif" or "else" or "endif" in C:\xampp\htdocs\artflow2\views\metas\index.php:3
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#1 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('metas/index', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\MetaController.php(64): App\Controllers\BaseController->view('metas/index', Array)
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\MetaController->index(Object(App\Core\Request))
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#7 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#8 {main}
+

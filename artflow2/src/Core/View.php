@@ -105,8 +105,8 @@ class View
         $data['success'] = $_SESSION['_flash']['success'] ?? null;
         $data['error'] = $_SESSION['_flash']['error'] ?? null;
         
-        // Limpa flash após usar
-        unset($_SESSION['_flash']);
+        // NÃO limpar flash aqui — o layout main.php chama flash()
+        // que já faz a limpeza ao consumir as mensagens.
         
         // Renderiza view
         $content = self::renderFile($viewPath, $data);

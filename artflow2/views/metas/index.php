@@ -3,29 +3,22 @@
  * VIEW: Listagem de Metas
  * GET /metas
  * 
- * ATUALIZAÇÃO (01/02/2026):
- * - Filtro de ano: trocado dropdown+filtrar/limpar por abas/pills clicáveis
- * - Status: badges agora usam campo 'status' do banco (iniciado/em_progresso/finalizado)
- * - Cards: melhor organização visual
+ * MELHORIA 2 (05/02/2026): Cards de Resumo Estatístico por Ano
+ * MELHORIA 3 (05/02/2026): Gráfico de Evolução Anual (Chart.js)
  * 
- * MELHORIA 1 — Status "Superado" (01/02/2026):
- * - Badge dourado com troféu para metas com status 'superado'
- * - Barra de progresso permite visualizar > 100% (limitada visualmente a 100%)
- * - Texto de porcentagem mostra valor real (ex: "135%") sem truncar
- * - Destaque visual especial para metas superadas (borda dourada)
- * 
- * Variáveis esperadas:
- * - $metas: array de objetos Meta
- * - $estatisticas: array com totais
- * - $anoSelecionado: int (ano ativo)
- * - $anos: array de inteiros (anos disponíveis)
+ * Variáveis recebidas do Controller:
+ *   $titulo           (string)  — título da página
+ *   $metas            (array)   — lista de objetos Meta do ano selecionado
+ *   $estatisticas     (array)   — estatísticas gerais (todas as metas)
+ *   $anoSelecionado   (int)     — ano atualmente filtrado
+ *   $anosDisponiveis  (array)   — anos disponíveis para o select
+ *   $estatisticasAno  (array)   — NOVO: totais/médias do ano selecionado (Melhoria 2)
+ *   $desempenhoAnual  (array)   — NOVO: 12 meses para gráfico (Melhoria 3)
  */
 $currentPage = 'metas';
 ?>
 
-<!-- ============================================ -->
-<!-- HEADER                                       -->
-<!-- ============================================ -->
+<!-- Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-1">
@@ -38,46 +31,215 @@ $currentPage = 'metas';
     </a>
 </div>
 
-<!-- ============================================ -->
-<!-- NAVEGAÇÃO POR ANO (PILLS/ABAS)               -->
-<!-- Cada pill é um link direto: /metas?ano=XXXX   -->
-<!-- ============================================ -->
-<div class="card mb-4">
-    <div class="card-body py-2">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <!-- Label -->
-            <span class="text-muted fw-semibold me-2">
-                <i class="bi bi-calendar3"></i> Ano:
-            </span>
-            
-            <!-- Pills de anos -->
-            <?php foreach ($anos ?? [] as $ano): ?>
-                <?php 
-                // Verifica se este é o ano selecionado
-                $isAtivo = ($ano == ($anoSelecionado ?? date('Y')));
-                ?>
-                <a href="<?= url('/metas?ano=' . $ano) ?>" 
-                   class="btn btn-sm <?= $isAtivo ? 'btn-primary' : 'btn-outline-secondary' ?>"
-                   title="Ver metas de <?= $ano ?>">
-                    <?= $ano ?>
-                    <?php if ($ano == date('Y')): ?>
-                        <span class="badge bg-light text-primary ms-1" style="font-size: 0.65em;">atual</span>
-                    <?php endif; ?>
-                </a>
-            <?php endforeach; ?>
+<!-- Meta Atual (Destaque) — só aparece se $metaAtual for passada pelo controller -->
+<?php if (isset($metaAtual) && $metaAtual): ?>
+    <div class="card border-primary mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="bi bi-star-fill"></i> Meta do Mês Atual - <?= date('F/Y') ?>
+            </h5>
         </div>
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <!-- Barra de Progresso -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>Progresso</span>
+                            <span class="fw-bold"><?= number_format($metaAtual['porcentagem'] ?? 0, 1) ?>%</span>
+                        </div>
+                        <div class="progress" style="height: 25px;">
+                            <?php 
+                            $porcentagem = min(100, $metaAtual['porcentagem'] ?? 0);
+                            $corBarra = $porcentagem >= 100 ? 'success' : ($porcentagem >= 50 ? 'info' : 'warning');
+                            ?>
+                            <div class="progress-bar bg-<?= $corBarra ?>" 
+                                 style="width: <?= $porcentagem ?>%;"
+                                 role="progressbar">
+                                <?= money($metaAtual['valor_realizado'] ?? 0) ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Detalhes -->
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <small class="text-muted">Meta</small>
+                            <h5><?= money($metaAtual['valor_meta'] ?? 0) ?></h5>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Realizado</small>
+                            <h5 class="text-success"><?= money($metaAtual['valor_realizado'] ?? 0) ?></h5>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-muted">Falta</small>
+                            <h5 class="text-danger">
+                                <?= money(max(0, ($metaAtual['valor_meta'] ?? 0) - ($metaAtual['valor_realizado'] ?? 0))) ?>
+                            </h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center">
+                    <?php if (($metaAtual['porcentagem'] ?? 0) >= 100): ?>
+                        <div class="display-1 text-success">🎉</div>
+                        <h5 class="text-success">Meta Batida!</h5>
+                    <?php else: ?>
+                        <div class="display-4 text-primary">
+                            <?= number_format($metaAtual['porcentagem'] ?? 0, 0) ?>%
+                        </div>
+                        <small class="text-muted">
+                            <?php
+                            $diasRestantes = (int)date('t') - (int)date('j');
+                            $faltaVender = max(0, ($metaAtual['valor_meta'] ?? 0) - ($metaAtual['valor_realizado'] ?? 0));
+                            $porDia = $diasRestantes > 0 ? $faltaVender / $diasRestantes : 0;
+                            ?>
+                            <?= $diasRestantes ?> dias restantes<br>
+                            <?= money($porDia) ?>/dia para bater
+                        </small>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form action="<?= url('/metas') ?>" method="GET" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Ano</label>
+                <select name="ano" class="form-select">
+                    <option value="">Todos os anos</option>
+                    <?php foreach ($anosDisponiveis ?? [] as $ano): ?>
+                        <option value="<?= $ano ?>" <?= ($anoSelecionado ?? '') == $ano ? 'selected' : '' ?>>
+                            <?= $ano ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-filter"></i> Filtrar
+                </button>
+                <a href="<?= url('/metas') ?>" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Limpar
+                </a>
+            </div>
+        </form>
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- LISTA DE METAS (CARDS)                       -->
-<!-- ============================================ -->
+<!-- =====================================================
+     MELHORIA 2: Cards de Estatísticas do Ano
+     Exibe 4 cards com totais e médias do ano selecionado.
+     Só aparece se existirem metas no ano.
+     ===================================================== -->
+<?php if (isset($estatisticasAno) && $estatisticasAno['total_metas'] > 0): ?>
+<div class="row mb-4">
+    <!-- Card 1: Total de Metas do ano -->
+    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="text-muted mb-1">
+                    <i class="bi bi-bullseye"></i> Total de Metas
+                </div>
+                <h3 class="card-title mb-1"><?= $estatisticasAno['total_metas'] ?></h3>
+                <small class="text-muted">
+                    <!-- Mostra quantas foram superadas (>= 120%) -->
+                    <?php if ($estatisticasAno['metas_superadas'] > 0): ?>
+                        <span class="text-warning">
+                            <i class="bi bi-trophy-fill"></i> <?= $estatisticasAno['metas_superadas'] ?> superada(s)
+                        </span>
+                    <?php endif; ?>
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 2: Metas Atingidas + Taxa de Sucesso -->
+    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+        <div class="card text-center h-100 border-success">
+            <div class="card-body">
+                <div class="text-muted mb-1">
+                    <i class="bi bi-check-circle"></i> Atingidas
+                </div>
+                <h3 class="card-title mb-1 text-success">
+                    <?= $estatisticasAno['metas_atingidas'] ?>
+                    <small class="fs-6">(<?= $estatisticasAno['taxa_sucesso'] ?>%)</small>
+                </h3>
+                <small class="text-muted">
+                    <?= $estatisticasAno['metas_nao_atingidas'] ?> não atingida(s)
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 3: Média de Realização (porcentagem média) -->
+    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <div class="text-muted mb-1">
+                    <i class="bi bi-graph-up"></i> Média Realização
+                </div>
+                <?php 
+                // Cor dinâmica baseada na média
+                $mediaPct = $estatisticasAno['media_porcentagem'];
+                $corMedia = $mediaPct >= 100 ? 'text-success' : ($mediaPct >= 70 ? 'text-primary' : ($mediaPct >= 40 ? 'text-warning' : 'text-danger'));
+                ?>
+                <h3 class="card-title mb-1 <?= $corMedia ?>">
+                    <?= number_format($mediaPct, 1) ?>%
+                </h3>
+                <small class="text-muted">média do ano</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Card 4: Faturamento Total do Ano (realizado vs meta) -->
+    <div class="col-md-3 col-sm-6">
+        <div class="card text-center h-100 border-primary">
+            <div class="card-body">
+                <div class="text-muted mb-1">
+                    <i class="bi bi-currency-dollar"></i> Faturamento <?= $anoSelecionado ?>
+                </div>
+                <h3 class="card-title mb-1 text-primary">
+                    R$ <?= number_format($estatisticasAno['soma_realizado'], 2, ',', '.') ?>
+                </h3>
+                <small class="text-muted">
+                    Meta: R$ <?= number_format($estatisticasAno['soma_metas'], 2, ',', '.') ?>
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- =====================================================
+     MELHORIA 3: Gráfico de Evolução Anual (Chart.js)
+     Barras comparando meta vs realizado mês a mês.
+     Só aparece se existirem metas no ano.
+     ===================================================== -->
+<?php if (isset($desempenhoAnual) && !empty($desempenhoAnual) && isset($estatisticasAno) && $estatisticasAno['total_metas'] > 0): ?>
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-bar-chart-fill me-2"></i>Evolução <?= $anoSelecionado ?>
+        </h5>
+        <small class="text-muted">Meta vs Realizado — mês a mês</small>
+    </div>
+    <div class="card-body">
+        <!-- Canvas do gráfico — height controla a proporção -->
+        <canvas id="graficoEvolucao" height="100"></canvas>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- Lista de Metas -->
 <?php if (empty($metas)): ?>
-    <!-- Estado vazio: nenhuma meta no ano selecionado -->
     <div class="card">
         <div class="card-body text-center py-5">
             <i class="bi bi-bullseye display-4 text-muted"></i>
-            <h5 class="mt-3">Nenhuma meta em <?= $anoSelecionado ?? date('Y') ?></h5>
+            <h5 class="mt-3">Nenhuma meta cadastrada</h5>
             <p class="text-muted">Defina metas mensais para acompanhar seu desempenho.</p>
             <a href="<?= url('/metas/criar') ?>" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> Criar Meta
@@ -88,66 +250,19 @@ $currentPage = 'metas';
     <div class="row g-4">
         <?php foreach ($metas as $meta): ?>
             <?php
-            // --- Dados para o card ---
-            
-            // Porcentagem real (sem truncar — pode ser > 100%)
-            $porcentagemReal = $meta->getPorcentagemAtingida() ?? 0;
-            
-            // Porcentagem para a barra visual (limitada a 100% para não estourar)
-            $porcentagemBarra = min(100, $porcentagemReal);
-            
+            $porcentagem = min(100, $meta->getPorcentagemAtingida() ?? 0);
+            $corBarra = $porcentagem >= 100 ? 'success' : ($porcentagem >= 50 ? 'info' : ($porcentagem >= 25 ? 'warning' : 'danger'));
             $mesAno = date('m/Y', strtotime($meta->getMesAno()));
-            $isAtual = $meta->isMesAtual();
-            
-            // Cor da barra de progresso baseada no percentual
-            if ($porcentagemReal >= 120) {
-                // NOVO: Dourado/amarelo para metas superadas (>= 120%)
-                $corBarra = 'warning';
-            } elseif ($porcentagemReal >= 100) {
-                $corBarra = 'success';
-            } elseif ($porcentagemReal >= 50) {
-                $corBarra = 'info';
-            } elseif ($porcentagemReal >= 25) {
-                $corBarra = 'warning';
-            } else {
-                $corBarra = 'danger';
-            }
-            
-            // Status vem do Model (campo do banco)
-            $statusLabel = $meta->getStatusLabel();
-            $statusIcon = $meta->getStatusIcon();
-            $statusBadgeClass = $meta->getStatusBadgeClass();
-            
-            // Flags para decisão visual
-            $foiAtingida = $meta->foiAtingida();
-            $isSuperado = $meta->isSuperado();
+            $isAtual = date('Y-m', strtotime($meta->getMesAno())) === date('Y-m');
             ?>
-            
             <div class="col-md-6 col-lg-4">
-                <!-- 
-                  NOVO: Borda especial para metas superadas
-                  - border-primary = mês atual
-                  - border-warning = meta superada (dourado)
-                  - Ambos podem coexistir
-                -->
-                <div class="card h-100 <?= $isAtual ? 'border-primary' : '' ?> <?= $isSuperado ? 'border-warning' : '' ?>">
-                    
-                    <!-- Faixa do mês atual (destaque azul) -->
+                <div class="card h-100 <?= $isAtual ? 'border-primary' : '' ?>">
                     <?php if ($isAtual): ?>
                         <div class="card-header bg-primary text-white py-1 text-center">
-                            <small><i class="bi bi-star-fill"></i> Mês Atual</small>
+                            <small>Mês Atual</small>
                         </div>
                     <?php endif; ?>
-                    
-                    <!-- NOVO: Faixa de troféu para metas superadas (se não é mês atual) -->
-                    <?php if ($isSuperado && !$isAtual): ?>
-                        <div class="card-header bg-warning text-dark py-1 text-center">
-                            <small><i class="bi bi-trophy-fill"></i> Meta Superada!</small>
-                        </div>
-                    <?php endif; ?>
-                    
                     <div class="card-body">
-                        <!-- Título + Menu de ações -->
                         <div class="d-flex justify-content-between align-items-start mb-3">
                             <h5 class="card-title mb-0"><?= $mesAno ?></h5>
                             <div class="dropdown">
@@ -183,45 +298,33 @@ $currentPage = 'metas';
                             </div>
                         </div>
                         
-                        <!-- Barra de Progresso -->
+                        <!-- Progresso -->
                         <div class="progress mb-2" style="height: 10px;">
                             <div class="progress-bar bg-<?= $corBarra ?>" 
-                                 style="width: <?= $porcentagemBarra ?>%;">
+                                 style="width: <?= $porcentagem ?>%;">
                             </div>
                         </div>
-                        
-                        <!-- Valores -->
                         <div class="d-flex justify-content-between small text-muted mb-3">
-                            <!-- NOVO: Mostra porcentagem real (pode ser > 100%) -->
-                            <span>
-                                <?= number_format($porcentagemReal, 0) ?>%
-                                <?php if ($porcentagemReal > 100): ?>
-                                    <i class="bi bi-arrow-up-circle-fill text-success" title="Acima da meta!"></i>
-                                <?php endif; ?>
-                            </span>
+                            <span><?= number_format($porcentagem, 0) ?>%</span>
                             <span><?= money($meta->getValorRealizado()) ?> / <?= money($meta->getValorMeta()) ?></span>
                         </div>
                         
-                        <!-- ============================================ -->
-                        <!-- STATUS DO CICLO DE VIDA                      -->
-                        <!-- ============================================ -->
-                        <?php if ($isSuperado): ?>
-                            <!-- NOVO: Status 'superado' — badge dourado com troféu -->
-                            <span class="badge <?= $statusBadgeClass ?>">
-                                <i class="bi <?= $statusIcon ?>"></i> <?= $statusLabel ?>
-                            </span>
-                            <small class="text-muted ms-1">
-                                (<?= number_format($porcentagemReal, 0) ?>% da meta)
-                            </small>
-                        <?php elseif ($foiAtingida): ?>
-                            <!-- Meta batida (100-119%): verde -->
+                        <!-- Status -->
+                        <?php if ($porcentagem >= 100): ?>
                             <span class="badge bg-success">
-                                <i class="bi bi-check-circle-fill"></i> Meta Batida!
+                                <i class="bi bi-check-circle"></i> Meta Batida!
+                            </span>
+                        <?php elseif ($porcentagem >= 75): ?>
+                            <span class="badge bg-info">
+                                <i class="bi bi-graph-up-arrow"></i> Quase lá!
+                            </span>
+                        <?php elseif ($porcentagem >= 50): ?>
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-activity"></i> Em progresso
                             </span>
                         <?php else: ?>
-                            <!-- Status normal do ciclo de vida -->
-                            <span class="badge <?= $statusBadgeClass ?>">
-                                <i class="bi <?= $statusIcon ?>"></i> <?= $statusLabel ?>
+                            <span class="badge bg-secondary">
+                                <i class="bi bi-hourglass"></i> Iniciando
                             </span>
                         <?php endif; ?>
                     </div>
@@ -231,9 +334,7 @@ $currentPage = 'metas';
     </div>
 <?php endif; ?>
 
-<!-- ============================================ -->
-<!-- MODAL DE EXCLUSÃO                            -->
-<!-- ============================================ -->
+<!-- Modal Exclusão -->
 <div class="modal fade" id="modalExcluir" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -243,13 +344,12 @@ $currentPage = 'metas';
             </div>
             <div class="modal-body">
                 <p>Tem certeza que deseja excluir esta meta?</p>
-                <p class="text-danger small">Esta ação não pode ser desfeita.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <form id="formExcluir" method="POST">
-                    <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     <input type="hidden" name="_method" value="DELETE">
+                    <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     <button type="submit" class="btn btn-danger">
                         <i class="bi bi-trash"></i> Excluir
                     </button>
@@ -259,19 +359,92 @@ $currentPage = 'metas';
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- JAVASCRIPT                                   -->
-<!-- ============================================ -->
 <script>
-/**
- * Abre modal de confirmação de exclusão
- * Define a action do form com o ID da meta
- */
+// =====================================================
+// Script: Exclusão de Meta via Modal
+// =====================================================
 function confirmarExclusao(id) {
-    const form = document.getElementById('formExcluir');
-    form.action = '<?= url('/metas/') ?>' + id + '/deletar';
-    
-    const modal = new bootstrap.Modal(document.getElementById('modalExcluir'));
-    modal.show();
+    document.getElementById('formExcluir').action = '<?= url('/metas') ?>/' + id;
+    new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }
 </script>
+
+<!-- =====================================================
+     MELHORIA 3: Script Chart.js — Gráfico de Evolução Anual
+     
+     Carrega Chart.js via CDN e renderiza gráfico de barras
+     comparando Meta (azul) vs Realizado (verde) mês a mês.
+     
+     IMPORTANTE: O CDN do Chart.js é carregado APENAS se
+     existirem dados para exibir (evita request desnecessário).
+     ===================================================== -->
+<?php if (isset($desempenhoAnual) && !empty($desempenhoAnual) && isset($estatisticasAno) && $estatisticasAno['total_metas'] > 0): ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+/**
+ * Gráfico de Evolução Anual — Meta vs Realizado
+ * 
+ * Dados vindos do PHP (MetaRepository::getDesempenhoAnual):
+ * Array de 12 objetos com: mes, nome_mes, valor_meta, valor_realizado, porcentagem, status
+ * Meses sem meta têm valor null → Chart.js ignora automaticamente barras null
+ */
+const desempenhoAnual = <?= json_encode($desempenhoAnual) ?>;
+
+const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        // Labels: nomes abreviados dos meses (Jan, Fev, Mar, ...)
+        labels: desempenhoAnual.map(d => d.nome_mes),
+        datasets: [
+            {
+                // Dataset 1: Valor da Meta (barras azuis)
+                label: 'Meta',
+                data: desempenhoAnual.map(d => d.valor_meta),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',  // Azul semi-transparente
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            },
+            {
+                // Dataset 2: Valor Realizado (barras verdes)
+                label: 'Realizado',
+                data: desempenhoAnual.map(d => d.valor_realizado),
+                backgroundColor: 'rgba(75, 192, 92, 0.6)',   // Verde semi-transparente
+                borderColor: 'rgba(75, 192, 92, 1)',
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { 
+                position: 'top' 
+            },
+            tooltip: {
+                callbacks: {
+                    // Tooltip customizado: exibe "Sem meta" para meses null
+                    label: function(context) {
+                        let value = context.raw;
+                        if (value === null) return 'Sem meta';
+                        return context.dataset.label + ': R$ ' + 
+                               value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    // Eixo Y formatado em R$
+                    callback: function(value) {
+                        return 'R$ ' + value.toLocaleString('pt-BR');
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+<?php endif; ?>

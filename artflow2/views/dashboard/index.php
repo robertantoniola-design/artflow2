@@ -75,6 +75,8 @@ $metaFalta = max(0, $metaValor - $metaRealizado);
     </div>
 </div>
 
+<?php include __DIR__ . '/../components/alerta-meta-risco.php'; ?>
+
 <!-- ============================================ -->
 <!-- CARDS PRINCIPAIS                             -->
 <!-- ============================================ -->

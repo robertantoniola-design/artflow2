@@ -2,6 +2,11 @@
 /**
  * VIEW: Criar Meta
  * GET /metas/criar
+ * 
+ * MELHORIA 5 (06/02/2026):
+ * - Adicionado checkbox "Repetir meta" e campo "Quantidade de Meses"
+ * - JavaScript para toggle condicional do campo quantidade
+ * - Preview dos meses que serão criados
  */
 $currentPage = 'metas';
 ?>
@@ -106,10 +111,71 @@ $currentPage = 'metas';
                         </div>
                     </div>
                     
+                    <!-- ============================================ -->
+                    <!-- MELHORIA 5: Seção de Meta Recorrente         -->
+                    <!-- ============================================ -->
+                    <hr class="my-4">
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="recorrente" 
+                                   name="recorrente" 
+                                   value="1"
+                                   <?= old('recorrente') === '1' ? 'checked' : '' ?>>
+                            <label class="form-check-label fw-medium" for="recorrente">
+                                <i class="bi bi-arrow-repeat me-1 text-primary"></i>
+                                Repetir meta para os próximos meses
+                            </label>
+                        </div>
+                        <small class="text-muted ms-4 ps-2">
+                            Cria automaticamente metas com o mesmo valor para múltiplos meses consecutivos.
+                        </small>
+                    </div>
+                    
+                    <!-- Container que aparece/desaparece conforme checkbox -->
+                    <div class="mb-3" id="recorrente-wrapper" style="display: none;">
+                        <div class="card bg-light border-primary border-opacity-25">
+                            <div class="card-body py-3">
+                                <div class="row align-items-end">
+                                    <div class="col-md-4">
+                                        <label for="quantidade_meses" class="form-label fw-medium">
+                                            Quantidade de Meses
+                                        </label>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="quantidade_meses" 
+                                               name="quantidade_meses" 
+                                               min="2" 
+                                               max="12" 
+                                               value="<?= old('quantidade_meses', 3) ?>">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <div class="form-text">
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Metas serão criadas para os próximos meses a partir do mês selecionado.
+                                            Meses que já possuem meta serão <strong>ignorados automaticamente</strong>.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Preview dos meses que serão criados -->
+                                <div id="preview-meses" class="mt-3" style="display: none;">
+                                    <small class="text-muted fw-medium">Meses que serão criados:</small>
+                                    <div id="preview-badges" class="mt-1 d-flex flex-wrap gap-1">
+                                        <!-- Preenchido via JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- FIM MELHORIA 5 -->
+                    
                     <!-- Botões -->
                     <div class="mt-4 d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg"></i> Criar Meta
+                        <button type="submit" class="btn btn-primary" id="btnSubmit">
+                            <i class="bi bi-check-lg"></i> <span id="btnText">Criar Meta</span>
                         </button>
                         <a href="<?= url('/metas') ?>" class="btn btn-outline-secondary">
                             Cancelar
@@ -163,7 +229,6 @@ $currentPage = 'metas';
             <div class="card-body">
                 <h6><i class="bi bi-lightbulb text-warning"></i> Dica</h6>
                 <p class="text-muted small mb-0">
-                    Defina metas realistas baseadas no seu histórico. 
                     Uma meta desafiadora mas alcançável mantém a motivação alta!
                 </p>
             </div>
@@ -172,6 +237,9 @@ $currentPage = 'metas';
 </div>
 
 <script>
+// ==========================================
+// CALCULADORA (código original preservado)
+// ==========================================
 const valorInput = document.getElementById('valor_meta');
 const horasInput = document.getElementById('horas_diarias_ideal');
 const diasInput = document.getElementById('dias_trabalho_semana');
@@ -181,17 +249,14 @@ function calcular() {
     const horasDia = parseInt(horasInput.value) || 8;
     const diasSemana = parseInt(diasInput.value) || 5;
     
-    // Dias úteis no mês (aproximado)
     const diasUteis = Math.round((diasSemana / 7) * 30);
     const semanas = 4;
     
-    // Cálculos
     const diario = diasUteis > 0 ? valor / diasUteis : 0;
     const semanal = semanas > 0 ? valor / semanas : 0;
     const horasTotais = diasUteis * horasDia;
     const valorHora = horasTotais > 0 ? valor / horasTotais : 0;
     
-    // Atualiza interface
     document.getElementById('calcDias').textContent = '~' + diasUteis + ' dias';
     document.getElementById('calcDiario').textContent = formatMoney(diario);
     document.getElementById('calcSemanal').textContent = formatMoney(semanal);
@@ -203,11 +268,93 @@ function formatMoney(value) {
     return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// Eventos
 valorInput.addEventListener('input', calcular);
 horasInput.addEventListener('input', calcular);
 diasInput.addEventListener('change', calcular);
-
-// Cálculo inicial
 calcular();
+
+// ==========================================
+// MELHORIA 5: Toggle de Meta Recorrente
+// ==========================================
+const checkRecorrente = document.getElementById('recorrente');
+const wrapperRecorrente = document.getElementById('recorrente-wrapper');
+const inputQuantidade = document.getElementById('quantidade_meses');
+const inputMesAno = document.getElementById('mes_ano');
+const previewMeses = document.getElementById('preview-meses');
+const previewBadges = document.getElementById('preview-badges');
+const btnText = document.getElementById('btnText');
+
+// Nomes dos meses em português
+const nomesMeses = [
+    'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
+];
+
+/**
+ * Mostra/esconde a seção de recorrência
+ */
+function toggleRecorrente() {
+    const ativo = checkRecorrente.checked;
+    wrapperRecorrente.style.display = ativo ? 'block' : 'none';
+    
+    // Atualiza texto do botão
+    if (ativo) {
+        const qtd = parseInt(inputQuantidade.value) || 3;
+        btnText.textContent = 'Criar ' + qtd + ' Meta' + (qtd > 1 ? 's' : '');
+    } else {
+        btnText.textContent = 'Criar Meta';
+    }
+    
+    // Atualiza preview se ativo
+    if (ativo) atualizarPreview();
+}
+
+/**
+ * Gera preview dos meses que serão criados
+ * Mostra badges com mês/ano para visualização
+ */
+function atualizarPreview() {
+    const mesAno = inputMesAno.value; // formato: "YYYY-MM"
+    const quantidade = parseInt(inputQuantidade.value) || 2;
+    
+    if (!mesAno || quantidade < 2) {
+        previewMeses.style.display = 'none';
+        return;
+    }
+    
+    // Parse do mês/ano selecionado
+    const partes = mesAno.split('-');
+    let ano = parseInt(partes[0]);
+    let mes = parseInt(partes[1]) - 1; // 0-based para cálculos
+    
+    // Gera badges
+    let html = '';
+    for (let i = 0; i < quantidade; i++) {
+        const mesAtual = (mes + i) % 12;
+        const anoAtual = ano + Math.floor((mes + i) / 12);
+        const nome = nomesMeses[mesAtual] + '/' + anoAtual;
+        
+        // Primeiro mês em destaque, demais em tom mais suave
+        const classe = i === 0 ? 'bg-primary' : 'bg-primary bg-opacity-50';
+        html += '<span class="badge ' + classe + '">' + nome + '</span>';
+    }
+    
+    previewBadges.innerHTML = html;
+    previewMeses.style.display = 'block';
+    
+    // Atualiza texto do botão
+    btnText.textContent = 'Criar ' + quantidade + ' Meta' + (quantidade > 1 ? 's' : '');
+}
+
+// Event listeners
+checkRecorrente.addEventListener('change', toggleRecorrente);
+inputQuantidade.addEventListener('input', atualizarPreview);
+inputMesAno.addEventListener('change', function() {
+    if (checkRecorrente.checked) atualizarPreview();
+});
+
+// Estado inicial (para quando voltamos com old() após erro de validação)
+if (checkRecorrente.checked) {
+    toggleRecorrente();
+}
 </script>

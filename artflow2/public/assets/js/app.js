@@ -273,13 +273,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ==========================================
     // 6. ALERTAS AUTO-DISMISS
-    // ==========================================
-    document.querySelectorAll('.alert-dismissible').forEach(function(alert) {
-        setTimeout(function() {
-            const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
-            bsAlert.close();
-        }, 5000); // 5 segundos
-    });
+// Fecha flash messages após 5s, mas preserva alertas com data-persist="true"
+document.querySelectorAll('.alert-dismissible').forEach(function(alert) {
+    if (alert.dataset.persist === 'true') return; // ← Ignora alertas persistentes
+    setTimeout(function() {
+        const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+        bsAlert.close();
+    }, 10000);
+});
     
     // ==========================================
     // 7. TOOLTIPS (Bootstrap)

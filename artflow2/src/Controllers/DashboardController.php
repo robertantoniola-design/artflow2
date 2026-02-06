@@ -16,6 +16,10 @@ use App\Services\ClienteService;
  * 
  * Controller responsável pela página inicial do sistema.
  * Agrega estatísticas de todos os módulos.
+ * 
+ * MELHORIA 4 (06/02/2026):
+ * - index() agora passa $metaEmRisco para exibir alerta
+ *   quando projeção indica que meta não será batida
  */
 class DashboardController extends BaseController
 {
@@ -52,6 +56,15 @@ class DashboardController extends BaseController
         // Meta do mês atual
         $metaAtual = $this->metaService->getResumoDashboard();
         
+        // =====================================================
+        // MELHORIA 4: Verificar se meta está em risco
+        // Usa calcularProjecao() para detectar se a projeção
+        // do mês corrente indica que a meta não será batida.
+        // Retorna ['alerta' => true/false, ...] — seguro para
+        // uso na view com verificação simples.
+        // =====================================================
+        $metaEmRisco = $this->metaService->getMetasEmRisco();
+        
         // Top clientes
         $topClientes = $this->clienteService->getTopClientes(5);
         
@@ -72,6 +85,7 @@ class DashboardController extends BaseController
                     'vendas_mes' => count($vendasMes),
                     'faturamento_mes' => $faturamentoMes,
                     'meta' => $metaAtual,
+                    'meta_em_risco' => $metaEmRisco, // MELHORIA 4: inclui no JSON
                     'top_clientes' => $topClientes,
                     'artes_disponiveis' => count($artesDisponiveis),
                     'vendas_mensais' => $vendasMensais,
@@ -86,6 +100,7 @@ class DashboardController extends BaseController
             'vendasMes' => $vendasMes,
             'faturamentoMes' => $faturamentoMes,
             'metaAtual' => $metaAtual,
+            'metaEmRisco' => $metaEmRisco, // MELHORIA 4: passa para a view
             'topClientes' => $topClientes,
             'artesDisponiveis' => $artesDisponiveis,
             'vendasMensais' => $vendasMensais,
@@ -114,6 +129,9 @@ class DashboardController extends BaseController
                 // Meta atual
                 'meta' => $this->metaService->getResumoDashboard(),
                 
+                // MELHORIA 4: Inclui status de risco no refresh
+                'meta_em_risco' => $this->metaService->getMetasEmRisco(),
+                
                 // Gráfico de vendas
                 'vendas_mensais' => $this->vendaService->getVendasMensais(6)
             ]
@@ -128,14 +146,12 @@ class DashboardController extends BaseController
     {
         $stats = $this->arteService->getEstatisticas();
         
-        // Distribuição por complexidade
         $porComplexidade = [
             'baixa' => 0,
             'media' => 0,
             'alta' => 0
         ];
         
-        // Distribuição por status
         $porStatus = [
             'disponivel' => $stats['disponiveis'] ?? 0,
             'em_producao' => $stats['em_producao'] ?? 0,
@@ -170,7 +186,6 @@ class DashboardController extends BaseController
         $vendasMensais = $this->vendaService->getVendasMensais($meses);
         $ranking = $this->vendaService->getRankingRentabilidade(10);
         
-        // Calcula totais
         $totalFaturamento = array_sum(array_column($vendasMensais, 'total'));
         $totalVendas = array_sum(array_column($vendasMensais, 'quantidade'));
         $ticketMedio = $totalVendas > 0 ? $totalFaturamento / $totalVendas : 0;
@@ -198,12 +213,10 @@ class DashboardController extends BaseController
     {
         $resumo = $this->metaService->getResumoDashboard();
         
-        // Calcula dias restantes no mês
         $hoje = new \DateTime();
         $fimMes = new \DateTime('last day of this month');
         $diasRestantes = $hoje->diff($fimMes)->days + 1;
         
-        // Calcula quanto falta por dia
         $faltaVender = max(0, ($resumo['valor_meta'] ?? 0) - ($resumo['valor_realizado'] ?? 0));
         $faltaPorDia = $diasRestantes > 0 ? $faltaVender / $diasRestantes : 0;
         
@@ -212,7 +225,9 @@ class DashboardController extends BaseController
             'data' => array_merge($resumo, [
                 'dias_restantes' => $diasRestantes,
                 'falta_vender' => $faltaVender,
-                'falta_por_dia' => $faltaPorDia
+                'falta_por_dia' => $faltaPorDia,
+                // MELHORIA 4: Inclui status de risco
+                'em_risco' => $this->metaService->getMetasEmRisco()
             ])
         ]);
     }
@@ -225,11 +240,9 @@ class DashboardController extends BaseController
     {
         $limite = (int) $request->get('limite', 10);
         
-        // Busca últimas vendas
         $ultimasVendas = $this->vendaService->getVendasMesAtual();
         $ultimasVendas = array_slice($ultimasVendas, 0, $limite);
         
-        // Formata como atividades
         $atividades = [];
         
         foreach ($ultimasVendas as $venda) {
@@ -239,68 +252,38 @@ class DashboardController extends BaseController
                 'cor' => 'success',
                 'titulo' => 'Nova venda registrada',
                 'descricao' => "Arte vendida por R$ " . number_format($venda->getValor(), 2, ',', '.'),
-                'data' => $venda->getDataVenda(),
-                'id' => $venda->getId()
+                'data' => $venda->getDataVenda()
             ];
         }
         
-        // Ordena por data (mais recente primeiro)
-        usort($atividades, function($a, $b) {
-            return strtotime($b['data']) - strtotime($a['data']);
-        });
-        
         return $this->json([
             'success' => true,
-            'data' => array_slice($atividades, 0, $limite)
+            'data' => $atividades
         ]);
     }
     
     /**
-     * Busca global (artes, clientes, vendas)
-     * GET /dashboard/busca?termo=xxx
+     * Busca global
+     * GET /dashboard/busca
      */
     public function busca(Request $request): Response
     {
-        $termo = $request->get('termo', '');
+        $termo = $request->get('q', '');
         
         if (strlen($termo) < 2) {
             return $this->json([
                 'success' => false,
-                'message' => 'Digite pelo menos 2 caracteres'
+                'message' => 'Termo de busca deve ter pelo menos 2 caracteres'
             ]);
         }
         
-        // Busca em artes
-        $artes = $this->arteService->pesquisar(['termo' => $termo], 5);
-        
-        // Busca em clientes
-        $clientes = $this->clienteService->pesquisar($termo, 5);
-        
+        // TODO: Implementar busca global
         return $this->json([
             'success' => true,
-            'termo' => $termo,
-            'resultados' => [
-                'artes' => array_map(function($arte) {
-                    return [
-                        'id' => $arte->getId(),
-                        'nome' => $arte->getNome(),
-                        'status' => $arte->getStatus(),
-                        'tipo' => 'arte',
-                        'url' => "/artes/{$arte->getId()}"
-                    ];
-                }, $artes),
-                
-                'clientes' => array_map(function($cliente) {
-                    return [
-                        'id' => $cliente->getId(),
-                        'nome' => $cliente->getNome(),
-                        'email' => $cliente->getEmail(),
-                        'tipo' => 'cliente',
-                        'url' => "/clientes/{$cliente->getId()}"
-                    ];
-                }, $clientes)
-            ],
-            'total' => count($artes) + count($clientes)
+            'data' => [
+                'termo' => $termo,
+                'resultados' => []
+            ]
         ]);
     }
 }

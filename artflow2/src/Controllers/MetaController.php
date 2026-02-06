@@ -15,11 +15,8 @@ use App\Exceptions\NotFoundException;
  * 
  * Controller responsável pelas operações de Metas Mensais.
  * 
- * ATUALIZAÇÃO (01/02/2026):
- * - index(): Agora auto-finaliza metas passadas ao carregar
- * - index(): Anos dinâmicos vindos do banco (não mais fixos)
- * - index(): Default é ano atual (não 'todos')
- * - getAnosDisponiveis(): Usa MetaService em vez de gerar fixo
+ * MELHORIA 2 + 3 (05/02/2026): index() passa estatísticasAno e desempenhoAnual
+ * MELHORIA 5 (06/02/2026): store() suporta criação recorrente
  */
 class MetaController extends BaseController
 {
@@ -33,50 +30,34 @@ class MetaController extends BaseController
     /**
      * Lista todas as metas
      * GET /metas
-     * GET /metas?ano=2025
      * 
-     * ATUALIZADO:
-     * - Auto-finaliza metas de meses passados
-     * - Busca anos reais do banco para navegação
-     * - Default: ano atual
+     * MELHORIA 2+3: Passa estatísticasAno e desempenhoAnual para a view
      */
     public function index(Request $request): Response
     {
-        // NOVO: Auto-finaliza metas de meses passados
-        // Garante que metas antigas tenham status = 'finalizado'
-        $this->metaService->finalizarMetasPassadas();
-        
-        // Busca anos disponíveis (do banco + ano atual)
-        $anosDisponiveis = $this->metaService->getAnosDisponiveis();
-        
-        // Determina o ano selecionado
-        // - Se veio ?ano=XXXX na URL, usa esse
-        // - Se não, usa o ano atual como padrão
-        $anoSelecionado = $request->get('ano');
-        
-        if (empty($anoSelecionado) || !is_numeric($anoSelecionado)) {
-            // Default: ano atual
-            $anoSelecionado = (int) date('Y');
-        } else {
-            $anoSelecionado = (int) $anoSelecionado;
-        }
-        
-        // Filtros para o service
         $filtros = [
-            'ano' => $anoSelecionado,
+            'ano' => $request->get('ano', date('Y')),
             'limite' => $request->get('limite', 12)
         ];
         
+        $anoSelecionado = (int) $filtros['ano'];
+        
         $metas = $this->metaService->listar($filtros);
         $estatisticas = $this->metaService->getEstatisticas();
+        
+        // MELHORIA 2: Estatísticas do ano selecionado (cards)
+        $estatisticasAno = $this->metaService->getEstatisticasAno($anoSelecionado);
+        
+        // MELHORIA 3: Dados para gráfico de evolução anual
+        $desempenhoAnual = $this->metaService->getDesempenhoAnual($anoSelecionado);
         
         if ($request->wantsJson()) {
             return $this->json([
                 'success' => true,
                 'data' => array_map(fn($m) => $m->toArray(), $metas),
                 'estatisticas' => $estatisticas,
-                'ano_selecionado' => $anoSelecionado,
-                'anos_disponiveis' => $anosDisponiveis
+                'estatisticasAno' => $estatisticasAno,
+                'desempenhoAnual' => $desempenhoAnual
             ]);
         }
         
@@ -85,7 +66,9 @@ class MetaController extends BaseController
             'metas' => $metas,
             'estatisticas' => $estatisticas,
             'anoSelecionado' => $anoSelecionado,
-            'anos' => $anosDisponiveis   // Agora é array de inteiros do banco
+            'anosDisponiveis' => $this->getAnosDisponiveis(),
+            'estatisticasAno' => $estatisticasAno,       // MELHORIA 2
+            'desempenhoAnual' => $desempenhoAnual         // MELHORIA 3
         ]);
     }
     
@@ -102,27 +85,100 @@ class MetaController extends BaseController
     }
     
     /**
-     * Salva nova meta
+     * Salva nova meta (simples ou recorrente)
      * POST /metas
+     * 
+     * MELHORIA 5: Suporta criação recorrente quando checkbox 'recorrente'
+     * está marcado e quantidade_meses > 1. Meses já existentes são ignorados.
      */
     public function store(Request $request): Response
     {
         $this->validateCsrf($request);
         
         try {
+            // Dados base da meta
             $dados = $request->only([
                 'mes_ano', 'valor_meta', 
                 'horas_diarias_ideal', 'dias_trabalho_semana'
             ]);
             
-            $meta = $this->metaService->criar($dados);
+            // =====================================================
+            // MELHORIA 5: Verifica se é criação recorrente
+            // Usa $_POST diretamente porque checkbox desmarcado
+            // não envia campo, e $request->get() pode não capturá-lo
+            // corretamente no merge GET+POST.
+            // =====================================================
+            $recorrente = isset($_POST['recorrente']) && $_POST['recorrente'] === '1';
+            $quantidadeMeses = isset($_POST['quantidade_meses']) 
+                ? (int) $_POST['quantidade_meses'] 
+                : 1;
             
-            if ($request->wantsJson()) {
-                return $this->success('Meta criada!', ['id' => $meta->getId()]);
+            if ($recorrente && $quantidadeMeses > 1) {
+                // --- CRIAÇÃO RECORRENTE ---
+                $resultado = $this->metaService->criarRecorrente($dados, $quantidadeMeses);
+                
+                // Monta mensagem de feedback detalhada
+                $totalCriadas = count($resultado['criadas']);
+                $totalIgnoradas = count($resultado['ignoradas']);
+                $totalErros = count($resultado['erros']);
+                
+                // Monta mensagem de feedback detalhada
+                // Nota: usa flashSuccess para todos os cenários porque
+                // flashWarning não é exibido corretamente em todas as views.
+                if ($totalCriadas > 0) {
+                    $mensagem = sprintf('✅ %d meta(s) criada(s) com sucesso.', $totalCriadas);
+                    
+                    if ($totalIgnoradas > 0) {
+                        $mensagem .= sprintf(
+                            ' ⚠️ %d mês(es) ignorado(s) (já existiam).', 
+                            $totalIgnoradas
+                        );
+                    }
+                    
+                    if ($totalErros > 0) {
+                        $mensagem .= sprintf(' ❌ %d erro(s) encontrado(s).', $totalErros);
+                    }
+                    
+                    $this->flashSuccess($mensagem);
+                    
+                } elseif ($totalIgnoradas > 0) {
+                    // Todos os meses já existem
+                    $this->flashSuccess(
+                        '⚠️ Nenhuma meta criada. Todos os ' . $totalIgnoradas 
+                        . ' meses selecionados já possuem meta definida.'
+                    );
+                    
+                } else {
+                    // Nenhuma criada e nenhuma ignorada = erro
+                    $this->flashError(
+                        'Não foi possível criar as metas. Verifique os dados informados.'
+                    );
+                }
+                
+                if ($request->wantsJson()) {
+                    return $this->json([
+                        'success' => $totalCriadas > 0,
+                        'data' => $resultado
+                    ]);
+                }
+                
+                return $this->redirectTo('/metas');
+             
+                
+                
+            } else {
+                // --- CRIAÇÃO SIMPLES (comportamento original) ---
+                $meta = $this->metaService->criar($dados);
+                
+                if ($request->wantsJson()) {
+                    return $this->success('Meta criada!', ['id' => $meta->getId()]);
+                }
+                
+                $this->flashSuccess(
+                    'Meta de R$ ' . number_format($meta->getValorMeta(), 2, ',', '.') . ' criada!'
+                );
+                return $this->redirectTo('/metas');
             }
-            
-            $this->flashSuccess('Meta de R$ ' . number_format($meta->getValorMeta(), 2, ',', '.') . ' criada com sucesso!');
-            return $this->redirectTo('/metas');
             
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
@@ -130,11 +186,16 @@ class MetaController extends BaseController
             }
             
             return $this->back()->withErrors($e->getErrors())->withInput();
+            
+        } catch (\Exception $e) {
+            // Captura qualquer exceção inesperada (DateTime, PDO, etc.)
+            $this->flashError('Erro ao criar meta: ' . $e->getMessage());
+            return $this->redirectTo('/metas/criar');
         }
     }
     
     /**
-     * Detalhes da meta
+     * Exibe detalhes da meta com projeções
      * GET /metas/{id}
      */
     public function show(Request $request, int $id): Response
@@ -142,19 +203,22 @@ class MetaController extends BaseController
         try {
             $meta = $this->metaService->buscar($id);
             $projecao = $this->metaService->calcularProjecao($meta);
+            $horasNecessarias = $this->metaService->calcularHorasNecessarias($meta);
             
             if ($request->wantsJson()) {
                 return $this->json([
                     'success' => true,
                     'data' => $meta->toArray(),
-                    'projecao' => $projecao
+                    'projecao' => $projecao,
+                    'horas_necessarias' => $horasNecessarias
                 ]);
             }
             
             return $this->view('metas/show', [
-                'titulo' => 'Meta - ' . $meta->getMesAnoFormatado(),
+                'titulo' => 'Meta: ' . $this->formatarMesAno($meta->getMesAno()),
                 'meta' => $meta,
-                'projecao' => $projecao
+                'projecao' => $projecao,
+                'horasNecessarias' => $horasNecessarias
             ]);
             
         } catch (NotFoundException $e) {
@@ -177,7 +241,8 @@ class MetaController extends BaseController
             ]);
             
         } catch (NotFoundException $e) {
-            return $this->notFound('Meta não encontrada');
+            $this->flashError('Meta não encontrada');
+            return $this->redirectTo('/metas');
         }
     }
     
@@ -197,7 +262,7 @@ class MetaController extends BaseController
             $meta = $this->metaService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
-                return $this->success('Meta atualizada!', $meta->toArray());
+                return $this->success('Meta atualizada!');
             }
             
             $this->flashSuccess('Meta atualizada com sucesso!');
@@ -250,8 +315,7 @@ class MetaController extends BaseController
             if ($request->wantsJson()) {
                 return $this->success('Valor recalculado!', [
                     'valor_realizado' => $meta->getValorRealizado(),
-                    'porcentagem' => $meta->getPorcentagemAtingida(),
-                    'status' => $meta->getStatus()
+                    'porcentagem' => $meta->getPorcentagemAtingida()
                 ]);
             }
             
@@ -277,17 +341,23 @@ class MetaController extends BaseController
     // HELPERS
     // ==========================================
     
-    /**
-     * REMOVIDO: getAnosDisponiveis() antigo que gerava anos fixos
-     * Agora usa MetaService::getAnosDisponiveis() que consulta o banco
-     */
+    private function getAnosDisponiveis(): array
+    {
+        $anoAtual = (int) date('Y');
+        $anos = [];
+        
+        for ($i = $anoAtual - 2; $i <= $anoAtual + 1; $i++) {
+            $anos[$i] = $i;
+        }
+        
+        return $anos;
+    }
     
     private function getMesesDisponiveis(): array
     {
         $meses = [];
         $dataAtual = new \DateTime();
         
-        // Próximos 12 meses a partir do atual
         for ($i = 0; $i < 12; $i++) {
             $data = clone $dataAtual;
             $data->modify("+{$i} months");
