@@ -20,6 +20,11 @@ use App\Exceptions\NotFoundException;
  * - Garantir unicidade de nomes
  * - Normalizar cores
  * - Gerenciar relacionamentos com artes
+ * 
+ * CORREÇÕES APLICADAS:
+ * - [07/02/2026] Adicionado pesquisar() — chamado pelo TagController::index() e buscar()
+ * - [07/02/2026] Adicionado getArtesComTag() — chamado pelo TagController::show()
+ * - [07/02/2026] Fix normalizarDados() — lógica de cor padrão corrigida
  */
 class TagService
 {
@@ -121,7 +126,7 @@ class TagService
         // Verifica se existe
         $tag = $this->tagRepository->findOrFail($id);
         
-        // Validação
+        // Validação (usa validateUpdate para campos opcionais na edição)
         if (!$this->validator->validateUpdate($dados)) {
             throw new ValidationException($this->validator->getErrors());
         }
@@ -154,8 +159,59 @@ class TagService
     {
         $this->tagRepository->findOrFail($id);
         
-        // Remove tag e todas associações
+        // Remove tag e todas associações na arte_tags
         return $this->tagRepository->deleteWithRelations($id);
+    }
+    
+    // ==========================================
+    // BUSCA E PESQUISA
+    // ==========================================
+    
+    /**
+     * ============================================
+     * NOVO: Pesquisa tags por termo
+     * ============================================
+     * 
+     * Método chamado pelo TagController::index() quando há filtro de busca
+     * e pelo TagController::buscar() no endpoint AJAX de autocomplete.
+     * 
+     * Retorna tags COM contagem de artes (para exibir nos cards da listagem).
+     * Para o AJAX, o controller extrai apenas os campos necessários.
+     * 
+     * @param string $termo Parte do nome da tag para buscar
+     * @param int $limite Máximo de resultados (default 50)
+     * @return array Array de Tag objects com artesCount ou arrays associativos
+     */
+    public function pesquisar(string $termo, int $limite = 50): array
+    {
+        // Termo muito curto: retorna vazio para evitar queries pesadas
+        if (mb_strlen(trim($termo)) < 1) {
+            return [];
+        }
+        
+        // Usa searchWithCount para retornar tags com contagem de artes
+        // Isso garante que os cards na listagem exibam "X arte(s)"
+        return $this->tagRepository->searchWithCount(trim($termo), $limite);
+    }
+    
+    /**
+     * ============================================
+     * NOVO: Retorna artes associadas a uma tag
+     * ============================================
+     * 
+     * Método chamado pelo TagController::show() para exibir
+     * a lista de artes que possuem esta tag na página de detalhes.
+     * 
+     * Retorna arrays associativos (não objetos Arte) porque
+     * o TagService/TagRepository não devem depender do model Arte.
+     * A view show.php itera sobre estes arrays diretamente.
+     * 
+     * @param int $tagId ID da tag
+     * @return array Array de arrays associativos com dados das artes
+     */
+    public function getArtesComTag(int $tagId): array
+    {
+        return $this->tagRepository->getArtesByTag($tagId);
     }
     
     // ==========================================
@@ -164,6 +220,10 @@ class TagService
     
     /**
      * Normaliza dados da tag
+     * 
+     * FIX [07/02/2026]: Corrigida lógica da cor padrão.
+     * ANTES: O else+?? nunca executava (se !isset, ?? também não resolve)
+     * AGORA: Verifica isset separadamente e atribui default quando ausente
      * 
      * @param array $dados
      * @return array
@@ -175,12 +235,13 @@ class TagService
             $dados['nome'] = ucfirst(mb_strtolower(trim($dados['nome']), 'UTF-8'));
         }
         
-        // Cor: normaliza para formato padrão
-        if (isset($dados['cor'])) {
+        // Cor: normaliza para formato padrão ou aplica default
+        if (isset($dados['cor']) && !empty($dados['cor'])) {
+            // Cor fornecida: normaliza formato hex
             $dados['cor'] = TagValidator::normalizeCor($dados['cor']);
         } else {
-            // Cor padrão se não fornecida
-            $dados['cor'] = $dados['cor'] ?? '#6c757d';
+            // Cor não fornecida ou vazia: aplica cor padrão cinza
+            $dados['cor'] = '#6c757d';
         }
         
         return $dados;
@@ -220,7 +281,7 @@ class TagService
      */
     public function syncArte(int $arteId, array $tagIds): void
     {
-        // Filtra IDs válidos
+        // Filtra IDs válidos (numéricos e positivos)
         $tagIds = array_filter($tagIds, function($id) {
             return is_numeric($id) && $id > 0;
         });

@@ -19,6 +19,10 @@ use PDO;
  * - Busca por nome/cor
  * - Gerenciamento de relacionamento N:N com artes
  * - Contagem de artes por tag
+ * 
+ * CORREÇÕES APLICADAS:
+ * - [07/02/2026] Adicionado searchWithCount() — busca por termo COM contagem de artes
+ * - [07/02/2026] Adicionado getArtesByTag() — retorna artes associadas a uma tag
  */
 class TagRepository extends BaseRepository
 {
@@ -74,7 +78,8 @@ class TagRepository extends BaseRepository
     }
     
     /**
-     * Busca tags por parte do nome
+     * Busca tags por parte do nome (sem contagem de artes)
+     * Usado internamente e no endpoint AJAX de autocomplete
      * 
      * @param string $termo
      * @return array
@@ -89,6 +94,48 @@ class TagRepository extends BaseRepository
         $stmt->execute(['termo' => "%{$termo}%"]);
         
         return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+    
+    /**
+     * ============================================
+     * NOVO: Busca tags por termo COM contagem de artes
+     * ============================================
+     * 
+     * Usado pela listagem (index) quando há filtro de busca.
+     * Diferente de search(), este método retorna tags com
+     * a contagem de artes associadas (total_artes), igual
+     * ao allWithCount() mas filtrado por termo.
+     * 
+     * @param string $termo Parte do nome da tag
+     * @param int $limite Máximo de resultados
+     * @return array Array de Tag objects com artesCount setado
+     */
+    public function searchWithCount(string $termo, int $limite = 50): array
+    {
+        $sql = "SELECT t.*, COUNT(at.arte_id) as total_artes
+                FROM {$this->table} t
+                LEFT JOIN arte_tags at ON t.id = at.tag_id
+                WHERE t.nome LIKE :termo
+                GROUP BY t.id
+                ORDER BY t.nome ASC
+                LIMIT :limite";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->bindValue(':termo', "%{$termo}%", PDO::PARAM_STR);
+        $stmt->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Hidrata e adiciona contagem (mesmo padrão de allWithCount)
+        $tags = [];
+        foreach ($results as $row) {
+            $tag = $this->hydrate($row);
+            $tag->setArtesCount((int) $row['total_artes']);
+            $tags[] = $tag;
+        }
+        
+        return $tags;
     }
     
     /**
@@ -107,7 +154,7 @@ class TagRepository extends BaseRepository
     // ==========================================
     
     /**
-     * Associa tags a uma arte
+     * Associa tags a uma arte (sync: remove antigas + insere novas)
      * 
      * @param int $arteId
      * @param array $tagIds Array de IDs das tags
@@ -143,7 +190,7 @@ class TagRepository extends BaseRepository
      */
     public function attachArte(int $arteId, int $tagId): bool
     {
-        // Verifica se já existe
+        // Verifica se já existe (evita duplicata)
         $sql = "SELECT COUNT(*) FROM arte_tags WHERE arte_id = :arte_id AND tag_id = :tag_id";
         $stmt = $this->getConnection()->prepare($sql);
         $stmt->execute(['arte_id' => $arteId, 'tag_id' => $tagId]);
@@ -176,7 +223,7 @@ class TagRepository extends BaseRepository
      * Retorna tags de uma arte específica
      * 
      * @param int $arteId
-     * @return array
+     * @return array Array de Tag objects
      */
     public function getByArte(int $arteId): array
     {
@@ -195,7 +242,7 @@ class TagRepository extends BaseRepository
      * Retorna IDs das tags de uma arte
      * 
      * @param int $arteId
-     * @return array
+     * @return array Array de inteiros (IDs)
      */
     public function getIdsByArte(int $arteId): array
     {
@@ -206,6 +253,33 @@ class TagRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
     
+    /**
+     * ============================================
+     * NOVO: Retorna artes associadas a uma tag
+     * ============================================
+     * 
+     * Usado pela página show (detalhes da tag) para exibir
+     * todas as artes que possuem esta tag.
+     * Retorna arrays associativos (não objetos Arte) porque
+     * o TagRepository não conhece o model Arte.
+     * 
+     * @param int $tagId ID da tag
+     * @return array Array de arrays associativos com dados das artes
+     */
+    public function getArtesByTag(int $tagId): array
+    {
+        $sql = "SELECT a.* 
+                FROM artes a
+                INNER JOIN arte_tags at ON a.id = at.arte_id
+                WHERE at.tag_id = :tag_id
+                ORDER BY a.nome ASC";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute(['tag_id' => $tagId]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
     // ==========================================
     // ESTATÍSTICAS
     // ==========================================
@@ -213,7 +287,7 @@ class TagRepository extends BaseRepository
     /**
      * Retorna tags com contagem de artes
      * 
-     * @return array
+     * @return array Array de Tag objects com artesCount setado
      */
     public function allWithCount(): array
     {
@@ -241,7 +315,7 @@ class TagRepository extends BaseRepository
      * Retorna as tags mais usadas
      * 
      * @param int $limit
-     * @return array
+     * @return array Array de Tag objects com artesCount setado
      */
     public function getMaisUsadas(int $limit = 10): array
     {
@@ -271,7 +345,7 @@ class TagRepository extends BaseRepository
     /**
      * Retorna contagem de artes por tag (para gráfico)
      * 
-     * @return array
+     * @return array Array associativo ['nome', 'cor', 'quantidade']
      */
     public function getContagemPorTag(): array
     {
@@ -333,7 +407,7 @@ class TagRepository extends BaseRepository
     }
     
     /**
-     * Remove tag e todas suas associações
+     * Remove tag e todas suas associações (transação segura)
      * 
      * @param int $id
      * @return bool
@@ -345,7 +419,7 @@ class TagRepository extends BaseRepository
         try {
             $db->beginTransaction();
             
-            // Remove associações
+            // Remove associações na tabela pivot
             $stmt = $db->prepare("DELETE FROM arte_tags WHERE tag_id = :id");
             $stmt->execute(['id' => $id]);
             

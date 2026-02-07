@@ -1013,3 +1013,117 @@ Stack trace:
 #4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #5 {main}
 
+[2026-02-07 09:50:46] Error: Call to undefined method App\Services\TagService::getArtesComTag() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:119
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 6)
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-02-07 09:51:34] Error: Call to undefined method App\Services\TagService::getArtesComTag() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:119
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 6)
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-02-07 09:53:57] Error: Call to undefined method App\Services\TagService::getArtesComTag() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:119
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 6)
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-02-07 09:56:55] Error: Call to undefined method App\Services\TagService::pesquisar() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:42
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->index(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+
+[2026-02-07 10:05:59] Error: Call to a member function getStatus() on array in C:\xampp\htdocs\artflow2\views\tags\show.php:77
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('tags/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(129): App\Controllers\BaseController->view('tags/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 3)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-02-07 10:07:33] Error: Call to a member function getStatus() on array in C:\xampp\htdocs\artflow2\views\tags\show.php:77
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('tags/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(129): App\Controllers\BaseController->view('tags/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 4)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-02-07 10:07:45] Error: Call to a member function getStatus() on array in C:\xampp\htdocs\artflow2\views\tags\show.php:77
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('tags/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(129): App\Controllers\BaseController->view('tags/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 1)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-02-07 10:09:00] Error: Call to a member function getStatus() on array in C:\xampp\htdocs\artflow2\views\tags\show.php:77
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('tags/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(129): App\Controllers\BaseController->view('tags/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 4)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-02-07 10:10:42] Error: Call to a member function getStatus() on array in C:\xampp\htdocs\artflow2\views\tags\show.php:77
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('tags/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(129): App\Controllers\BaseController->view('tags/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 7)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+
+[2026-02-07 10:12:21] Error: Call to a member function getStatus() on array in C:\xampp\htdocs\artflow2\views\tags\show.php:77
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\View.php(168): include()
+#1 C:\xampp\htdocs\artflow2\src\Core\View.php(112): App\Core\View::renderFile('C:\\xampp\\htdocs...', Array)
+#2 C:\xampp\htdocs\artflow2\src\Controllers\BaseController.php(36): App\Core\View::render('tags/show', Array)
+#3 C:\xampp\htdocs\artflow2\src\Controllers\TagController.php(129): App\Controllers\BaseController->view('tags/show', Array)
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->show(Object(App\Core\Request), 5)
+#5 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#6 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#7 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#9 {main}
+

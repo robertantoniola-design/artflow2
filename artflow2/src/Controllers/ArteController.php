@@ -48,10 +48,10 @@ class ArteController extends BaseController
     public function index(Request $request): Response
     {
         // Filtros da URL
-        $filtros = [
-            'status' => $request->get('status'),
-            'termo' => $request->get('q'),
-            'tag_id' => $request->get('tag')
+       $filtros = [
+        'status' => $request->get('status'),
+        'termo' => $request->get('termo'),    // FIX: view envia 'termo', não 'q'
+        'tag_id' => $request->get('tag_id')   // FIX: view envia 'tag_id', não 'tag'
         ];
         
         $artes = $this->arteService->listar($filtros);
