@@ -1004,3 +1004,12 @@ Stack trace:
 #7 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #8 {main}
 
+[2026-02-07 02:23:53] TypeError: App\Controllers\MetaController::show(): Argument #2 ($id) must be of type int, string given, called in C:\xampp\htdocs\artflow2\src\Core\Router.php on line 289 in C:\xampp\htdocs\artflow2\src\Controllers\MetaController.php:203
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(289): App\Controllers\MetaController->show(Object(App\Core\Request), '%7Bid%7D')
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+

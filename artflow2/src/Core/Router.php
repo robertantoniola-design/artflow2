@@ -252,9 +252,20 @@ class Router
             preg_match_all('/\{([a-zA-Z_]+)\}/', $routeUri, $paramNames);
             
             // Combina nomes com valores
+            // CORREÇÃO: Converte strings numéricas para int automaticamente
+            // Resolve TypeError em controllers que declaram (int $id)
+            // Ex: URL /metas/24 → $matches = ["24"] → convertido para int 24
             $params = [];
             foreach ($paramNames[1] as $index => $name) {
-                $params[$name] = $matches[$index] ?? null;
+                $value = $matches[$index] ?? null;
+                
+                // Se o valor é puramente numérico, converte para int
+                // ctype_digit() retorna true para "123", false para "abc" ou "12a"
+                if ($value !== null && ctype_digit($value)) {
+                    $value = (int) $value;
+                }
+                
+                $params[$name] = $value;
             }
             
             return $params;

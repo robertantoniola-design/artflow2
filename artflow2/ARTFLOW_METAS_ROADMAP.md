@@ -1,15 +1,15 @@
 # ArtFlow 2.0 — Módulo Metas: Documentação Completa
 
-**Data:** 06/02/2026  
-**Status Geral:** 5 de 6 melhorias implementadas  
-**Versão Base:** Sistema funcional com melhorias 1-5 completas  
+**Data:** 07/02/2026  
+**Status Geral:** ✅ 6 de 6 melhorias implementadas e testadas  
+**Versão Base:** Sistema funcional com melhorias 1-6 completas  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)
 
 ---
 
 ## 📋 RESUMO EXECUTIVO
 
-O módulo de Metas do ArtFlow 2.0 gerencia metas mensais de faturamento para negócios de arte, permitindo acompanhar progresso, projeções e histórico. O módulo passou por 6 melhorias planejadas, das quais 5 já foram implementadas e testadas com sucesso.
+O módulo de Metas do ArtFlow 2.0 gerencia metas mensais de faturamento para negócios de arte, permitindo acompanhar progresso, projeções e histórico. O módulo passou por 6 melhorias planejadas, todas implementadas e testadas com sucesso.
 
 ### Status das Melhorias
 
@@ -20,7 +20,13 @@ O módulo de Metas do ArtFlow 2.0 gerencia metas mensais de faturamento para neg
 | 3 | Gráfico Evolução Anual (Chart.js) | Baixa-Média | ✅ IMPLEMENTADA |
 | 4 | Notificação de Metas em Risco | Baixa | ✅ IMPLEMENTADA |
 | 5 | Criação de Metas Recorrentes | Média | ✅ IMPLEMENTADA |
-| 6 | Histórico de Transições de Status | Média-Alta | ⏳ PENDENTE |
+| 6 | Histórico de Transições de Status | Média-Alta | ✅ IMPLEMENTADA |
+
+### Correção Sistêmica Aplicada
+
+| Correção | Arquivo | Impacto |
+|----------|---------|---------|
+| Router: conversão automática string→int em parâmetros de URL | `src/Core/Router.php` | Todos os módulos |
 
 ---
 
@@ -33,11 +39,11 @@ src/
 ├── Models/
 │   └── Meta.php                      ✅ Atualizado (Melhoria 1)
 ├── Repositories/
-│   └── MetaRepository.php            ✅ Atualizado (Melhorias 1,2,3)
+│   └── MetaRepository.php            ✅ Atualizado (Melhorias 1,2,3,6)
 ├── Services/
-│   └── MetaService.php               ✅ Atualizado (Melhorias 2,3,4,5)
+│   └── MetaService.php               ✅ Atualizado (Melhorias 2,3,4,5,6)
 ├── Controllers/
-│   ├── MetaController.php            ✅ Atualizado (Melhorias 2,3,5)
+│   ├── MetaController.php            ✅ Atualizado (Melhorias 2,3,5,6)
 │   └── DashboardController.php       ✅ Atualizado (Melhoria 4)
 └── Validators/
     └── MetaValidator.php             ✅ Original
@@ -46,19 +52,21 @@ views/
 ├── metas/
 │   ├── index.php                     ✅ Atualizado (Melhorias 1,2,3)
 │   ├── create.php                    ✅ Atualizado (Melhoria 5)
-│   ├── show.php                      ✅ Original
+│   ├── show.php                      ✅ Atualizado (Melhoria 6 — timeline)
 │   └── edit.php                      ✅ Original
 └── dashboard/
     └── index.php                     ✅ Atualizado (Melhoria 4)
 
 database/migrations/
-└── 012_add_status_superado.php       ✅ Executada (Melhoria 1)
+├── 012_add_status_superado.php       ✅ Executada (Melhoria 1)
+└── 013_create_meta_status_log.php    ✅ Executada (Melhoria 6)
 
 public/assets/js/
 └── app.js                            ✅ Atualizado (timeout alertas: 10s)
 
 src/Core/
-└── View.php                          ✅ Corrigido (bug flash messages)
+├── View.php                          ✅ Corrigido (bug flash messages)
+└── Router.php                        ✅ Corrigido (conversão string→int)
 ```
 
 ### Dependências entre Classes
@@ -86,6 +94,30 @@ CREATE TABLE metas (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
+
+### Tabela `meta_status_log` (Melhoria 6)
+
+```sql
+CREATE TABLE meta_status_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    meta_id INT(10) UNSIGNED NOT NULL,
+    status_anterior VARCHAR(20) NULL COMMENT 'NULL para criação inicial',
+    status_novo VARCHAR(20) NOT NULL,
+    porcentagem_momento DECIMAL(10,2) NULL,
+    valor_realizado_momento DECIMAL(10,2) NULL,
+    observacao TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (meta_id) REFERENCES metas(id) ON DELETE CASCADE,
+    INDEX idx_meta_status_log_meta_id (meta_id),
+    INDEX idx_meta_status_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**Notas sobre a tabela:**
+- `status_novo` é NOT NULL (campo obrigatório)
+- `created_at` NÃO tem `ON UPDATE` (log é imutável)
+- CASCADE: ao deletar meta, logs são removidos automaticamente
 
 ---
 
@@ -329,64 +361,127 @@ Botão: texto muda dinamicamente conforme quantidade
 
 ---
 
-## ⏳ MELHORIA 6: HISTÓRICO DE TRANSIÇÕES DE STATUS — PENDENTE
+## ✅ MELHORIA 6: HISTÓRICO DE TRANSIÇÕES DE STATUS — IMPLEMENTADA
 
 ### Descrição
-Registra todas as mudanças de status em tabela de log para auditoria. Exibe timeline na página de detalhes da meta.
+Registra todas as mudanças de status em tabela de log para auditoria. Exibe timeline visual na página de detalhes da meta (`/metas/{id}`).
 
-### Especificação Técnica
+### Regras de Negócio
+1. Toda transição de status é registrada com snapshot (porcentagem, valor realizado, data/hora)
+2. Criação de meta registra transição `null → iniciado` automaticamente
+3. Registro de venda que muda status registra transição automaticamente
+4. Finalização de metas passadas registra transição automaticamente
+5. Log é imutável — `created_at` sem `ON UPDATE`
+6. Falha no log NÃO bloqueia operação principal (try/catch silencioso)
+7. Exclusão de meta remove logs via CASCADE
+
+### Fontes de Transições
+
+| Fonte | Transição | Disparador |
+|-------|-----------|-----------|
+| Criação | null → iniciado | `MetaService::criar()` |
+| Primeira venda | iniciado → em_progresso | `MetaRepository::atualizarProgresso()` |
+| Superação (≥120%) | em_progresso → superado | `MetaRepository::atualizarProgresso()` |
+| Fim do mês | em_progresso → finalizado | `MetaRepository::finalizarMetasPassadas()` |
+| Fim do mês (sem vendas) | iniciado → finalizado | `MetaRepository::finalizarMetasPassadas()` |
+
+### Observações Automáticas
+
+| Transição | Texto gerado |
+|-----------|-------------|
+| null → iniciado | "Meta criada" |
+| iniciado → em_progresso | "Primeira venda registrada no mês" |
+| em_progresso → superado | "Meta superada! Ultrapassou 120% de realização" |
+| em_progresso → finalizado | "Mês encerrado — meta finalizada automaticamente" |
+| iniciado → finalizado | "Mês encerrado sem vendas registradas" |
+| Outros | "Status alterado de '{de}' para '{para}'" |
+
+### Implementação
 
 **Migration:** `database/migrations/013_create_meta_status_log.php`
-```sql
-CREATE TABLE IF NOT EXISTS meta_status_log (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    meta_id INT NOT NULL,
-    status_anterior VARCHAR(20) NULL COMMENT 'NULL para criação inicial',
-    status_novo VARCHAR(20) NOT NULL,
-    porcentagem_momento DECIMAL(10,2) NULL,
-    valor_realizado_momento DECIMAL(10,2) NULL,
-    observacao TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (meta_id) REFERENCES metas(id) ON DELETE CASCADE,
-    INDEX idx_meta_status_log_meta_id (meta_id),
-    INDEX idx_meta_status_log_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-```
+- Tabela `meta_status_log` com CASCADE delete
+- Índices em `meta_id` e `created_at`
 
-**Repository:** `MetaRepository` — Novos métodos:
+**Repository:** `MetaRepository` — Métodos adicionados/modificados:
+
 ```php
-private function registrarTransicao(int $metaId, ?string $statusAnterior, string $statusNovo, 
+// NOVOS (Melhoria 6):
+private function registrarTransicao(int $metaId, ?string $anterior, string $novo, 
     ?float $porcentagem, ?float $valorRealizado, ?string $observacao): void;
-
-// atualizarStatus() modificado para registrar transição ANTES de atualizar
-
+private function gerarObservacaoTransicao(?string $de, string $para): string;
+public function registrarCriacaoInicial(int $metaId): void;  // Ponte pública
+public function atualizarStatus(int $id, string $status): bool;
+public function finalizarMetasPassadas(): void;
 public function getHistoricoTransicoes(int $metaId): array;
+public function getAnosComMetas(): array;
+
+// MODIFICADO (Melhoria 6):
+public function atualizarProgresso(int $id, float $valorRealizado): bool;
+// Agora inclui: determinação de novo status + registrarTransicao() + UPDATE com status
 ```
 
-**Service:** `MetaService::getHistoricoTransicoes(int $metaId): array`
+**Service:** `MetaService` — Alterações:
 ```php
-// Retorna array formatado com labels e datas em PT-BR
+// NOVO:
+public function getHistoricoTransicoes(int $metaId): array;
+
+// MODIFICADOS:
+public function criar(array $dados): Meta;
+// Agora chama registrarCriacaoInicial() após create()
+
+public function listar(array $filtros = []): array;
+// Agora chama finalizarMetasPassadas() antes de listar
 ```
 
-**Controller:** `MetaController::show()` — Passa `historicoTransicoes` para a view
+**Controller:** `MetaController::show()` — Passa `historicoTransicoes` para view e JSON
 
-**View:** `views/metas/show.php` — Timeline com:
-- Badge status anterior → seta → badge status novo
-- Porcentagem e valor no momento da transição
-- Data/hora formatada
-- Observação opcional
+**View:** `views/metas/show.php` — Timeline vertical com:
+- Ícone colorido do status novo (badge circular)
+- Badges: status anterior → seta → status novo
+- Observação automática
+- Snapshot: porcentagem + valor realizado no momento
+- Data/hora formatada em PT-BR
+- Empty state quando sem transições
 
-### Arquivos a Criar/Modificar
-- ✅ `database/migrations/013_create_meta_status_log.php` — Criar
-- ✅ `src/Repositories/MetaRepository.php` — Adicionar 2 métodos
-- ✅ `src/Services/MetaService.php` — Adicionar 1 método
-- ✅ `src/Controllers/MetaController.php` — Modificar show()
-- ✅ `views/metas/show.php` — Adicionar seção timeline
+### Testes
+✅ Teste 1: Meta criada → timeline mostra "Meta criada" (null → Iniciado) com snapshot 0%  
+✅ Teste 2: Primeira venda → timeline mostra "Primeira venda registrada" (Iniciado → Em Progresso)  
+✅ Teste 3: Meta ultrapassou 120% → timeline mostra "Meta superada!" (Em Progresso → Superado)  
+✅ Teste 4: Metas de meses passados finalizadas automaticamente ao listar  
+✅ Teste 5: CASCADE — exclusão de meta remove logs automaticamente  
+✅ Teste 6: Metas criadas antes da Melhoria 6 funcionam (timeline vazia, sem erros)  
 
-### Dependências
-- Migration 012 (status superado) deve estar executada
-- Método `atualizarStatus()` existente será modificado
+---
+
+## 🔧 CORREÇÃO SISTÊMICA: ROUTER STRING→INT
+
+### Problema
+O `Router::matchRoute()` extraía parâmetros de URL como strings. Todos os controllers declaram `show(Request $request, int $id)`, causando `TypeError: Argument #2 ($id) must be of type int, string given` em **todos os módulos**.
+
+### Correção
+No método `matchRoute()` de `src/Core/Router.php`, a conversão automática foi adicionada:
+
+```php
+// ANTES:
+$params[$name] = $matches[$index] ?? null;
+
+// DEPOIS:
+$value = $matches[$index] ?? null;
+// Se o valor é puramente numérico, converte para int
+// ctype_digit() retorna true para "123", false para "abc" ou "12a"
+if ($value !== null && ctype_digit($value)) {
+    $value = (int) $value;
+}
+$params[$name] = $value;
+```
+
+### Impacto
+Resolve o bug em TODOS os módulos de uma vez (Artes, Clientes, Vendas, Metas, Tags).
+
+### Testes
+✅ `/metas/10` — funciona sem TypeError  
+✅ `/metas/10/editar` — funciona sem TypeError  
+✅ Parâmetros não-numéricos continuam como string (comportamento correto)  
 
 ---
 
@@ -415,42 +510,31 @@ $data['error'] = $_SESSION['_flash']['error'] ?? null;
 // que já faz a leitura E limpeza ao consumir as mensagens.
 ```
 
-**Impacto:** Este bug afetava TODOS os módulos, não apenas Metas. Com a correção, flash messages funcionam corretamente em todo o sistema.
+**Impacto:** Este bug afetava TODOS os módulos, não apenas Metas.
 
 ### Bug 2: Alertas Desaparecem Muito Rápido (app.js)
 
-**Problema:** Flash messages complexas (com contadores de metas criadas/ignoradas) desapareciam em 5 segundos, tempo insuficiente para leitura.
+**Problema:** Flash messages complexas desapareciam em 5 segundos, tempo insuficiente para leitura.
 
-**Correção:** Aumentado timeout de auto-dismiss de 5000ms para 10000ms em `public/assets/js/app.js`:
-
-```javascript
-// ANTES:
-setTimeout(function() { bsAlert.close(); }, 5000);
-
-// DEPOIS:
-setTimeout(function() { bsAlert.close(); }, 10000);
-```
-
-**Nota:** Alertas com `data-persist="true"` (Melhoria 4: alerta de risco) continuam sem auto-dismiss.
+**Correção:** Aumentado timeout de 5000ms para 10000ms em `public/assets/js/app.js`.
 
 ### Bug 3: Checkbox POST não Detectada (MetaController)
 
 **Problema:** `$request->get('recorrente')` retornava null mesmo com checkbox marcado.
 
-**Correção:** Substituído por leitura direta do `$_POST`:
-```php
-// ANTES:
-$recorrente = $request->get('recorrente') === '1';
-
-// DEPOIS:
-$recorrente = isset($_POST['recorrente']) && $_POST['recorrente'] === '1';
-```
+**Correção:** Substituído por leitura direta do `$_POST`.
 
 ### Bug 4: Variável Renomeada no Controller (Melhorias 2-3)
 
-**Problema:** Controller passava `anosDisponiveis` para a view, mas o filtro de anos usava variável com nome diferente.
+**Problema:** Controller passava `anosDisponiveis` para a view, mas filtro usava nome diferente.
 
-**Nota importante:** Se o filtro de anos quebrar em algum momento, verificar se a variável no controller bate com o nome esperado na view. O controller renomeou de `'anos'` para `'anosDisponiveis'`.
+**Nota:** Se o filtro de anos quebrar, verificar se variável no controller bate com o esperado na view.
+
+### Bug 5: Tabela meta_status_log com ON UPDATE (Melhoria 6)
+
+**Problema:** `created_at` foi criada com `ON UPDATE CURRENT_TIMESTAMP`, fazendo a data mudar se o registro fosse tocado. Em tabela de log, a data deve ser imutável.
+
+**Correção:** `ALTER TABLE` para remover o `ON UPDATE` e tornar `status_novo` NOT NULL.
 
 ---
 
@@ -484,11 +568,15 @@ $recorrente = isset($_POST['recorrente']) && $_POST['recorrente'] === '1';
 | `findMesAtual()` | Meta/null | Base | Meta do mês corrente |
 | `findByMesAno(string)` | Meta/null | Base | Meta por mês/ano específico |
 | `existsMesAno(string)` | bool | Base | Verifica se já existe meta |
-| `getAnosComMetas()` | array | Base | Anos com metas cadastradas |
+| `getAnosComMetas()` | array | **M6** | Anos com metas cadastradas |
 | `getRecentes(int)` | array | Base | Últimas metas |
-| `atualizarProgresso(int, float)` | bool | M1 | Atualiza valor + status automático |
-| `atualizarStatus(int, string)` | bool | Base | Atualiza status |
-| `finalizarMetasPassadas()` | void | Base | Finaliza metas de meses anteriores |
+| `atualizarProgresso(int, float)` | bool | **M1+M6** | Atualiza valor + status + log |
+| `atualizarStatus(int, string)` | bool | **M6** | Atualiza status com log |
+| `registrarCriacaoInicial(int)` | void | **M6** | Registra null→iniciado |
+| `registrarTransicao(...)` | void | **M6** | INSERT no log (privado) |
+| `gerarObservacaoTransicao(...)` | string | **M6** | Texto automático (privado) |
+| `finalizarMetasPassadas()` | void | **M6** | Finaliza metas de meses anteriores |
+| `getHistoricoTransicoes(int)` | array | **M6** | Timeline formatada |
 | `getDesempenhoMensal(int)` | array | Base | Desempenho últimos N meses |
 | `getEstatisticas()` | array | Base | Estatísticas gerais |
 | `getEstatisticasAno(int)` | array | **M2** | Estatísticas agregadas por ano |
@@ -498,22 +586,20 @@ $recorrente = isset($_POST['recorrente']) && $_POST['recorrente'] === '1';
 
 | Método | Retorno | Melhoria | Descrição |
 |--------|---------|----------|-----------|
-| `listar(array)` | array | Base | Lista com filtros |
+| `listar(array)` | array | **M6** | Lista com filtros + finaliza passadas |
 | `buscar(int)` | Meta | Base | Busca por ID |
 | `buscarMesAtual()` | Meta/null | Base | Meta do mês corrente |
-| `buscarPorAno(int)` | array | Base | Lista metas de um ano |
-| `criar(array)` | Meta | Base | Cria meta (valida unicidade) |
+| `criar(array)` | Meta | **M6** | Cria meta + registra log inicial |
 | `atualizar(int, array)` | Meta | Base | Atualiza meta |
-| `excluir(int)` | void | Base | Exclui meta |
+| `remover(int)` | bool | Base | Exclui meta |
 | `getResumoDashboard()` | array | Base | Resumo para dashboard |
 | `calcularProjecao(Meta)` | array | Base | Projeção linear |
-| `recalcularProgresso(int)` | void | Base | Recalcula via vendas |
-| `getAnosDisponiveis()` | array | Base | Anos para filtro |
-| `finalizarMetasPassadas()` | void | Base | Wrapper do repository |
+| `recalcularRealizado(int)` | Meta | Base | Recalcula via vendas |
 | `getEstatisticasAno(int)` | array | **M2** | Estatísticas do ano |
 | `getDesempenhoAnual(int)` | array | **M3** | Dados para gráfico |
 | `getMetasEmRisco()` | array | **M4** | Alerta de projeção |
 | `criarRecorrente(array, int)` | array | **M5** | Criação em lote |
+| `getHistoricoTransicoes(int)` | array | **M6** | Timeline formatada |
 
 ### MetaController (`src/Controllers/MetaController.php`)
 
@@ -522,45 +608,12 @@ $recorrente = isset($_POST['recorrente']) && $_POST['recorrente'] === '1';
 | `index()` | GET /metas | M2,M3 | Lista + cards + gráfico |
 | `create()` | GET /metas/criar | — | Formulário criação |
 | `store()` | POST /metas | **M5** | Cria simples ou recorrente |
-| `show($id)` | GET /metas/{id} | — | Detalhes + progresso |
+| `show($id)` | GET /metas/{id} | **M6** | Detalhes + timeline |
 | `edit($id)` | GET /metas/{id}/editar | — | Formulário edição |
 | `update($id)` | PUT /metas/{id} | — | Atualiza |
 | `destroy($id)` | DELETE /metas/{id} | — | Exclui |
-
----
-
-## 🔧 INSTRUÇÕES PARA CONTINUAÇÃO
-
-### Para implementar Melhoria 6 (Histórico de Transições):
-
-1. **Criar migration** `013_create_meta_status_log.php` com SQL descrito na seção da Melhoria 6
-2. **Executar migration** via phpMyAdmin ou CLI
-3. **Modificar** `MetaRepository.php`:
-   - Adicionar método privado `registrarTransicao()`
-   - Modificar `atualizarStatus()` para registrar antes de atualizar
-   - Adicionar método público `getHistoricoTransicoes()`
-4. **Adicionar** `MetaService::getHistoricoTransicoes()`
-5. **Modificar** `MetaController::show()` para passar `historicoTransicoes`
-6. **Atualizar** `views/metas/show.php` com seção de timeline
-
-### Verificação do Estado Atual
-
-```bash
-# Verificar tabela metas
-DESCRIBE metas;
-# Deve mostrar status ENUM com 'superado'
-
-# Verificar se migration 012 foi executada
-SELECT * FROM metas WHERE status = 'superado';
-
-# Verificar se tabela de log existe (Melhoria 6)
-SHOW TABLES LIKE 'meta_status_log';
-```
-
-### Referências
-- **Documentação geral:** `ARTFLOW_2_0_DOCUMENTACAO_COMPLETA.md`
-- **Arquitetura:** `ARTFLOW_2_0_ARQUITETURA_PROFISSIONAL.md`
-- **Este documento:** `ARTFLOW_METAS_ROADMAP.md`
+| `recalcular($id)` | POST /metas/{id}/recalcular | — | Recalcula vendas |
+| `resumo()` | GET /metas/resumo | — | JSON para dashboard |
 
 ---
 
@@ -593,7 +646,16 @@ O controller passa `'anosDisponiveis'` (renomeado de `'anos'`). Se o filtro de a
 - **Service:** Appenda `-01` ao input antes de salvar
 - **Display:** Formatado como `Fev/2026` nas views
 
+### Log de Transições — Estratégia de Resiliência
+
+- `registrarTransicao()` tem try/catch silencioso
+- Falha no log NÃO impede a operação principal (venda, atualização, etc.)
+- Erros são registrados em `error_log()` para debug
+- `registrarCriacaoInicial()` é o método público que o Service chama
+- `registrarTransicao()` e `gerarObservacaoTransicao()` são privados
+
 ---
 
-**Última atualização:** 06/02/2026  
-**Próxima ação:** Implementar Melhoria 6 (Histórico de Transições de Status)
+**Última atualização:** 07/02/2026  
+**Status:** ✅ Módulo Metas COMPLETO — todas as 6 melhorias implementadas e testadas  
+**Próxima ação:** Avançar para próximo módulo do sistema

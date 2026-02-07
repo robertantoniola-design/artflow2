@@ -195,8 +195,10 @@ class MetaController extends BaseController
     }
     
     /**
-     * Exibe detalhes da meta com projeções
+     * Exibe detalhes da meta com projeções e histórico de transições
      * GET /metas/{id}
+     * 
+     * MELHORIA 6: Agora inclui historicoTransicoes na view
      */
     public function show(Request $request, int $id): Response
     {
@@ -205,12 +207,16 @@ class MetaController extends BaseController
             $projecao = $this->metaService->calcularProjecao($meta);
             $horasNecessarias = $this->metaService->calcularHorasNecessarias($meta);
             
+            // MELHORIA 6: Buscar histórico de transições de status
+            $historicoTransicoes = $this->metaService->getHistoricoTransicoes($id);
+            
             if ($request->wantsJson()) {
                 return $this->json([
                     'success' => true,
                     'data' => $meta->toArray(),
                     'projecao' => $projecao,
-                    'horas_necessarias' => $horasNecessarias
+                    'horas_necessarias' => $horasNecessarias,
+                    'historico_transicoes' => $historicoTransicoes  // MELHORIA 6
                 ]);
             }
             
@@ -218,7 +224,8 @@ class MetaController extends BaseController
                 'titulo' => 'Meta: ' . $this->formatarMesAno($meta->getMesAno()),
                 'meta' => $meta,
                 'projecao' => $projecao,
-                'horasNecessarias' => $horasNecessarias
+                'horasNecessarias' => $horasNecessarias,
+                'historicoTransicoes' => $historicoTransicoes  // MELHORIA 6
             ]);
             
         } catch (NotFoundException $e) {

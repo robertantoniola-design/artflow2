@@ -3,18 +3,24 @@
  * VIEW: Detalhes da Meta
  * GET /metas/{id}
  * 
- * Variáveis:
- * - $meta: Objeto Meta
- * - $projecao: Array com projeções (opcional)
+ * Variáveis disponíveis (passadas pelo MetaController::show):
+ * - $meta: Objeto Meta com todos os dados
+ * - $projecao: Array com projeções de fechamento
+ * - $horasNecessarias: Array com cálculo de horas (opcional)
+ * - $historicoTransicoes: Array de transições de status (Melhoria 6)
  */
 $currentPage = 'metas';
+
+// ==========================================
+// PREPARAÇÃO DOS DADOS
+// ==========================================
 
 // Dados da meta
 $mesAno = $meta->getMesAno();
 $porcentagem = $meta->getPorcentagemAtingida();
 $foiAtingida = $porcentagem >= 100;
 
-// Formata mês/ano
+// Formata mês/ano para exibição
 $mesesNomes = [
     1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 
     4 => 'Abril', 5 => 'Maio', 6 => 'Junho',
@@ -26,36 +32,44 @@ $ano = date('Y', strtotime($mesAno));
 $mesNome = $mesesNomes[$mesNum] ?? '';
 $mesAnoFormatado = "{$mesNome} de {$ano}";
 
-// Calcula valores
+// Calcula valores auxiliares
 $faltaVender = max(0, $meta->getValorMeta() - $meta->getValorRealizado());
 
-// Dias do mês
+// Dias do mês e dia atual
 $diasNoMes = (int) date('t', strtotime($mesAno));
 $diaAtual = $meta->isMesAtual() ? (int) date('j') : $diasNoMes;
 $diasRestantes = max(0, $diasNoMes - $diaAtual);
 
-// Média diária
+// Média diária atual e necessária
 $mediaDiariaAtual = $diaAtual > 0 ? $meta->getValorRealizado() / $diaAtual : 0;
 $mediaDiariaNecessaria = $diasRestantes > 0 ? $faltaVender / $diasRestantes : 0;
 
-// Projeção
+// Projeção de fechamento
 $projecaoTotal = $mediaDiariaAtual * $diasNoMes;
 $vaiBaterMeta = $projecaoTotal >= $meta->getValorMeta();
 ?>
 
-<!-- Header -->
+<!-- ==========================================
+     HEADER — Título + Status + Botões
+     ========================================== -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-1">
             <i class="bi bi-bullseye text-primary"></i> Meta: <?= $mesAnoFormatado ?>
         </h2>
         <p class="text-muted mb-0">
+            <!-- Badge de status com ícone (Melhoria 1: inclui "Superado") -->
+            <span class="badge <?= $meta->getStatusBadgeClass() ?>">
+                <i class="bi <?= $meta->getStatusIcon() ?>"></i>
+                <?= $meta->getStatusLabel() ?>
+            </span>
+            
             <?php if ($foiAtingida): ?>
-                <span class="badge bg-success">✓ Meta Atingida!</span>
+                <span class="badge bg-success ms-1">✓ Meta Atingida!</span>
             <?php elseif ($meta->isMesAtual()): ?>
-                <span class="badge bg-info">Mês Atual</span>
-            <?php else: ?>
-                <span class="badge bg-secondary">Encerrada</span>
+                <span class="badge bg-info ms-1">Mês Atual</span>
+            <?php elseif ($meta->isMesPassado()): ?>
+                <span class="badge bg-secondary ms-1">Encerrada</span>
             <?php endif; ?>
         </p>
     </div>
@@ -69,206 +83,275 @@ $vaiBaterMeta = $projecaoTotal >= $meta->getValorMeta();
     </div>
 </div>
 
-<!-- Progresso Principal -->
+<!-- ==========================================
+     CARD: PROGRESSO PRINCIPAL
+     ========================================== -->
 <div class="card mb-4">
     <div class="card-body">
         <div class="row align-items-center">
+            <!-- Barra de Progresso (col-8) -->
             <div class="col-md-8">
                 <h5 class="mb-3">Progresso</h5>
                 <div class="progress mb-3" style="height: 30px;">
-                    <div class="progress-bar bg-<?= $foiAtingida ? 'success' : ($porcentagem >= 75 ? 'info' : ($porcentagem >= 50 ? 'warning' : 'danger')) ?>" 
-                         style="width: <?= min($porcentagem, 100) ?>%">
-                        <strong><?= number_format($porcentagem, 1) ?>%</strong>
+                    <?php 
+                    // Cor da barra baseada na porcentagem
+                    $corBarra = $foiAtingida 
+                        ? 'success' 
+                        : ($porcentagem >= 75 ? 'info' : ($porcentagem >= 50 ? 'warning' : 'danger'));
+                    $larguraBarra = min(100, $porcentagem);
+                    ?>
+                    <div class="progress-bar bg-<?= $corBarra ?> fw-bold" 
+                         role="progressbar"
+                         style="width: <?= $larguraBarra ?>%;"
+                         aria-valuenow="<?= $porcentagem ?>" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                        <?= number_format($porcentagem, 1, ',', '.') ?>%
                     </div>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span>
-                        <strong class="text-success"><?= money($meta->getValorRealizado()) ?></strong>
-                        <small class="text-muted">realizado</small>
-                    </span>
-                    <span>
-                        <strong><?= money($meta->getValorMeta()) ?></strong>
-                        <small class="text-muted">meta</small>
-                    </span>
+                
+                <!-- Valores: Meta / Realizado / Falta -->
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small class="text-muted">Meta</small>
+                        <h5>R$ <?= number_format($meta->getValorMeta(), 2, ',', '.') ?></h5>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Realizado</small>
+                        <h5 class="text-success">R$ <?= number_format($meta->getValorRealizado(), 2, ',', '.') ?></h5>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted">Falta</small>
+                        <h5 class="text-danger">R$ <?= number_format($faltaVender, 2, ',', '.') ?></h5>
+                    </div>
                 </div>
             </div>
+            
+            <!-- Porcentagem grande (col-4) -->
             <div class="col-md-4 text-center">
-                <?php if ($foiAtingida): ?>
-                    <div class="display-1 text-success">🎉</div>
-                    <h5 class="text-success">Parabéns!</h5>
-                    <p class="text-muted mb-0">Meta atingida!</p>
-                <?php else: ?>
-                    <h4 class="text-warning mb-1"><?= money($faltaVender) ?></h4>
-                    <p class="text-muted mb-0">falta para a meta</p>
-                <?php endif; ?>
+                <div class="display-3 fw-bold text-<?= $corBarra ?>">
+                    <?= number_format($porcentagem, 1, ',', '.') ?>%
+                </div>
+                <small class="text-muted">de realização</small>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row g-4">
-    <!-- Detalhes da Meta -->
+<!-- ==========================================
+     CARDS: DETALHES E PROJEÇÃO (Lado a lado)
+     ========================================== -->
+<div class="row mb-4">
+    <!-- Card Detalhes -->
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Detalhes</h6>
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Detalhes</h5>
             </div>
             <div class="card-body">
-                <table class="table table-borderless mb-0">
+                <table class="table table-sm">
                     <tr>
-                        <td class="text-muted">Período:</td>
-                        <td class="text-end fw-bold"><?= $mesAnoFormatado ?></td>
+                        <td class="text-muted">Período</td>
+                        <td class="fw-bold"><?= $mesAnoFormatado ?></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Valor da Meta:</td>
-                        <td class="text-end fw-bold"><?= money($meta->getValorMeta()) ?></td>
+                        <td class="text-muted">Dias no Mês</td>
+                        <td><?= $diasNoMes ?></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Valor Realizado:</td>
-                        <td class="text-end fw-bold text-success"><?= money($meta->getValorRealizado()) ?></td>
+                        <td class="text-muted">Dia Atual</td>
+                        <td><?= $meta->isMesAtual() ? $diaAtual . '/' . $diasNoMes : 'Encerrado' ?></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Porcentagem:</td>
-                        <td class="text-end fw-bold"><?= number_format($porcentagem, 1) ?>%</td>
+                        <td class="text-muted">Dias Restantes</td>
+                        <td><?= $diasRestantes ?></td>
                     </tr>
                     <tr>
-                        <td class="text-muted">Horas Diárias Ideal:</td>
-                        <td class="text-end"><?= $meta->getHorasDiariasIdeal() ?>h</td>
+                        <td class="text-muted">Dias Trabalho/Semana</td>
+                        <td><?= $meta->getDiasTrabalhoSemana() ?? 5 ?></td>
                     </tr>
+                    <?php if ($meta->getObservacoes()): ?>
                     <tr>
-                        <td class="text-muted">Dias de Trabalho/Semana:</td>
-                        <td class="text-end"><?= $meta->getDiasTrabalhoSemana() ?> dias</td>
+                        <td class="text-muted">Observações</td>
+                        <td><?= nl2br(htmlspecialchars($meta->getObservacoes())) ?></td>
                     </tr>
+                    <?php endif; ?>
                 </table>
             </div>
         </div>
     </div>
     
-    <!-- Projeção -->
+    <!-- Card Projeção -->
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-header">
-                <h6 class="mb-0"><i class="bi bi-graph-up"></i> Projeção</h6>
+                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Projeção</h5>
             </div>
             <div class="card-body">
-                <?php if ($meta->isMesAtual()): ?>
-                    <table class="table table-borderless mb-0">
-                        <tr>
-                            <td class="text-muted">Dias no Mês:</td>
-                            <td class="text-end"><?= $diasNoMes ?> dias</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Dia Atual:</td>
-                            <td class="text-end"><?= $diaAtual ?>º dia</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Dias Restantes:</td>
-                            <td class="text-end fw-bold"><?= $diasRestantes ?> dias</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Média Diária Atual:</td>
-                            <td class="text-end"><?= money($mediaDiariaAtual) ?>/dia</td>
-                        </tr>
-                        <?php if (!$foiAtingida && $diasRestantes > 0): ?>
-                        <tr>
-                            <td class="text-muted">Média Necessária:</td>
-                            <td class="text-end text-warning fw-bold"><?= money($mediaDiariaNecessaria) ?>/dia</td>
-                        </tr>
-                        <?php endif; ?>
-                        <tr>
-                            <td class="text-muted">Projeção Final:</td>
-                            <td class="text-end">
-                                <span class="fw-bold <?= $vaiBaterMeta ? 'text-success' : 'text-danger' ?>">
-                                    <?= money($projecaoTotal) ?>
-                                </span>
-                                <?php if ($vaiBaterMeta): ?>
-                                    <i class="bi bi-check-circle text-success"></i>
-                                <?php else: ?>
-                                    <i class="bi bi-x-circle text-danger"></i>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    </table>
-                    
-                    <?php if (!$foiAtingida): ?>
-                        <div class="alert alert-<?= $vaiBaterMeta ? 'success' : 'warning' ?> mt-3 mb-0">
-                            <small>
-                                <?php if ($vaiBaterMeta): ?>
-                                    <i class="bi bi-check-circle"></i> No ritmo atual, você <strong>vai atingir</strong> a meta!
-                                <?php else: ?>
-                                    <i class="bi bi-exclamation-triangle"></i> Você precisa vender <strong><?= money($mediaDiariaNecessaria) ?>/dia</strong> para atingir a meta.
-                                <?php endif; ?>
-                            </small>
-                        </div>
+                <table class="table table-sm">
+                    <tr>
+                        <td class="text-muted">Média Diária Atual</td>
+                        <td class="fw-bold">R$ <?= number_format($mediaDiariaAtual, 2, ',', '.') ?></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Média Necessária/Dia</td>
+                        <td class="fw-bold text-<?= $mediaDiariaNecessaria > $mediaDiariaAtual ? 'danger' : 'success' ?>">
+                            R$ <?= number_format($mediaDiariaNecessaria, 2, ',', '.') ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Projeção Fim do Mês</td>
+                        <td class="fw-bold text-<?= $vaiBaterMeta ? 'success' : 'danger' ?>">
+                            R$ <?= number_format($projecaoTotal, 2, ',', '.') ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Vai Bater a Meta?</td>
+                        <td>
+                            <?php if ($vaiBaterMeta): ?>
+                                <span class="badge bg-success"><i class="bi bi-check-lg"></i> Sim!</span>
+                            <?php else: ?>
+                                <span class="badge bg-danger"><i class="bi bi-x-lg"></i> Em risco</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php if (isset($horasNecessarias) && is_array($horasNecessarias)): ?>
+                    <tr>
+                        <td class="text-muted">Horas Necessárias/Dia</td>
+                        <td class="fw-bold text-<?= ($horasNecessarias['viavel'] ?? false) ? 'success' : 'warning' ?>">
+                            <?= number_format($horasNecessarias['horas_por_dia'] ?? 0, 1, ',', '.') ?>h
+                        </td>
+                    </tr>
                     <?php endif; ?>
-                <?php else: ?>
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-calendar-check display-4"></i>
-                        <p class="mt-2 mb-0">Este mês já encerrou.</p>
-                        <p class="mb-0">
-                            Resultado final: 
-                            <strong class="<?= $foiAtingida ? 'text-success' : 'text-danger' ?>">
-                                <?= number_format($porcentagem, 1) ?>%
-                            </strong>
-                        </p>
-                    </div>
-                <?php endif; ?>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Ações -->
-<div class="card mt-4">
+<!-- ==========================================
+     MELHORIA 6: TIMELINE DE TRANSIÇÕES DE STATUS
+     ==========================================
+     
+     Exibe o histórico completo de mudanças de status da meta.
+     Cada transição mostra:
+     - Data/hora formatada
+     - Badge do status anterior → seta → badge do status novo
+     - Porcentagem e valor no momento da transição
+     - Observação automática ou manual
+     
+     Se não há registros, exibe mensagem informativa.
+     ========================================== -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-clock-history"></i> Histórico de Status
+        </h5>
+    </div>
     <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <small class="text-muted">
-                    Criada em: <?= datetime_br($meta->getCreatedAt()) ?>
-                    <?php if ($meta->getUpdatedAt()): ?>
-                        | Atualizada: <?= datetime_br($meta->getUpdatedAt()) ?>
-                    <?php endif; ?>
-                </small>
+        <?php if (!empty($historicoTransicoes)): ?>
+            
+            <!-- Timeline vertical com CSS inline (sem dependências externas) -->
+            <div class="timeline-container">
+                <?php foreach ($historicoTransicoes as $index => $transicao): ?>
+                    <div class="d-flex mb-3 <?= $index < count($historicoTransicoes) - 1 ? 'pb-3 border-bottom' : '' ?>">
+                        
+                        <!-- Ícone da transição (coluna esquerda) -->
+                        <div class="flex-shrink-0 me-3 text-center" style="width: 40px;">
+                            <span class="badge rounded-pill <?= $transicao['status_novo_badge'] ?>" 
+                                  style="width: 36px; height: 36px; line-height: 24px; font-size: 1rem;">
+                                <i class="bi <?= $transicao['status_novo_icon'] ?>"></i>
+                            </span>
+                        </div>
+                        
+                        <!-- Conteúdo da transição (coluna direita) -->
+                        <div class="flex-grow-1">
+                            <!-- Linha 1: Badges de status anterior → novo -->
+                            <div class="mb-1">
+                                <?php if ($transicao['is_criacao']): ?>
+                                    <!-- Criação inicial: apenas badge do status novo -->
+                                    <span class="badge <?= $transicao['status_novo_badge'] ?>">
+                                        <?= $transicao['status_novo_label'] ?>
+                                    </span>
+                                    <small class="text-muted ms-1">— Meta criada</small>
+                                <?php else: ?>
+                                    <!-- Transição: anterior → novo -->
+                                    <span class="badge <?= $transicao['status_anterior_badge'] ?>">
+                                        <?= $transicao['status_anterior_label'] ?>
+                                    </span>
+                                    <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                                    <span class="badge <?= $transicao['status_novo_badge'] ?>">
+                                        <?= $transicao['status_novo_label'] ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <!-- Linha 2: Observação -->
+                            <?php if (!empty($transicao['observacao'])): ?>
+                                <div class="text-muted small mb-1">
+                                    <?= htmlspecialchars($transicao['observacao']) ?>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <!-- Linha 3: Dados do momento + Data/hora -->
+                            <div class="d-flex flex-wrap gap-3 small text-muted">
+                                <!-- Porcentagem no momento (se disponível) -->
+                                <?php if ($transicao['porcentagem_momento'] !== null): ?>
+                                    <span>
+                                        <i class="bi bi-percent"></i>
+                                        <?= number_format($transicao['porcentagem_momento'], 1, ',', '.') ?>%
+                                    </span>
+                                <?php endif; ?>
+                                
+                                <!-- Valor realizado no momento (se disponível) -->
+                                <?php if ($transicao['valor_realizado_momento'] !== null): ?>
+                                    <span>
+                                        <i class="bi bi-cash"></i>
+                                        R$ <?= number_format($transicao['valor_realizado_momento'], 2, ',', '.') ?>
+                                    </span>
+                                <?php endif; ?>
+                                
+                                <!-- Data/hora da transição -->
+                                <span>
+                                    <i class="bi bi-calendar-event"></i>
+                                    <?= $transicao['data_formatada'] ?>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
-            <div class="d-flex gap-2">
-                <a href="<?= url('/metas/' . $meta->getId() . '/editar') ?>" class="btn btn-outline-primary">
-                    <i class="bi bi-pencil"></i> Editar Meta
-                </a>
-                <a href="<?= url('/vendas?mes=' . date('Y-m', strtotime($mesAno))) ?>" class="btn btn-outline-info">
-                    <i class="bi bi-cart"></i> Ver Vendas do Mês
-                </a>
-                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalExcluir">
-                    <i class="bi bi-trash"></i> Excluir
-                </button>
+            
+        <?php else: ?>
+            <!-- Nenhuma transição registrada -->
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-clock-history display-6 d-block mb-2 opacity-25"></i>
+                <p class="mb-1">Nenhuma transição de status registrada.</p>
+                <small>O histórico será preenchido automaticamente a partir de agora.</small>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
 </div>
 
-<!-- Modal de Exclusão -->
-<div class="modal fade" id="modalExcluir" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusão</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir a meta de <strong><?= $mesAnoFormatado ?></strong>?</p>
-                <p class="text-muted mb-0">
-                    <i class="bi bi-info-circle"></i> As vendas do período não serão afetadas.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form action="<?= url('/metas/' . $meta->getId()) ?>" method="POST" class="d-inline">
-                    <input type="hidden" name="_token" value="<?= csrf_token() ?>">
-                    <input type="hidden" name="_method" value="DELETE">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Excluir Meta
-                    </button>
-                </form>
-            </div>
-        </div>
+<!-- ==========================================
+     BOTÕES DE AÇÃO
+     ========================================== -->
+<div class="d-flex justify-content-between">
+    <a href="<?= url('/metas') ?>" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar para Lista
+    </a>
+    <div class="d-flex gap-2">
+        <a href="<?= url('/metas/' . $meta->getId() . '/editar') ?>" class="btn btn-outline-primary">
+            <i class="bi bi-pencil"></i> Editar Meta
+        </a>
+        <!-- Botão de excluir com confirmação -->
+        <form method="POST" action="<?= url('/metas/' . $meta->getId()) ?>" 
+              onsubmit="return confirm('Tem certeza que deseja excluir esta meta? Esta ação não pode ser desfeita.')">
+            <input type="hidden" name="_method" value="DELETE">
+            <input type="hidden" name="_token" value="<?= csrf_token() ?>">
+            <button type="submit" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Excluir
+            </button>
+        </form>
     </div>
 </div>

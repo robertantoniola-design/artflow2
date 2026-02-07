@@ -19,6 +19,7 @@ use App\Exceptions\NotFoundException;
  * MELHORIA 2 + 3 (05/02/2026): getEstatisticasAno(), getDesempenhoAnual()
  * MELHORIA 4 (06/02/2026): getMetasEmRisco()
  * MELHORIA 5 (06/02/2026): criarRecorrente()
+ * MELHORIA 6 (06/02/2026): getHistoricoTransicoes(), integração de log em criar()
  */
 class MetaService
 {
@@ -40,8 +41,19 @@ class MetaService
     // OPERAÇÕES CRUD
     // ==========================================
     
+    /**
+     * Lista metas com filtro opcional por ano
+     * 
+     * MELHORIA 6: Ao listar, finaliza automaticamente metas de meses
+     * anteriores que ainda estão 'iniciado' ou 'em_progresso'.
+     * Isso garante que metas passadas tenham status correto.
+     */
     public function listar(array $filtros = []): array
     {
+        // MELHORIA 6: Finaliza metas de meses passados automaticamente
+        // Executa ANTES de listar para que os dados já venham atualizados
+        $this->metaRepository->finalizarMetasPassadas();
+        
         if (!empty($filtros['ano'])) {
             return $this->metaRepository->findByAno((int) $filtros['ano']);
         }
@@ -60,6 +72,9 @@ class MetaService
     
     /**
      * Cria nova meta (criação simples, 1 mês)
+     * 
+     * MELHORIA 6: Após criar, registra transição inicial null → 'iniciado'
+     * no log de transições. Assim a timeline nunca começa vazia.
      */
     public function criar(array $dados): Meta
     {
@@ -79,6 +94,11 @@ class MetaService
         $dados['porcentagem_atingida'] = 0;
         
         $meta = $this->metaRepository->create($dados);
+        
+        // MELHORIA 6: Registra criação inicial no log de transições
+        // Grava null → 'iniciado' com snapshot zerado
+        $this->metaRepository->registrarCriacaoInicial($meta->getId());
+        
         $this->recalcularRealizado($meta->getId());
         
         return $this->metaRepository->find($meta->getId());
@@ -93,8 +113,8 @@ class MetaService
      * consecutivos a partir do mês inicial selecionado.
      * 
      * Meses que já possuem meta são ignorados (sem erro).
-     * Usa o método criar() internamente, que já faz validação
-     * e recalcula vendas existentes do mês.
+     * Usa o método criar() internamente, que já faz validação,
+     * recalcula vendas existentes e registra transição inicial (Melhoria 6).
      * 
      * @param array $dados  Dados base da meta (mes_ano, valor_meta, etc.)
      * @param int $quantidadeMeses Quantidade de meses (1-12)
@@ -123,7 +143,6 @@ class MetaService
             $mesAno = $mesInicial->format('Y-m-01');
             
             // Verifica se já existe meta para este mês
-            // Usa existsMesAno() que aceita tanto 'Y-m-01' quanto 'Y-m'
             if ($this->metaRepository->existsMesAno($mesAno)) {
                 // Mês já tem meta → ignora sem erro
                 $resultado['ignoradas'][] = [
@@ -138,12 +157,12 @@ class MetaService
                         'mes_ano' => $mesInicial->format('Y-m')
                     ]);
                     
-                    // Chama criar() que faz validação, normalização e recálculo
+                    // criar() já faz validação, normalização, recálculo
+                    // E registra transição inicial (Melhoria 6)
                     $meta = $this->criar($dadosMeta);
                     $resultado['criadas'][] = $meta;
                     
                 } catch (\Exception $e) {
-                    // Captura qualquer erro (validação, DB, etc.)
                     $resultado['erros'][] = [
                         'mes_ano' => $mesAno,
                         'erro' => $e->getMessage()
@@ -369,6 +388,26 @@ class MetaService
         return $this->metaRepository->getDesempenhoMensal($meses);
     }
     
+    // ==========================================
+    // HISTÓRICO DE TRANSIÇÕES (Melhoria 6)
+    // ==========================================
+
+    /**
+     * Retorna histórico de transições de status de uma meta (Melhoria 6)
+     * 
+     * Busca no log todas as mudanças de status, já formatado
+     * com labels, classes CSS e datas em PT-BR para a view.
+     * 
+     * Usado em: MetaController::show() → view metas/show.php (timeline)
+     * 
+     * @param int $metaId ID da meta
+     * @return array Lista de transições formatadas (vazia se sem histórico)
+     */
+    public function getHistoricoTransicoes(int $metaId): array
+    {
+        return $this->metaRepository->getHistoricoTransicoes($metaId);
+    }
+
     public function criarOuObterMesAtual(float $valorSugerido = 5000): Meta
     {
         $mesAno = date('Y-m-01');
