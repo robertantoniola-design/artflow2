@@ -1,9 +1,16 @@
 <?php
 /**
- * VIEW: Criar Tag
+ * VIEW: Criar Tag (Melhoria 3 — + Descrição e Ícone)
  * GET /tags/criar
+ * 
+ * Variáveis recebidas do Controller:
+ * - $cores: array de cores predefinidas (hex => nome)
+ * - $icones: array de ícones disponíveis (classe => nome) — MELHORIA 3
  */
 $currentPage = 'tags';
+// Variável segura para cores (compatibilidade)
+$coresPredefinidas = $cores ?? [];
+$iconesDisponiveis = $icones ?? [];
 ?>
 
 <!-- Header -->
@@ -20,13 +27,15 @@ $currentPage = 'tags';
 </div>
 
 <div class="row">
-    <div class="col-lg-6">
+    <div class="col-lg-7">
         <div class="card">
             <div class="card-body">
                 <form action="<?= url('/tags') ?>" method="POST">
                     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     
-                    <!-- Nome -->
+                    <!-- ==========================================
+                         NOME (obrigatório)
+                         ========================================== -->
                     <div class="mb-4">
                         <label for="nome" class="form-label">
                             Nome da Tag <span class="text-danger">*</span>
@@ -46,11 +55,63 @@ $currentPage = 'tags';
                         <small class="text-muted">2 a 50 caracteres</small>
                     </div>
                     
-                    <!-- Cor -->
+                    <!-- ==========================================
+                         DESCRIÇÃO (opcional) — MELHORIA 3
+                         ========================================== -->
+                    <div class="mb-4">
+                        <label for="descricao" class="form-label">
+                            Descrição
+                        </label>
+                        <textarea name="descricao" 
+                                  id="descricao"
+                                  class="form-control <?= has_error('descricao') ? 'is-invalid' : '' ?>" 
+                                  rows="3"
+                                  maxlength="500"
+                                  placeholder="Descreva o uso desta tag... (opcional)"><?= old('descricao') ?></textarea>
+                        <?php if (has_error('descricao')): ?>
+                            <div class="invalid-feedback"><?= errors('descricao') ?></div>
+                        <?php endif; ?>
+                        <small class="text-muted">
+                            <span id="descricaoCount">0</span>/500 caracteres
+                        </small>
+                    </div>
+                    
+                    <!-- ==========================================
+                         ÍCONE (opcional) — MELHORIA 3
+                         ========================================== -->
+                    <div class="mb-4">
+                        <label for="icone" class="form-label">
+                            Ícone
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text" id="iconePreviewContainer">
+                                <i id="iconePreview" class="bi bi-tag"></i>
+                            </span>
+                            <select name="icone" 
+                                    id="icone" 
+                                    class="form-select <?= has_error('icone') ? 'is-invalid' : '' ?>">
+                                <option value="">Sem ícone (padrão)</option>
+                                <?php foreach ($iconesDisponiveis as $classe => $nomeIcone): ?>
+                                    <option value="<?= e($classe) ?>" 
+                                            <?= old('icone') === $classe ? 'selected' : '' ?>>
+                                        <?= e($nomeIcone) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php if (has_error('icone')): ?>
+                            <div class="text-danger small mt-1"><?= errors('icone') ?></div>
+                        <?php endif; ?>
+                        <small class="text-muted">Escolha um ícone Bootstrap Icons para a tag</small>
+                    </div>
+                    
+                    <!-- ==========================================
+                         COR (opcional)
+                         ========================================== -->
                     <div class="mb-4">
                         <label class="form-label">Cor</label>
                         
-                        <!-- Cores Predefinidas -->
+                        <!-- Cores Predefinidas (radio buttons visuais) -->
                         <div class="d-flex flex-wrap gap-2 mb-3">
                             <?php foreach ($coresPredefinidas as $hex => $nome): ?>
                                 <div class="form-check">
@@ -58,7 +119,7 @@ $currentPage = 'tags';
                                            name="cor" 
                                            value="<?= $hex ?>"
                                            id="cor_<?= substr($hex, 1) ?>"
-                                           class="btn-check"
+                                           class="btn-check corRadio"
                                            <?= old('cor', '#6c757d') === $hex ? 'checked' : '' ?>>
                                     <label for="cor_<?= substr($hex, 1) ?>" 
                                            class="btn btn-outline-secondary"
@@ -70,8 +131,8 @@ $currentPage = 'tags';
                         </div>
                         
                         <!-- Cor Personalizada -->
-                        <div class="input-group">
-                            <span class="input-group-text">Cor personalizada</span>
+                        <div class="input-group" style="max-width: 280px;">
+                            <span class="input-group-text">Personalizada</span>
                             <input type="color" 
                                    id="corPersonalizada"
                                    class="form-control form-control-color"
@@ -89,13 +150,17 @@ $currentPage = 'tags';
                         <?php endif; ?>
                     </div>
                     
-                    <!-- Preview -->
+                    <!-- ==========================================
+                         PREVIEW (atualizado em tempo real)
+                         ========================================== -->
                     <div class="mb-4">
                         <label class="form-label">Preview</label>
                         <div class="p-3 bg-light rounded">
                             <span id="tagPreview" class="badge fs-5" style="background-color: <?= old('cor', '#6c757d') ?>;">
-                                <?= old('nome') ?: 'Nome da Tag' ?>
+                                <i id="previewIcone" class="<?= old('icone') ? e(old('icone')) . ' me-1' : '' ?>"></i>
+                                <span id="previewNome"><?= old('nome') ?: 'Nome da Tag' ?></span>
                             </span>
+                            <p id="previewDescricao" class="text-muted small mt-2 mb-0" style="display: none;"></p>
                         </div>
                     </div>
                     
@@ -113,8 +178,8 @@ $currentPage = 'tags';
         </div>
     </div>
     
-    <!-- Dicas -->
-    <div class="col-lg-6">
+    <!-- Dicas (sidebar) -->
+    <div class="col-lg-5">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-lightbulb"></i> Dicas</h5>
@@ -127,73 +192,113 @@ $currentPage = 'tags';
                     <li>Agrupe por tema: Retrato, Paisagem, Abstrato...</li>
                     <li>Agrupe por cliente ou projeto</li>
                     <li>Use cores diferentes para categorias distintas</li>
+                    <li><strong>Novo:</strong> Adicione uma descrição para documentar o uso da tag</li>
+                    <li><strong>Novo:</strong> Escolha um ícone para identificação rápida</li>
                 </ul>
                 
                 <hr>
                 
                 <h6>Exemplos de tags:</h6>
                 <div class="d-flex flex-wrap gap-2">
-                    <span class="badge" style="background-color: #007bff;">Aquarela</span>
-                    <span class="badge" style="background-color: #28a745;">Paisagem</span>
-                    <span class="badge" style="background-color: #dc3545;">Urgente</span>
-                    <span class="badge" style="background-color: #6f42c1;">Encomenda</span>
-                    <span class="badge" style="background-color: #fd7e14;">Em exposição</span>
+                    <span class="badge" style="background-color: #17a2b8;"><i class="bi bi-droplet me-1"></i>Aquarela</span>
+                    <span class="badge" style="background-color: #28a745;"><i class="bi bi-tree me-1"></i>Paisagem</span>
+                    <span class="badge" style="background-color: #dc3545;"><i class="bi bi-exclamation-triangle me-1"></i>Urgente</span>
+                    <span class="badge" style="background-color: #6f42c1;"><i class="bi bi-cart me-1"></i>Encomenda</span>
+                    <span class="badge" style="background-color: #fd7e14;"><i class="bi bi-star me-1"></i>Destaque</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- ==========================================
+     JAVASCRIPT: Preview em tempo real
+     ========================================== -->
 <script>
-const nomeInput = document.getElementById('nome');
-const corRadios = document.querySelectorAll('input[name="cor"]');
-const corPersonalizada = document.getElementById('corPersonalizada');
-const corHex = document.getElementById('corHex');
-const tagPreview = document.getElementById('tagPreview');
-
-// Atualiza preview quando digita nome
-nomeInput.addEventListener('input', function() {
-    tagPreview.textContent = this.value || 'Nome da Tag';
-});
-
-// Atualiza preview quando seleciona cor predefinida
-corRadios.forEach(radio => {
-    radio.addEventListener('change', function() {
-        tagPreview.style.backgroundColor = this.value;
-        corPersonalizada.value = this.value;
-        corHex.value = this.value;
-    });
-});
-
-// Sincroniza cor personalizada
-corPersonalizada.addEventListener('input', function() {
-    corHex.value = this.value;
-    tagPreview.style.backgroundColor = this.value;
-    // Desmarca radios
-    corRadios.forEach(r => r.checked = false);
-});
-
-corHex.addEventListener('input', function() {
-    if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
-        corPersonalizada.value = this.value;
-        tagPreview.style.backgroundColor = this.value;
-        corRadios.forEach(r => r.checked = false);
-    }
-});
-
-// Adiciona campo hidden para garantir que a cor seja enviada
-document.querySelector('form').addEventListener('submit', function() {
-    // Verifica se algum radio está marcado, senão usa a cor personalizada
-    let corSelecionada = null;
-    corRadios.forEach(r => { if (r.checked) corSelecionada = r.value; });
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos
+    const nomeInput = document.getElementById('nome');
+    const descricaoInput = document.getElementById('descricao');
+    const iconeSelect = document.getElementById('icone');
+    const corRadios = document.querySelectorAll('.corRadio');
+    const corPersonalizada = document.getElementById('corPersonalizada');
+    const corHex = document.getElementById('corHex');
+    const tagPreview = document.getElementById('tagPreview');
+    const previewNome = document.getElementById('previewNome');
+    const previewIcone = document.getElementById('previewIcone');
+    const previewDescricao = document.getElementById('previewDescricao');
+    const iconePreview = document.getElementById('iconePreview');
+    const descricaoCount = document.getElementById('descricaoCount');
     
-    if (!corSelecionada) {
-        // Cria input hidden com a cor personalizada
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'cor';
-        hiddenInput.value = corHex.value;
-        this.appendChild(hiddenInput);
+    // === Atualiza preview do badge ===
+    function updatePreview() {
+        const cor = corHex.value || '#6c757d';
+        tagPreview.style.backgroundColor = cor;
+        
+        // Calcula cor de texto contrastante
+        const hex = cor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        tagPreview.style.color = luminance > 0.5 ? '#000000' : '#ffffff';
     }
+    
+    // === Nome: atualiza texto no preview ===
+    nomeInput.addEventListener('input', function() {
+        previewNome.textContent = this.value || 'Nome da Tag';
+    });
+    
+    // === Descrição: contador de caracteres + preview ===
+    descricaoInput.addEventListener('input', function() {
+        descricaoCount.textContent = this.value.length;
+        if (this.value.trim()) {
+            previewDescricao.textContent = this.value;
+            previewDescricao.style.display = 'block';
+        } else {
+            previewDescricao.style.display = 'none';
+        }
+    });
+    
+    // === Ícone: atualiza preview no badge e no input group ===
+    iconeSelect.addEventListener('change', function() {
+        const classe = this.value;
+        if (classe) {
+            previewIcone.className = classe + ' me-1';
+            iconePreview.className = classe;
+        } else {
+            previewIcone.className = '';
+            iconePreview.className = 'bi bi-tag';
+        }
+    });
+    
+    // === Cor: radio buttons ===
+    corRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            corHex.value = this.value;
+            corPersonalizada.value = this.value;
+            updatePreview();
+        });
+    });
+    
+    // === Cor: picker personalizado ===
+    corPersonalizada.addEventListener('input', function() {
+        corHex.value = this.value;
+        corRadios.forEach(r => r.checked = false);
+        updatePreview();
+    });
+    
+    // === Cor: input hex manual ===
+    corHex.addEventListener('input', function() {
+        if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+            corPersonalizada.value = this.value;
+            corRadios.forEach(r => r.checked = false);
+            updatePreview();
+        }
+    });
+    
+    // Inicializa preview
+    updatePreview();
+    descricaoCount.textContent = descricaoInput.value.length;
 });
 </script>

@@ -1127,3 +1127,150 @@ Stack trace:
 #8 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #9 {main}
 
+[2026-02-07 17:39:53] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:283
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ar...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+
+[2026-02-07 17:40:03] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:283
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ar...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+
+[2026-02-07 17:40:04] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:283
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ar...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+
+[2026-02-07 17:40:14] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:283
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ar...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+
+[2026-02-07 19:51:18] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:283
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ar...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+
+[2026-02-07 19:53:32] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:283
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ar...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ar...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+
+[2026-02-07 20:00:23] ParseError: syntax error, unexpected token "*", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Services\TagService.php:79
+Stack trace:
+#0 [internal function]: {closure}('App\\Services\\Ta...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Services\\Ta...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ta...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ta...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#9 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#10 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#11 {main}
+
+[2026-02-07 21:51:00] Error: Cannot call constructor in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:29
+Stack trace:
+#0 [internal function]: App\Controllers\TagController->__construct(Object(App\Services\TagService))
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(165): ReflectionClass->newInstanceArgs(Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#7 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#8 {main}
+
+[2026-02-07 21:52:41] Error: Cannot call constructor in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:29
+Stack trace:
+#0 [internal function]: App\Controllers\TagController->__construct(Object(App\Services\TagService))
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(165): ReflectionClass->newInstanceArgs(Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#6 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#7 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#8 {main}
+

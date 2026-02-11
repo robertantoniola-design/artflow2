@@ -10,15 +10,15 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * TAG CONTROLLER (Melhoria 3 — + Descrição e Ícone)
+ * TAG CONTROLLER
  * ============================================
  * 
- * Gerencia rotas do módulo Tags.
+ * Controller responsável pelas operações de Tags.
+ * Tags são usadas para categorizar artes.
  * 
- * ALTERAÇÕES:
- * - Melhoria 2: index() usa listarPaginado() com paginação/ordenação
- * - Melhoria 3: store()/update() agora leem 'descricao' e 'icone'
- * - Melhoria 3: create()/edit() passam lista de ícones para as views
+ * MELHORIAS APLICADAS:
+ * - [07/02/2026] Melhoria 1+2: index() agora usa listarPaginado()
+ *   com paginação (?page=X) e ordenação (?ordenar=&direcao=)
  */
 class TagController extends BaseController
 {
@@ -29,86 +29,88 @@ class TagController extends BaseController
         $this->tagService = $tagService;
     }
     
-    // ==========================================
-    // CRUD
-    // ==========================================
-    
     /**
-     * Lista tags com paginação e ordenação (Melhoria 2)
+     * Lista todas as tags com paginação e ordenação
      * GET /tags
+     * GET /tags?page=2&ordenar=contagem&direcao=DESC&termo=Aqua
+     * 
+     * MELHORIA 1: Paginação via ?page=X (12 tags por página)
+     * MELHORIA 2: Ordenação via ?ordenar=nome|data|contagem&direcao=ASC|DESC
      */
     public function index(Request $request): Response
     {
-        // Parâmetros de URL
-        $page = max(1, (int) $request->get('page', 1));
-        $ordenar = $request->get('ordenar', 'nome');
-        $direcao = strtoupper($request->get('direcao', 'ASC'));
-        $termo = $request->get('termo', '');
-        
-        // Sanitiza direção
-        if (!in_array($direcao, ['ASC', 'DESC'])) {
-            $direcao = 'ASC';
-        }
-        
-        // Busca paginada via Service
+        // ── Lê TODOS os filtros da URL ──
+        $filtros = [
+            'termo'   => $request->get('termo'),                         // Busca por nome
+            'ordenar' => $request->get('ordenar', 'nome'),               // Coluna: nome|data|contagem
+            'direcao' => $request->get('direcao', 'ASC'),                // Direção: ASC|DESC
+            'page'    => max(1, (int) $request->get('page', 1)),         // Página: mínimo 1
+        ];
+
+        // ── Busca paginada com ordenação (unifica busca + listagem) ──
+        // O Service retorna ['tags' => [...], 'paginacao' => [...]]
         $resultado = $this->tagService->listarPaginado(
-            $page, 12, $ordenar, $direcao, $termo
+            $filtros['page'],           // Página atual
+            12,                         // 12 tags por página (3 linhas × 4 colunas em XL)
+            $filtros['ordenar'],        // Coluna de ordenação
+            $filtros['direcao'],        // ASC ou DESC
+            !empty($filtros['termo']) ? $filtros['termo'] : null  // Termo de busca (null se vazio)
         );
-        
-        // Tags mais usadas (sidebar — independente dos filtros)
-        $tagsMaisUsadas = $this->tagService->getMaisUsadas(5);
-        
+
+        // Tags mais usadas para a seção de destaque (independe da paginação)
+        $maisUsadas = $this->tagService->getMaisUsadas(5);
+
+        // ── Resposta AJAX (mantém compatibilidade) ──
+        if ($request->wantsJson()) {
+            return $this->json([
+                'success'     => true,
+                'data'        => $resultado['tags'],
+                'paginacao'   => $resultado['paginacao'],
+                'mais_usadas' => $maisUsadas
+            ]);
+        }
+
+        // ── Resposta HTML ──
         return $this->view('tags/index', [
-            'titulo' => 'Tags',
-            'tags' => $resultado['tags'],
-            'paginacao' => $resultado['paginacao'],
-            'tagsMaisUsadas' => $tagsMaisUsadas,
-            // Mantém filtros na view para preservar nos links
-            'filtros' => [
-                'ordenar' => $ordenar,
-                'direcao' => $direcao,
-                'termo' => $termo,
-            ]
+            'titulo'            => 'Tags',
+            'tags'              => $resultado['tags'],           // Array de objetos Tag
+            'paginacao'         => $resultado['paginacao'],      // NOVO: dados de paginação
+            'maisUsadas'        => $maisUsadas,                  // Tags populares
+            'filtros'           => $filtros,                     // Filtros ativos (para preservar na URL)
+            'coresPredefinidas' => $this->getCoresPredefinidas() // Paleta de cores
         ]);
     }
     
     /**
-     * Formulário de criação
+     * Formulário de nova tag
      * GET /tags/criar
-     * 
-     * MELHORIA 3: Passa lista de ícones disponíveis para a view
      */
     public function create(Request $request): Response
     {
         return $this->view('tags/create', [
             'titulo' => 'Nova Tag',
-            'cores' => $this->tagService->getCoresPredefinidas(),
-            'icones' => $this->tagService->getIconesDisponiveis(),  // MELHORIA 3
+            'coresPredefinidas' => $this->getCoresPredefinidas()
         ]);
     }
     
     /**
      * Salva nova tag
      * POST /tags
-     * 
-     * MELHORIA 3: Agora lê 'descricao' e 'icone' do request
      */
     public function store(Request $request): Response
     {
         $this->validateCsrf($request);
         
         try {
-            // MELHORIA 3: Adicionados 'descricao' e 'icone' aos campos extraídos
-            $dados = $request->only(['nome', 'cor', 'descricao', 'icone']);
-            
+            $dados = $request->only(['nome', 'cor']);
             $tag = $this->tagService->criar($dados);
             
             if ($request->wantsJson()) {
-                return $this->json([
-                    'success' => true,
-                    'tag' => $tag->toArray(),
-                    'message' => 'Tag criada!'
-                ], 201);
+                return $this->success('Tag criada!', [
+                    'id' => $tag->getId(),
+                    'nome' => $tag->getNome(),
+                    'cor' => $tag->getCor()
+                ]);
             }
             
             $this->flashSuccess("Tag \"{$tag->getNome()}\" criada com sucesso!");
@@ -124,7 +126,7 @@ class TagController extends BaseController
     }
     
     /**
-     * Detalhes da tag
+     * Exibe detalhes da tag com artes associadas
      * GET /tags/{id}
      */
     public function show(Request $request, int $id): Response
@@ -133,10 +135,18 @@ class TagController extends BaseController
             $tag = $this->tagService->buscar($id);
             $artes = $this->tagService->getArtesComTag($id);
             
+            if ($request->wantsJson()) {
+                return $this->json([
+                    'success' => true,
+                    'data' => $tag->toArray(),
+                    'artes' => $artes
+                ]);
+            }
+            
             return $this->view('tags/show', [
-                'titulo' => 'Tag: ' . $tag->getNome(),
+                'titulo' => "Tag: {$tag->getNome()}",
                 'tag' => $tag,
-                'artes' => $artes,
+                'artes' => $artes
             ]);
             
         } catch (NotFoundException $e) {
@@ -147,8 +157,6 @@ class TagController extends BaseController
     /**
      * Formulário de edição
      * GET /tags/{id}/editar
-     * 
-     * MELHORIA 3: Passa lista de ícones disponíveis para a view
      */
     public function edit(Request $request, int $id): Response
     {
@@ -158,37 +166,29 @@ class TagController extends BaseController
             return $this->view('tags/edit', [
                 'titulo' => 'Editar Tag',
                 'tag' => $tag,
-                'cores' => $this->tagService->getCoresPredefinidas(),
-                'icones' => $this->tagService->getIconesDisponiveis(),  // MELHORIA 3
+                'coresPredefinidas' => $this->getCoresPredefinidas()
             ]);
             
         } catch (NotFoundException $e) {
-            return $this->notFound('Tag não encontrada');
+            $this->flashError('Tag não encontrada');
+            return $this->redirectTo('/tags');
         }
     }
     
     /**
      * Atualiza tag
      * PUT /tags/{id}
-     * 
-     * MELHORIA 3: Agora lê 'descricao' e 'icone' do request
      */
     public function update(Request $request, int $id): Response
     {
         $this->validateCsrf($request);
         
         try {
-            // MELHORIA 3: Adicionados 'descricao' e 'icone' aos campos extraídos
-            $dados = $request->only(['nome', 'cor', 'descricao', 'icone']);
-            
+            $dados = $request->only(['nome', 'cor']);
             $tag = $this->tagService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
-                return $this->json([
-                    'success' => true,
-                    'tag' => $tag->toArray(),
-                    'message' => 'Tag atualizada!'
-                ]);
+                return $this->success('Tag atualizada!');
             }
             
             $this->flashSuccess('Tag atualizada com sucesso!');
@@ -295,5 +295,19 @@ class TagController extends BaseController
                 'message' => $e->getMessage()
             ], 400);
         }
+    }
+    
+    // ==========================================
+    // UTILITÁRIOS
+    // ==========================================
+    
+    /**
+     * Retorna cores predefinidas para views
+     * 
+     * @return array
+     */
+    private function getCoresPredefinidas(): array
+    {
+        return $this->tagService->getCoresPredefinidas();
     }
 }

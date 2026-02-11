@@ -2,34 +2,20 @@
 namespace App\Models;
 
 /**
- * ============================================
- * MODEL: TAG (Melhoria 3 — + Descrição e Ícone)
- * ============================================
+ * MODEL: TAG
  * 
  * Representa uma etiqueta/categoria para artes.
- * 
- * ALTERAÇÕES Melhoria 3:
- * - [07/02/2026] Adicionada propriedade $descricao (TEXT NULL no banco)
- * - [07/02/2026] Getter/Setter para descricao
- * - [07/02/2026] Método getDescricaoResumida() — trunca para exibição em listagens
- * - [07/02/2026] Atualizado toArray() e fromArray() para incluir descricao
- * - [07/02/2026] getBadgeHtml() agora exibe ícone se definido
  */
 class Tag
 {
-    // ========================================
-    // PROPRIEDADES
-    // ========================================
-    
     private ?int $id = null;
     private string $nome = '';
     private string $cor = '#6c757d';
-    private ?string $descricao = null;    // MELHORIA 3: descrição textual da tag
-    private ?string $icone = null;         // Já existia — agora usado nas views
+    private ?string $icone = null;
     private ?string $created_at = null;
     private ?string $updated_at = null;
     
-    // Contagem de artes (opcional — preenchido por queries com JOIN)
+    // Contagem de artes (opcional)
     private int $artes_count = 0;
     
     // ========================================
@@ -39,20 +25,18 @@ class Tag
     public function getId(): ?int { return $this->id; }
     public function getNome(): string { return $this->nome; }
     public function getCor(): string { return $this->cor; }
-    public function getDescricao(): ?string { return $this->descricao; }
     public function getIcone(): ?string { return $this->icone; }
     public function getCreatedAt(): ?string { return $this->created_at; }
     public function getUpdatedAt(): ?string { return $this->updated_at; }
     public function getArtesCount(): int { return $this->artes_count; }
     
     // ========================================
-    // SETTERS (Fluent — retornam $this)
+    // SETTERS
     // ========================================
     
     public function setId(?int $id): self { $this->id = $id; return $this; }
     public function setNome(string $nome): self { $this->nome = trim($nome); return $this; }
     public function setCor(string $cor): self { $this->cor = $cor; return $this; }
-    public function setDescricao(?string $descricao): self { $this->descricao = $descricao; return $this; }
     public function setIcone(?string $icone): self { $this->icone = $icone; return $this; }
     public function setCreatedAt(?string $dt): self { $this->created_at = $dt; return $this; }
     public function setUpdatedAt(?string $dt): self { $this->updated_at = $dt; return $this; }
@@ -63,45 +47,32 @@ class Tag
     // ========================================
     
     /**
-     * Retorna HTML do badge da tag (com ícone se definido)
-     * 
-     * MELHORIA 3: Agora renderiza o ícone Bootstrap Icons quando presente.
-     * Ex: <span class="badge" style="..."><i class="bi bi-palette me-1"></i>Aquarela</span>
+     * Retorna HTML do badge da tag
      */
     public function getBadgeHtml(): string
     {
         $nome = htmlspecialchars($this->nome);
-        $style = $this->getStyleInline();
-        
-        // Ícone: renderiza <i> apenas se icone está definido e não vazio
-        $iconeHtml = '';
-        if (!empty($this->icone)) {
-            $iconeClass = htmlspecialchars($this->icone);
-            $iconeHtml = "<i class=\"{$iconeClass} me-1\"></i>";
-        }
-        
-        return "<span class=\"badge\" style=\"{$style}\">{$iconeHtml}{$nome}</span>";
+        $icone = $this->icone ? "<i class=\"{$this->icone} me-1\"></i>" : '';
+        return "<span class=\"badge\" style=\"background-color: {$this->cor}\">{$icone}{$nome}</span>";
     }
     
     /**
      * Retorna cor de texto contrastante (preto ou branco)
-     * Usa fórmula ITU-R BT.601 de luminância perceptiva
      */
     public function getCorTexto(): string
     {
+        // Remove # se existir
         $hex = ltrim($this->cor, '#');
         
-        // Proteção: se hex inválido, retorna texto escuro
-        if (strlen($hex) < 6) {
-            return '#000000';
-        }
-        
+        // Converte para RGB
         $r = hexdec(substr($hex, 0, 2));
         $g = hexdec(substr($hex, 2, 2));
         $b = hexdec(substr($hex, 4, 2));
         
+        // Calcula luminância (percepção humana)
         $luminance = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
         
+        // Se claro, usa texto escuro; se escuro, usa texto claro
         return $luminance > 0.5 ? '#000000' : '#ffffff';
     }
     
@@ -113,56 +84,16 @@ class Tag
         return "background-color: {$this->cor}; color: {$this->getCorTexto()};";
     }
     
-    /**
-     * MELHORIA 3: Retorna descrição truncada para listagens
-     * 
-     * @param int $maxChars Máximo de caracteres (padrão 80)
-     * @return string Descrição truncada com "..." ou vazio se null
-     */
-    public function getDescricaoResumida(int $maxChars = 80): string
-    {
-        if (empty($this->descricao)) {
-            return '';
-        }
-        
-        if (mb_strlen($this->descricao) <= $maxChars) {
-            return $this->descricao;
-        }
-        
-        return mb_substr($this->descricao, 0, $maxChars) . '...';
-    }
-    
-    /**
-     * Verifica se tag tem descrição definida
-     */
-    public function hasDescricao(): bool
-    {
-        return !empty($this->descricao);
-    }
-    
-    /**
-     * Verifica se tag tem ícone definido
-     */
-    public function hasIcone(): bool
-    {
-        return !empty($this->icone);
-    }
-    
     // ========================================
     // CONVERSÃO
     // ========================================
     
-    /**
-     * Converte Tag para array associativo
-     * MELHORIA 3: Inclui 'descricao' no array
-     */
     public function toArray(): array
     {
         return [
             'id' => $this->id,
             'nome' => $this->nome,
             'cor' => $this->cor,
-            'descricao' => $this->descricao,    // MELHORIA 3
             'icone' => $this->icone,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
@@ -170,17 +101,12 @@ class Tag
         ];
     }
     
-    /**
-     * Cria Tag a partir de array (hydration)
-     * MELHORIA 3: Lê 'descricao' do array
-     */
     public static function fromArray(array $data): self
     {
         $tag = new self();
         $tag->id = isset($data['id']) ? (int)$data['id'] : null;
         $tag->nome = $data['nome'] ?? '';
         $tag->cor = $data['cor'] ?? '#6c757d';
-        $tag->descricao = $data['descricao'] ?? null;   // MELHORIA 3
         $tag->icone = $data['icone'] ?? null;
         $tag->created_at = $data['created_at'] ?? null;
         $tag->updated_at = $data['updated_at'] ?? null;

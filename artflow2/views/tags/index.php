@@ -1,9 +1,41 @@
 <?php
 /**
- * VIEW: Listagem de Tags
+ * VIEW: Listagem de Tags (Melhoria 3 — + Ícones e Descrição)
  * GET /tags
+ * 
+ * Variáveis recebidas do Controller:
+ * - $tags: array<Tag> (paginadas, com artesCount)
+ * - $paginacao: array com dados de paginação
+ * - $tagsMaisUsadas: array<Tag> (top 5 — sidebar)
+ * - $filtros: ['ordenar', 'direcao', 'termo']
+ * 
+ * Fases implementadas:
+ * - Fase 2: Paginação + Ordenação dinâmica
+ * - Melhoria 3: Ícones nos badges + descrição resumida nos cards
  */
 $currentPage = 'tags';
+
+// Extrai filtros com valores padrão seguros
+$ordenar = $filtros['ordenar'] ?? 'nome';
+$direcao = $filtros['direcao'] ?? 'ASC';
+$termo = $filtros['termo'] ?? '';
+
+// Helper: monta URL preservando todos os parâmetros
+function tagUrl(array $overrides = []): string {
+    global $ordenar, $direcao, $termo;
+    
+    $params = array_merge([
+        'ordenar' => $ordenar,
+        'direcao' => $direcao,
+        'termo' => $termo,
+        'page' => 1,
+    ], $overrides);
+    
+    // Remove parâmetros vazios
+    $params = array_filter($params, fn($v) => $v !== '' && $v !== null);
+    
+    return url('/tags') . '?' . http_build_query($params);
+}
 ?>
 
 <!-- Header -->
@@ -19,20 +51,23 @@ $currentPage = 'tags';
     </a>
 </div>
 
-<!-- Tags Mais Usadas -->
-<?php if (!empty($maisUsadas)): ?>
+<!-- Tags Mais Usadas (Melhoria 3: agora com ícones) -->
+<?php if (!empty($tagsMaisUsadas)): ?>
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0"><i class="bi bi-star"></i> Tags Mais Usadas</h5>
         </div>
         <div class="card-body">
             <div class="d-flex flex-wrap gap-2">
-                <?php foreach ($maisUsadas as $tag): ?>
-                    <a href="<?= url("/tags/{$tag->getId()}") ?>" 
+                <?php foreach ($tagsMaisUsadas as $tagPopular): ?>
+                    <a href="<?= url("/tags/{$tagPopular->getId()}") ?>" 
                        class="badge fs-6 text-decoration-none"
-                       style="background-color: <?= e($tag->getCor()) ?>;">
-                        <?= e($tag->getNome()) ?>
-                        <span class="badge bg-dark ms-1"><?= $tag->getArtesCount() ?></span>
+                       style="<?= $tagPopular->getStyleInline() ?>">
+                        <?php if ($tagPopular->hasIcone()): ?>
+                            <i class="<?= e($tagPopular->getIcone()) ?> me-1"></i>
+                        <?php endif; ?>
+                        <?= e($tagPopular->getNome()) ?>
+                        <span class="badge bg-dark ms-1"><?= $tagPopular->getArtesCount() ?></span>
                     </a>
                 <?php endforeach; ?>
             </div>
@@ -40,133 +75,166 @@ $currentPage = 'tags';
     </div>
 <?php endif; ?>
 
-<!-- Busca -->
+<!-- Barra de Busca + Ordenação (Fase 2) -->
 <div class="card mb-4">
     <div class="card-body">
-        <form action="<?= url('/tags') ?>" method="GET" class="row g-3">
-            <div class="col-md-8">
+        <form action="<?= url('/tags') ?>" method="GET" class="row g-3 align-items-end">
+            <!-- Campo de busca -->
+            <div class="col-md-6">
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-search"></i></span>
                     <input type="text" 
                            name="termo" 
                            class="form-control" 
                            placeholder="Buscar tags..."
-                           value="<?= e($filtros['termo'] ?? '') ?>">
+                           value="<?= e($termo) ?>">
                 </div>
             </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-outline-primary">Buscar</button>
-                <a href="<?= url('/tags') ?>" class="btn btn-outline-secondary">Limpar</a>
+            
+            <!-- Preserva ordenação no submit da busca -->
+            <input type="hidden" name="ordenar" value="<?= e($ordenar) ?>">
+            <input type="hidden" name="direcao" value="<?= e($direcao) ?>">
+            
+            <div class="col-md-6 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Buscar
+                </button>
+                <?php if (!empty($termo)): ?>
+                    <a href="<?= url('/tags') ?>" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-lg"></i> Limpar
+                    </a>
+                <?php endif; ?>
             </div>
         </form>
+        
+        <!-- Botões de Ordenação (Fase 2) -->
+        <div class="mt-3 d-flex gap-2 align-items-center">
+            <small class="text-muted">Ordenar por:</small>
+            
+            <?php
+            // Helper local: gera botão de ordenação com toggle de direção
+            $sortButtons = [
+                'nome' => ['label' => 'Nome', 'icon' => 'bi-sort-alpha'],
+                'data' => ['label' => 'Data', 'icon' => 'bi-calendar'],
+                'contagem' => ['label' => 'Artes', 'icon' => 'bi-collection'],
+            ];
+            
+            foreach ($sortButtons as $campo => $config):
+                $isActive = ($ordenar === $campo);
+                $nextDir = ($isActive && $direcao === 'ASC') ? 'DESC' : 'ASC';
+                $btnClass = $isActive ? 'btn-primary' : 'btn-outline-secondary';
+                $arrow = $isActive ? ($direcao === 'ASC' ? '↑' : '↓') : '';
+            ?>
+                <a href="<?= tagUrl(['ordenar' => $campo, 'direcao' => $nextDir]) ?>" 
+                   class="btn btn-sm <?= $btnClass ?>">
+                    <i class="bi <?= $config['icon'] ?>"></i> 
+                    <?= $config['label'] ?> <?= $arrow ?>
+                </a>
+            <?php endforeach; ?>
+        </div>
     </div>
 </div>
 
-<!-- Lista de Tags -->
+<!-- Resultado da busca -->
+<?php if (!empty($termo)): ?>
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> 
+        <?= $paginacao['total_registros'] ?? 0 ?> resultado(s) para "<strong><?= e($termo) ?></strong>"
+    </div>
+<?php endif; ?>
+
+<!-- Lista de Tags (Cards com ícone e descrição) -->
 <?php if (empty($tags)): ?>
     <div class="card">
         <div class="card-body text-center py-5">
-            <i class="bi bi-tags display-4 text-muted"></i>
-            <h5 class="mt-3">Nenhuma tag encontrada</h5>
-            <p class="text-muted">Crie tags para organizar suas artes.</p>
+            <i class="bi bi-tags text-muted fs-1"></i>
+            <p class="text-muted mt-2">Nenhuma tag encontrada</p>
             <a href="<?= url('/tags/criar') ?>" class="btn btn-primary">
-                <i class="bi bi-plus-lg"></i> Criar Tag
+                <i class="bi bi-plus-lg"></i> Criar Primeira Tag
             </a>
         </div>
     </div>
 <?php else: ?>
-    <div class="row g-4">
+    <div class="row g-3">
         <?php foreach ($tags as $tag): ?>
-            <div class="col-md-6 col-lg-4 col-xl-3">
+            <div class="col-sm-6 col-md-4 col-lg-3">
                 <div class="card h-100">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
-                            <span class="badge fs-5" style="background-color: <?= e($tag->getCor()) ?>;">
+                    <div class="card-body text-center">
+                        <!-- Badge com cor, ícone e nome (Melhoria 3: +ícone) -->
+                        <a href="<?= url('/tags/' . $tag->getId()) ?>" 
+                           class="text-decoration-none">
+                            <span class="badge fs-5 px-3 py-2" style="<?= $tag->getStyleInline() ?>">
+                                <?php if ($tag->hasIcone()): ?>
+                                    <i class="<?= e($tag->getIcone()) ?> me-1"></i>
+                                <?php endif; ?>
                                 <?= e($tag->getNome()) ?>
                             </span>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                                    <i class="bi bi-three-dots"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a href="<?= url("/tags/{$tag->getId()}") ?>" class="dropdown-item">
-                                            <i class="bi bi-eye"></i> Ver Artes
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a href="<?= url("/tags/{$tag->getId()}/editar") ?>" class="dropdown-item">
-                                            <i class="bi bi-pencil"></i> Editar
-                                        </a>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <button class="dropdown-item text-danger" 
-                                                onclick="confirmarExclusao(<?= $tag->getId() ?>, '<?= e($tag->getNome()) ?>')">
-                                            <i class="bi bi-trash"></i> Excluir
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
+                        </a>
                         
-                        <div class="d-flex align-items-center text-muted">
-                            <i class="bi bi-brush me-2"></i>
-                            <span><?= $tag->getArtesCount() ?> arte(s)</span>
-                        </div>
+                        <!-- Contagem de artes -->
+                        <p class="text-muted mt-2 mb-1">
+                            <i class="bi bi-images"></i> 
+                            <?= $tag->getArtesCount() ?> arte(s)
+                        </p>
                         
-                        <!-- Preview da cor -->
-                        <div class="mt-3">
-                            <small class="text-muted">Cor: <?= e($tag->getCor()) ?></small>
-                            <div class="progress mt-1" style="height: 5px;">
-                                <div class="progress-bar" style="width: 100%; background-color: <?= e($tag->getCor()) ?>;"></div>
-                            </div>
-                        </div>
+                        <!-- Descrição resumida (Melhoria 3) -->
+                        <?php if ($tag->hasDescricao()): ?>
+                            <p class="text-muted small mb-0" title="<?= e($tag->getDescricao()) ?>">
+                                <?= e($tag->getDescricaoResumida(60)) ?>
+                            </p>
+                        <?php endif; ?>
                     </div>
-                    <div class="card-footer bg-transparent">
-                        <a href="<?= url("/artes?tag_id={$tag->getId()}") ?>" class="btn btn-sm btn-outline-primary w-100">
-                            <i class="bi bi-filter"></i> Ver Artes com esta Tag
+                    <div class="card-footer bg-transparent text-center">
+                        <a href="<?= url('/tags/' . $tag->getId()) ?>" 
+                           class="btn btn-sm btn-outline-primary me-1" title="Detalhes">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="<?= url('/tags/' . $tag->getId() . '/editar') ?>" 
+                           class="btn btn-sm btn-outline-secondary" title="Editar">
+                            <i class="bi bi-pencil"></i>
                         </a>
                     </div>
                 </div>
             </div>
         <?php endforeach; ?>
     </div>
+    
+    <!-- ==========================================
+         PAGINAÇÃO (Fase 2)
+         ========================================== -->
+    <?php if (($paginacao['total_paginas'] ?? 1) > 1): ?>
+        <nav aria-label="Paginação de tags" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <!-- Anterior -->
+                <li class="page-item <?= !$paginacao['tem_anterior'] ? 'disabled' : '' ?>">
+                    <a class="page-link" 
+                       href="<?= tagUrl(['page' => $paginacao['pagina_atual'] - 1]) ?>">
+                        <i class="bi bi-chevron-left"></i> Anterior
+                    </a>
+                </li>
+                
+                <!-- Números de página -->
+                <?php for ($i = 1; $i <= $paginacao['total_paginas']; $i++): ?>
+                    <li class="page-item <?= $i === $paginacao['pagina_atual'] ? 'active' : '' ?>">
+                        <a class="page-link" href="<?= tagUrl(['page' => $i]) ?>">
+                            <?= $i ?>
+                        </a>
+                    </li>
+                <?php endfor; ?>
+                
+                <!-- Próxima -->
+                <li class="page-item <?= !$paginacao['tem_proxima'] ? 'disabled' : '' ?>">
+                    <a class="page-link" 
+                       href="<?= tagUrl(['page' => $paginacao['pagina_atual'] + 1]) ?>">
+                        Próxima <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+            
+            <p class="text-center text-muted small">
+                Exibindo página <?= $paginacao['pagina_atual'] ?> de <?= $paginacao['total_paginas'] ?>
+                (<?= $paginacao['total_registros'] ?> tags no total)
+            </p>
+        </nav>
+    <?php endif; ?>
 <?php endif; ?>
-
-<!-- Modal Exclusão -->
-<div class="modal fade" id="modalExcluir" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusão</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir a tag <strong id="nomeTagExcluir"></strong>?</p>
-                <p class="text-muted small">
-                    <i class="bi bi-info-circle"></i>
-                    As artes associadas não serão excluídas, apenas perderão esta tag.
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form id="formExcluir" method="POST">
-                    <input type="hidden" name="_method" value="DELETE">
-                    <input type="hidden" name="_token" value="<?= csrf_token() ?>">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Excluir
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function confirmarExclusao(id, nome) {
-    document.getElementById('nomeTagExcluir').textContent = nome;
-    document.getElementById('formExcluir').action = '<?= url('/tags') ?>/' + id;
-    new bootstrap.Modal(document.getElementById('modalExcluir')).show();
-}
-</script>

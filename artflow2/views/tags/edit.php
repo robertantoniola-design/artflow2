@@ -1,18 +1,17 @@
 <?php
 /**
- * VIEW: Editar Tag
+ * VIEW: Editar Tag (Melhoria 3 — + Descrição e Ícone)
  * GET /tags/{id}/editar
  * 
- * Variáveis:
+ * Variáveis recebidas do Controller:
  * - $tag: Objeto Tag para edição
- * - $coresPredefinidas: Array de cores predefinidas
- * 
- * CORREÇÃO (29/01/2026): 
- * - Campo CSRF padronizado para _token
- * - URLs usando helper url()
+ * - $cores: array de cores predefinidas (hex => nome)
+ * - $icones: array de ícones disponíveis (classe => nome) — MELHORIA 3
  */
 $currentPage = 'tags';
 $corAtual = $tag->getCor();
+$coresPredefinidas = $cores ?? [];
+$iconesDisponiveis = $icones ?? [];
 ?>
 
 <!-- Breadcrumb -->
@@ -25,12 +24,15 @@ $corAtual = $tag->getCor();
 </nav>
 
 <div class="row justify-content-center">
-    <div class="col-lg-6">
+    <div class="col-lg-7">
         <!-- Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h1 class="h2 mb-1">Editar Tag</h1>
-                <span class="badge" style="background-color: <?= e($corAtual) ?>; font-size: 1rem;">
+                <span class="badge" style="<?= $tag->getStyleInline() ?>; font-size: 1rem;">
+                    <?php if ($tag->hasIcone()): ?>
+                        <i class="<?= e($tag->getIcone()) ?> me-1"></i>
+                    <?php endif; ?>
                     <?= e($tag->getNome()) ?>
                 </span>
             </div>
@@ -48,11 +50,12 @@ $corAtual = $tag->getCor();
             </div>
             <div class="card-body">
                 <form method="POST" action="<?= url('/tags/' . $tag->getId()) ?>" id="formTag">
-                    <!-- CORREÇÃO: Token CSRF padronizado para _token -->
                     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     <input type="hidden" name="_method" value="PUT">
                     
-                    <!-- Nome -->
+                    <!-- ==========================================
+                         NOME
+                         ========================================== -->
                     <div class="mb-4">
                         <label for="nome" class="form-label">
                             Nome da Tag <span class="text-danger">*</span>
@@ -70,19 +73,71 @@ $corAtual = $tag->getCor();
                         <small class="text-muted">2 a 50 caracteres</small>
                     </div>
                     
-                    <!-- Cor -->
+                    <!-- ==========================================
+                         DESCRIÇÃO (opcional) — MELHORIA 3
+                         ========================================== -->
+                    <div class="mb-4">
+                        <label for="descricao" class="form-label">
+                            Descrição
+                        </label>
+                        <textarea name="descricao" 
+                                  id="descricao"
+                                  class="form-control <?= has_error('descricao') ? 'is-invalid' : '' ?>" 
+                                  rows="3"
+                                  maxlength="500"
+                                  placeholder="Descreva o uso desta tag... (opcional)"><?= old('descricao', $tag->getDescricao()) ?></textarea>
+                        <?php if (has_error('descricao')): ?>
+                            <div class="invalid-feedback"><?= errors('descricao') ?></div>
+                        <?php endif; ?>
+                        <small class="text-muted">
+                            <span id="descricaoCount"><?= mb_strlen(old('descricao', $tag->getDescricao()) ?? '') ?></span>/500 caracteres
+                        </small>
+                    </div>
+                    
+                    <!-- ==========================================
+                         ÍCONE (opcional) — MELHORIA 3
+                         ========================================== -->
+                    <div class="mb-4">
+                        <label for="icone" class="form-label">
+                            Ícone
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text" id="iconePreviewContainer">
+                                <i id="iconePreview" class="<?= $tag->hasIcone() ? e($tag->getIcone()) : 'bi bi-tag' ?>"></i>
+                            </span>
+                            <select name="icone" 
+                                    id="icone" 
+                                    class="form-select <?= has_error('icone') ? 'is-invalid' : '' ?>">
+                                <option value="">Sem ícone (padrão)</option>
+                                <?php foreach ($iconesDisponiveis as $classe => $nomeIcone): ?>
+                                    <option value="<?= e($classe) ?>" 
+                                            <?= old('icone', $tag->getIcone()) === $classe ? 'selected' : '' ?>>
+                                        <?= e($nomeIcone) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php if (has_error('icone')): ?>
+                            <div class="text-danger small mt-1"><?= errors('icone') ?></div>
+                        <?php endif; ?>
+                        <small class="text-muted">Escolha um ícone Bootstrap Icons para a tag</small>
+                    </div>
+                    
+                    <!-- ==========================================
+                         COR
+                         ========================================== -->
                     <div class="mb-4">
                         <label class="form-label">Cor</label>
                         
                         <!-- Cores Predefinidas -->
                         <div class="d-flex flex-wrap gap-2 mb-3">
-                            <?php foreach ($coresPredefinidas ?? [] as $hex => $nome): ?>
+                            <?php foreach ($coresPredefinidas as $hex => $nome): ?>
                                 <div class="form-check">
                                     <input type="radio" 
                                            name="cor" 
                                            value="<?= $hex ?>"
                                            id="cor_<?= substr($hex, 1) ?>"
-                                           class="btn-check"
+                                           class="btn-check corRadio"
                                            <?= old('cor', $corAtual) === $hex ? 'checked' : '' ?>>
                                     <label for="cor_<?= substr($hex, 1) ?>"
                                            class="btn btn-outline-secondary"
@@ -94,7 +149,7 @@ $corAtual = $tag->getCor();
                         </div>
                         
                         <!-- Cor Customizada -->
-                        <div class="input-group" style="max-width: 200px;">
+                        <div class="input-group" style="max-width: 280px;">
                             <span class="input-group-text">
                                 <i class="bi bi-palette"></i>
                             </span>
@@ -102,7 +157,7 @@ $corAtual = $tag->getCor();
                                    id="corCustom" 
                                    class="form-control form-control-color" 
                                    value="<?= old('cor', $corAtual) ?>"
-                                   title="Escolha uma cor customizada">
+                                   title="Cor customizada">
                             <input type="text" 
                                    name="cor" 
                                    id="corHex"
@@ -112,58 +167,58 @@ $corAtual = $tag->getCor();
                                    placeholder="#000000">
                         </div>
                         <?php if (has_error('cor')): ?>
-                            <div class="invalid-feedback d-block"><?= errors('cor') ?></div>
+                            <div class="text-danger small mt-1"><?= errors('cor') ?></div>
                         <?php endif; ?>
-                        <small class="text-muted">Formato: #RRGGBB</small>
                     </div>
                     
-                    <!-- Prévia -->
+                    <!-- ==========================================
+                         PREVIEW
+                         ========================================== -->
                     <div class="mb-4">
-                        <label class="form-label">Prévia</label>
-                        <div>
-                            <span class="badge fs-6" id="previewTag" style="background-color: <?= e($corAtual) ?>;">
-                                <?= e($tag->getNome()) ?>
+                        <label class="form-label">Preview</label>
+                        <div class="p-3 bg-light rounded">
+                            <span id="previewTag" class="badge fs-5" style="<?= $tag->getStyleInline() ?>">
+                                <i id="previewIcone" class="<?= $tag->hasIcone() ? e($tag->getIcone()) . ' me-1' : '' ?>"></i>
+                                <span id="previewNome"><?= e($tag->getNome()) ?></span>
                             </span>
+                            <?php 
+                            $descAtual = old('descricao', $tag->getDescricao());
+                            ?>
+                            <p id="previewDescricao" class="text-muted small mt-2 mb-0" 
+                               style="<?= empty($descAtual) ? 'display:none;' : '' ?>">
+                                <?= e($descAtual ?? '') ?>
+                            </p>
                         </div>
                     </div>
                     
                     <!-- Botões -->
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-check-lg me-1"></i> Salvar Alterações
+                            <i class="bi bi-check-lg"></i> Salvar Alterações
                         </button>
-                        <a href="<?= url('/tags') ?>" class="btn btn-outline-secondary">
+                        <a href="<?= url('/tags/' . $tag->getId()) ?>" class="btn btn-outline-secondary">
                             Cancelar
                         </a>
-                        <button type="button" class="btn btn-outline-danger ms-auto" data-bs-toggle="modal" data-bs-target="#modalExcluir">
-                            <i class="bi bi-trash"></i> Excluir
-                        </button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Modal de Exclusão -->
-<div class="modal fade" id="modalExcluir" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Confirmar Exclusão</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Tem certeza que deseja excluir a tag <strong><?= e($tag->getNome()) ?></strong>?</p>
-                <p class="text-muted mb-0">As artes associadas a esta tag não serão excluídas, apenas a associação será removida.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form action="<?= url('/tags/' . $tag->getId()) ?>" method="POST" class="d-inline">
+        
+        <!-- Card de exclusão (separado do form de edição) -->
+        <div class="card mt-4 border-danger">
+            <div class="card-body">
+                <h6 class="text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle"></i> Zona de Perigo
+                </h6>
+                <p class="text-muted small mb-3">
+                    Excluir esta tag removerá todas as associações com artes. Esta ação não pode ser desfeita.
+                </p>
+                <form action="<?= url('/tags/' . $tag->getId()) ?>" method="POST" class="d-inline"
+                      onsubmit="return confirm('Tem certeza que deseja excluir a tag \'<?= e($tag->getNome()) ?>\'?');">
                     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     <input type="hidden" name="_method" value="DELETE">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-trash"></i> Excluir
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="bi bi-trash"></i> Excluir Tag
                     </button>
                 </form>
             </div>
@@ -171,40 +226,83 @@ $corAtual = $tag->getCor();
     </div>
 </div>
 
+<!-- ==========================================
+     JAVASCRIPT: Preview em tempo real
+     ========================================== -->
 <script>
-// Sincroniza cor customizada com campo hex
 document.addEventListener('DOMContentLoaded', function() {
     const corCustom = document.getElementById('corCustom');
     const corHex = document.getElementById('corHex');
     const previewTag = document.getElementById('previewTag');
+    const previewNome = document.getElementById('previewNome');
+    const previewIcone = document.getElementById('previewIcone');
+    const previewDescricao = document.getElementById('previewDescricao');
     const nomeInput = document.getElementById('nome');
-    const radios = document.querySelectorAll('input[name="cor"][type="radio"]');
+    const descricaoInput = document.getElementById('descricao');
+    const iconeSelect = document.getElementById('icone');
+    const iconePreview = document.getElementById('iconePreview');
+    const descricaoCount = document.getElementById('descricaoCount');
+    const radios = document.querySelectorAll('.corRadio');
     
-    // Atualiza prévia
+    // === Atualiza cor do preview ===
     function updatePreview() {
-        previewTag.style.backgroundColor = corHex.value;
-        previewTag.textContent = nomeInput.value || 'Tag';
+        const cor = corHex.value || '#6c757d';
+        previewTag.style.backgroundColor = cor;
+        
+        // Contraste automático
+        const hex = cor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        previewTag.style.color = luminance > 0.5 ? '#000000' : '#ffffff';
     }
     
-    // Cor picker -> hex input
+    // === Nome ===
+    nomeInput.addEventListener('input', function() {
+        previewNome.textContent = this.value || 'Tag';
+    });
+    
+    // === Descrição: contador + preview ===
+    descricaoInput.addEventListener('input', function() {
+        descricaoCount.textContent = this.value.length;
+        if (this.value.trim()) {
+            previewDescricao.textContent = this.value;
+            previewDescricao.style.display = 'block';
+        } else {
+            previewDescricao.style.display = 'none';
+        }
+    });
+    
+    // === Ícone ===
+    iconeSelect.addEventListener('change', function() {
+        const classe = this.value;
+        if (classe) {
+            previewIcone.className = classe + ' me-1';
+            iconePreview.className = classe;
+        } else {
+            previewIcone.className = '';
+            iconePreview.className = 'bi bi-tag';
+        }
+    });
+    
+    // === Cor: picker -> hex ===
     corCustom.addEventListener('input', function() {
         corHex.value = this.value;
-        // Desmarca radios
         radios.forEach(r => r.checked = false);
         updatePreview();
     });
     
-    // Hex input -> cor picker
+    // === Cor: hex -> picker ===
     corHex.addEventListener('input', function() {
         if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
             corCustom.value = this.value;
-            // Desmarca radios
             radios.forEach(r => r.checked = false);
             updatePreview();
         }
     });
     
-    // Radio buttons
+    // === Cor: radio buttons ===
     radios.forEach(function(radio) {
         radio.addEventListener('change', function() {
             corHex.value = this.value;
@@ -213,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Nome
-    nomeInput.addEventListener('input', updatePreview);
+    // Inicializa
+    updatePreview();
 });
 </script>
