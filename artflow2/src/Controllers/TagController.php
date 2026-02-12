@@ -124,8 +124,11 @@ class TagController extends BaseController
     }
     
     /**
-     * Detalhes da tag
+     * Exibe detalhes de uma tag
      * GET /tags/{id}
+     * 
+     * MELHORIA 3: Mostra descrição e ícone
+     * MELHORIA 4: Passa lista de tags para dropdown de merge
      */
     public function show(Request $request, int $id): Response
     {
@@ -133,10 +136,15 @@ class TagController extends BaseController
             $tag = $this->tagService->buscar($id);
             $artes = $this->tagService->getArtesComTag($id);
             
+            // MELHORIA 4: Busca todas as tags para o dropdown de merge
+            // allWithCount() retorna Tag objects com artesCount para exibir no select
+            $todasTags = $this->tagService->listarComContagem();
+            
             return $this->view('tags/show', [
                 'titulo' => 'Tag: ' . $tag->getNome(),
-                'tag' => $tag,
-                'artes' => $artes,
+                'tag'    => $tag,
+                'artes'  => $artes,
+                'todasTags' => $todasTags,  // MELHORIA 4: para dropdown de merge
             ]);
             
         } catch (NotFoundException $e) {
@@ -232,6 +240,82 @@ class TagController extends BaseController
         }
     }
     
+    // ==========================================
+    // MELHORIA 4: MERGE DE TAGS
+    // ==========================================
+
+    /**
+     * Mescla tag atual (origem) em outra tag (destino)
+     * POST /tags/{id}/merge
+     * 
+     * Transfere todas as associações de artes da tag {id} para
+     * a tag destino informada via POST (tag_destino_id), e deleta
+     * a tag {id} ao final.
+     * 
+     * @param Request $request  Contém tag_destino_id e _token (CSRF)
+     * @param int     $id       ID da tag origem (será deletada)
+     * @return Response Redireciona para show da tag destino
+     */
+    public function merge(Request $request, int $id): Response
+    {
+        // Proteção CSRF
+        $this->validateCsrf($request);
+        
+        try {
+            // Extrai ID da tag destino do formulário
+            $destinoId = (int) $request->get('tag_destino_id', 0);
+            
+            // Validação básica: destino deve ser informado
+            if ($destinoId <= 0) {
+                $this->flashError('Selecione uma tag de destino para a mesclagem.');
+                return $this->redirectTo("/tags/{$id}");
+            }
+            
+            // Executa merge via Service (validações + transação)
+            $resultado = $this->tagService->mergeTags($id, $destinoId);
+            
+            // Monta mensagem de feedback detalhada
+            $nomeOrigem  = $resultado['tag_origem']->getNome();
+            $nomeDestino = $resultado['tag_destino']->getNome();
+            $transferidas = $resultado['transferidas'];
+            $duplicatas   = $resultado['duplicatas'];
+            
+            $mensagem = sprintf(
+                'Tag "%s" mesclada com "%s" com sucesso! %d arte(s) transferida(s).',
+                $nomeOrigem,
+                $nomeDestino,
+                $transferidas
+            );
+            
+            // Informa sobre duplicatas se houver
+            if ($duplicatas > 0) {
+                $mensagem .= sprintf(
+                    ' %d associação(ões) duplicada(s) foram ignoradas.',
+                    $duplicatas
+                );
+            }
+            
+            $this->flashSuccess($mensagem);
+            
+            // Redireciona para a tag destino (a origem foi deletada)
+            return $this->redirectTo("/tags/{$destinoId}");
+            
+        } catch (ValidationException $e) {
+            // Erro de validação (ex: mesclar consigo mesma)
+            $errors = $e->getErrors();
+            $mensagem = is_array($errors) ? implode(' ', $errors) : $errors;
+            $this->flashError($mensagem);
+            return $this->redirectTo("/tags/{$id}");
+            
+        } catch (NotFoundException $e) {
+            // Tag origem ou destino não encontrada
+            $this->flashError('Uma das tags não foi encontrada.');
+            return $this->redirectTo('/tags');
+        }
+    }
+
+
+
     // ==========================================
     // ENDPOINTS AJAX
     // ==========================================

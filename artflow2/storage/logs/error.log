@@ -1274,3 +1274,21 @@ Stack trace:
 #7 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #8 {main}
 
+[2026-02-11 21:36:00] ParseError: syntax error, unexpected token "<", expecting "function" or "const" in C:\xampp\htdocs\artflow2\src\Repositories\TagRepository.php:498
+Stack trace:
+#0 [internal function]: {closure}('App\\Repositorie...')
+#1 C:\xampp\htdocs\artflow2\src\Core\Container.php(138): class_exists('App\\Repositorie...')
+#2 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Repositorie...')
+#3 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Repositorie...')
+#4 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#5 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Services\\Ta...')
+#6 C:\xampp\htdocs\artflow2\src\Core\Container.php(197): App\Core\Container->make('App\\Services\\Ta...')
+#7 C:\xampp\htdocs\artflow2\src\Core\Container.php(162): App\Core\Container->resolveDependencies(Array)
+#8 C:\xampp\htdocs\artflow2\src\Core\Container.php(122): App\Core\Container->resolve('App\\Controllers...')
+#9 C:\xampp\htdocs\artflow2\src\Core\Router.php(297): App\Core\Container->make('App\\Controllers...')
+#10 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#11 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#12 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#14 {main}
+

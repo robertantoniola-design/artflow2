@@ -478,7 +478,7 @@ class TagRepository extends BaseRepository
      * Motivo: evitar dependência circular TagRepository→Arte Model.
      * A view show.php DEVE usar acesso por chave ($arte['nome']),
      * NÃO por método ($arte->getNome()).
-     * 
+     *
      * @param int $tagId
      * @return array Array de arrays associativos
      */
@@ -494,5 +494,105 @@ class TagRepository extends BaseRepository
         $stmt->execute();
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+
+    // ==========================================
+    // MELHORIA 4: MERGE DE TAGS
+    // ==========================================
+
+    /**
+     * Mescla tag origem na tag destino (transação atômica)
+     * 
+     * Transfere todas as associações arte_tags da tag origem para a tag destino,
+     * tratando duplicatas (arte que já tem ambas as tags), e depois deleta
+     * a tag origem.
+     * 
+     * LÓGICA DE DUPLICATAS:
+     * - Uma arte pode estar associada tanto à tag origem quanto à destino.
+     * - Passo 1: Transfere apenas associações que NÃO causariam duplicata.
+     * - Passo 2: Remove associações restantes da origem (eram duplicatas).
+     * - Passo 3: Deleta a tag origem.
+     * 
+     * @param int $origemId  ID da tag a ser absorvida (será deletada)
+     * @param int $destinoId ID da tag que receberá as associações
+     * @return array ['transferidas' => int, 'duplicatas' => int]
+     * @throws \Exception Em caso de erro (faz rollback)
+     */
+    public function mergeTags(int $origemId, int $destinoId): array
+    {
+        $db = $this->getConnection();
+        
+        try {
+            $db->beginTransaction();
+            
+            // ── Passo 1: Contar quantas artes têm APENAS a tag origem ──
+            // São as associações que serão transferidas (sem conflito)
+            $sqlContarTransferiveis = "
+                SELECT COUNT(*) FROM arte_tags 
+                WHERE tag_id = :origem_id 
+                AND arte_id NOT IN (
+                    SELECT arte_id FROM arte_tags WHERE tag_id = :destino_id
+                )
+            ";
+            $stmt = $db->prepare($sqlContarTransferiveis);
+            $stmt->execute(['origem_id' => $origemId, 'destino_id' => $destinoId]);
+            $transferiveis = (int) $stmt->fetchColumn();
+            
+            // ── Passo 2: Contar duplicatas (artes com ambas as tags) ──
+            $sqlContarDuplicatas = "
+                SELECT COUNT(*) FROM arte_tags a1
+                INNER JOIN arte_tags a2 ON a1.arte_id = a2.arte_id
+                WHERE a1.tag_id = :origem_id AND a2.tag_id = :destino_id
+            ";
+            $stmt = $db->prepare($sqlContarDuplicatas);
+            $stmt->execute(['origem_id' => $origemId, 'destino_id' => $destinoId]);
+            $duplicatas = (int) $stmt->fetchColumn();
+            
+            // ── Passo 3: Transferir associações sem duplicata ──
+            // UPDATE arte_tags SET tag_id = destino WHERE tag_id = origem
+            // APENAS para artes que NÃO têm a tag destino ainda
+            $sqlTransferir = "
+                UPDATE arte_tags 
+                SET tag_id = :destino_id 
+                WHERE tag_id = :origem_id 
+                AND arte_id NOT IN (
+                    SELECT arte_id FROM (
+                        SELECT arte_id FROM arte_tags WHERE tag_id = :destino_id2
+                    ) AS sub
+                )
+            ";
+            $stmt = $db->prepare($sqlTransferir);
+            $stmt->execute([
+                'destino_id'  => $destinoId,
+                'origem_id'   => $origemId,
+                'destino_id2' => $destinoId,
+            ]);
+            
+            // ── Passo 4: Remover associações duplicadas restantes ──
+            // As artes que já tinham a tag destino ficam com a entrada duplicada
+            // da tag origem que precisa ser removida
+            $sqlRemoverDuplicatas = "
+                DELETE FROM arte_tags WHERE tag_id = :origem_id
+            ";
+            $stmt = $db->prepare($sqlRemoverDuplicatas);
+            $stmt->execute(['origem_id' => $origemId]);
+            
+            // ── Passo 5: Deletar a tag origem ──
+            $sqlDeletarTag = "DELETE FROM {$this->table} WHERE id = :id";
+            $stmt = $db->prepare($sqlDeletarTag);
+            $stmt->execute(['id' => $origemId]);
+            
+            $db->commit();
+            
+            return [
+                'transferidas' => $transferiveis,
+                'duplicatas'   => $duplicatas,
+            ];
+            
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
     }
 }

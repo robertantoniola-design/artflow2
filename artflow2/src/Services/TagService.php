@@ -217,6 +217,51 @@ class TagService
         return $this->tagRepository->deleteWithRelations($id);
     }
     
+
+
+    // ==========================================
+    // MELHORIA 4: MERGE DE TAGS
+    // ==========================================
+
+    /**
+     * Mescla tag origem na tag destino
+     * 
+     * Valida que ambas as tags existem e são diferentes,
+     * depois delega para o Repository que faz a operação
+     * atômica em transação.
+     * 
+     * @param int $origemId  ID da tag que será absorvida (deletada)
+     * @param int $destinoId ID da tag que receberá as associações
+     * @return array ['tag_origem' => Tag, 'tag_destino' => Tag, 
+     *               'transferidas' => int, 'duplicatas' => int]
+     * @throws ValidationException Se origem == destino
+     * @throws NotFoundException Se alguma tag não existe
+     */
+    public function mergeTags(int $origemId, int $destinoId): array
+    {
+        // ── Validação 1: Não pode mesclar consigo mesma ──
+        if ($origemId === $destinoId) {
+            throw new ValidationException([
+                'tag_destino_id' => 'Não é possível mesclar uma tag consigo mesma.'
+            ]);
+        }
+        
+        // ── Validação 2: Ambas as tags devem existir ──
+        // findOrFail() lança NotFoundException se não encontrar
+        $tagOrigem  = $this->tagRepository->findOrFail($origemId);
+        $tagDestino = $this->tagRepository->findOrFail($destinoId);
+        
+        // ── Executa merge no Repository (transação atômica) ──
+        $resultado = $this->tagRepository->mergeTags($origemId, $destinoId);
+        
+        return [
+            'tag_origem'   => $tagOrigem,   // Para mensagem de feedback
+            'tag_destino'  => $tagDestino,   // Para redirecionamento
+            'transferidas' => $resultado['transferidas'],
+            'duplicatas'   => $resultado['duplicatas'],
+        ];
+    }
+
     // ==========================================
     // BUSCA E PESQUISA
     // ==========================================
