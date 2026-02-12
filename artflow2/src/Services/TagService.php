@@ -10,7 +10,7 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * TAG SERVICE (Melhoria 3 — + Descrição e Ícone)
+ * TAG SERVICE (Melhoria 6 — + Gráfico de Distribuição)
  * ============================================
  * 
  * Camada de lógica de negócio para Tags.
@@ -32,6 +32,9 @@ use App\Exceptions\NotFoundException;
  * MELHORIA 3:
  * - [07/02/2026] normalizarDados() agora trata descricao (trim) e icone (trim/null)
  * - [07/02/2026] criar() e atualizar() aceitam campos descricao e icone
+ * 
+ * MELHORIA 6:
+ * - [12/02/2026] Adicionado getContagemPorTag() — dados para gráfico Chart.js
  */
 class TagService
 {
@@ -460,6 +463,24 @@ class TagService
     public function getMaisUsadas(int $limite = 10): array
     {
         return $this->tagRepository->getMaisUsadas($limite);
+    }
+    
+    /**
+     * ============================================
+     * MELHORIA 6: Retorna contagem de artes por tag para gráfico
+     * ============================================
+     * 
+     * Wrapper do Repository::getContagemPorTag().
+     * Retorna dados formatados para Chart.js na view index.php.
+     * 
+     * Cada item contém: nome da tag, cor hexadecimal, quantidade de artes.
+     * Ordenado por quantidade DESC (tags mais populares primeiro).
+     * 
+     * @return array [{nome, cor, quantidade}]
+     */
+    public function getContagemPorTag(): array
+    {
+        return $this->tagRepository->getContagemPorTag();
     }
     
     /**

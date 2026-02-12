@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Tags: Documentação Completa
 
 **Data:** 12/02/2026  
-**Status Geral:** ✅ Melhoria 5 (Estatísticas por Tag) completa — Módulo estável  
-**Versão Base:** CRUD estabilizado + Paginação + Ordenação + Descrição/Ícone + Merge + Estatísticas  
+**Status Geral:** ✅ Melhoria 6 (Gráfico de Distribuição) completa — Módulo COMPLETO  
+**Versão Base:** CRUD estabilizado + Paginação + Ordenação + Descrição/Ícone + Merge + Estatísticas + Gráfico  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)
 
 ---
@@ -11,7 +11,7 @@
 
 O módulo de Tags do ArtFlow 2.0 gerencia etiquetas/categorias para organizar artes do negócio. Tags permitem classificar obras por técnica (Aquarela, Óleo, Digital), tema (Retrato, Paisagem, Abstrato), tipo (Encomenda, Favorito) ou qualquer critério personalizado. O módulo opera com relacionamento N:N com Artes através da tabela pivot `arte_tags`, e oferece endpoints AJAX para integração com formulários de outros módulos.
 
-O módulo passou por uma fase de estabilização (5 bugs corrigidos), cinco melhorias funcionais (paginação, ordenação, descrição/ícone, merge de tags, estatísticas por tag), e está em pleno funcionamento com todas as regressões de UI corrigidas.
+O módulo passou por uma fase de estabilização (5 bugs corrigidos), seis melhorias funcionais (paginação, ordenação, descrição/ícone, merge de tags, estatísticas por tag, gráfico de distribuição), e está **COMPLETO** com todas as regressões de UI corrigidas.
 
 ### Status das Fases
 
@@ -23,6 +23,7 @@ O módulo passou por uma fase de estabilização (5 bugs corrigidos), cinco melh
 | Melhoria 3 | Campo descrição + ativação ícone | ✅ COMPLETA (09/02/2026 — regressões corrigidas 11/02/2026) |
 | Melhoria 4 | Merge de tags (mesclar/absorver tags) | ✅ COMPLETA (12/02/2026) |
 | Melhoria 5 | Estatísticas por tag (métricas financeiras e produção) | ✅ COMPLETA (12/02/2026) |
+| Melhoria 6 | Gráfico de distribuição (Doughnut/Barras Chart.js) | ✅ COMPLETA (12/02/2026) |
 
 ### Melhorias — Visão Geral
 
@@ -33,7 +34,7 @@ O módulo passou por uma fase de estabilização (5 bugs corrigidos), cinco melh
 | 3 | Campo descrição e ícone customizado | Baixa | ✅ COMPLETA |
 | 4 | Merge de tags duplicadas | Média | ✅ COMPLETA |
 | 5 | Estatísticas por tag (produção + vendas) | Média | ✅ COMPLETA |
-| 6 | Tag cloud visual / gráfico de distribuição | Média | 📲 PLANEJADA |
+| 6 | Gráfico de distribuição (Doughnut ↔ Barras) | Média | ✅ COMPLETA |
 
 ---
 
@@ -48,15 +49,15 @@ src/
 ├── Repositories/
 │   └── TagRepository.php             ✅ Melhoria 5 (+ getEstatisticasByTag — 2 queries + complexidade)
 ├── Services/
-│   └── TagService.php                ✅ Melhoria 5 (+ getEstatisticasTag — métricas derivadas)
+│   └── TagService.php                ✅ Melhoria 6 (+ getContagemPorTag — dados para gráfico)
 ├── Controllers/
-│   └── TagController.php             ✅ Melhoria 5 (+ show() passa $estatisticas)
+│   └── TagController.php             ✅ Melhoria 6 (+ index() passa $contagemPorTag)
 └── Validators/
     └── TagValidator.php              ✅ Melhoria 3 (+ validação descricao/icone + getIconesDisponiveis)
 
 views/
 └── tags/
-    ├── index.php                     ✅ Melhoria 3 corrigida (dropdown three-dots + excluir restaurados)
+    ├── index.php                     ✅ Melhoria 6 (+ gráfico Chart.js Doughnut/Barras)
     ├── create.php                    ✅ Melhoria 3 (+ textarea descricao + select icone + preview)
     ├── show.php                      ✅ Melhoria 5 (+ mini-cards + card estatísticas detalhadas)
     └── edit.php                      ✅ Melhoria 3 (+ textarea descricao + select icone + preview)
@@ -86,11 +87,14 @@ TagController::show() usa getArtesByTag() para listar artes da tag
 TagController::show() usa listarComContagem() para dropdown de merge (M4)
 TagController::show() usa getEstatisticasTag() para cards de métricas (M5)
 TagController::merge() usa TagService::mergeTags() para mesclar tags (M4)
+TagController::index() usa TagService::getContagemPorTag() para gráfico (M6)
 ```
 
 **Nota sobre acoplamento:** O módulo Tags é o mais independente do sistema. Ele NÃO depende de nenhum outro módulo, mas OUTROS módulos dependem dele (Artes usa Tags para categorização).
 
 **Nota sobre Melhoria 5:** As queries de estatísticas fazem JOIN com as tabelas `artes` e `vendas`, mas isso é acesso SOMENTE LEITURA via SQL — não há dependência de código PHP (não importa Models/Services de outros módulos).
+
+**Nota sobre Melhoria 6:** O gráfico usa Chart.js 4.4.7 via CDN (mesmo padrão do módulo Metas). Dados vêm de `getContagemPorTag()` que já existia no Repository — só faltava o wrapper no Service.
 
 ### Tabela `tags` (Banco de Dados — após Melhoria 3)
 
@@ -483,6 +487,72 @@ return $this->view('tags/show', [
 
 ---
 
+## ✅ MELHORIA 6 — GRÁFICO DE DISTRIBUIÇÃO (COMPLETA)
+
+**Implementada em:** 12/02/2026  
+**Arquivos alterados:** TagService, TagController, views/tags/index.php  
+**Dependências externas:** Chart.js 4.4.7 via CDN
+
+### Objetivo
+
+Visualização gráfica da distribuição de tags por quantidade de artes associadas, com gráfico interativo (Doughnut ↔ Barras horizontais) usando Chart.js.
+
+### O que foi feito
+
+**Backend (alterações mínimas):**
+- **TagService:** +1 método `getContagemPorTag()` — wrapper que delega para `TagRepository::getContagemPorTag()` (já existia)
+- **TagController::index():** +2 linhas — chama `getContagemPorTag()` e passa `$contagemPorTag` para a view
+
+**Frontend (view index.php):**
+- Card "Distribuição de Tags" posicionado entre "Tags Mais Usadas" e "Busca/Ordenação"
+- Gráfico Doughnut (rosca) como default, com toggle para Barras horizontais
+- Legenda lateral: nome + quantidade + porcentagem de cada tag
+- Cores reais do banco de dados (campo `cor` de cada tag)
+- Botão collapse para recolher/expandir o gráfico
+- Container altura fixa 300px (evita loop de redimensionamento do Chart.js)
+- Proteção: só exibe se existirem tags com ≥1 arte (sem gráfico vazio)
+- Chart.js 4.4.7 via CDN (mesmo padrão do módulo Metas)
+
+### Arquivos Alterados (3 arquivos)
+
+| # | Arquivo | O que foi alterado | Linhas |
+|---|---------|-------------------|--------|
+| 1 | `src/Services/TagService.php` | + `getContagemPorTag()` wrapper | +15 |
+| 2 | `src/Controllers/TagController.php` | + chamada + passagem para view no `index()` | +3 |
+| 3 | `views/tags/index.php` | + seção completa do gráfico Chart.js | +130 |
+
+### Detalhes Técnicos
+
+**Dados do gráfico:**
+- Fonte: `TagRepository::getContagemPorTag()` retorna `[{nome, cor, quantidade}]` ordenado DESC
+- Filtro na view: `array_filter()` exclui tags com 0 artes (evita gráfico poluído)
+- Total calculado com `array_sum()` para porcentagens na legenda
+
+**Chart.js — Configuração:**
+- Tipo default: `doughnut` com `cutout: '55%'`
+- Tipo alternativo: `bar` horizontal (`indexAxis: 'y'`)
+- Toggle: destrói instância atual e recria (previne memory leak)
+- Tooltip customizado: `nome: X arte(s) (Y%)`
+- Responsivo: `maintainAspectRatio: false` + container fixo
+
+**Bug encontrado e corrigido durante implementação:**
+- `TagService::getContagemPorTag()` não existia — mesmo padrão dos Bugs 1 e 2 da Fase 1 (método no Repository sem wrapper no Service)
+- Correção: adicionado método simples que delega para o Repository
+
+### Testes Realizados
+
+| Teste | Resultado |
+|-------|-----------|
+| Página /tags carrega sem erro | ✅ OK |
+| Gráfico Doughnut aparece com cores reais | ✅ OK |
+| Toggle Doughnut ↔ Barras funciona | ✅ OK |
+| Collapse recolhe/expande corretamente | ✅ OK |
+| Legenda mostra quantidade + porcentagem | ✅ OK |
+| Sem tags com artes → gráfico não aparece | ✅ OK |
+| Melhorias 1-5 preservadas (paginação, ordenação, dropdown, etc.) | ✅ OK |
+
+---
+
 ## 📊 REFERÊNCIA RÁPIDA DE MÉTODOS
 
 ### Tag Model (`src/Models/Tag.php`) — Após Melhoria 3
@@ -537,7 +607,7 @@ return $this->view('tags/show', [
 
 **Legenda:** F1=Fase 1, M1=Melhoria 1, M3=Melhoria 3, M4=Melhoria 4, M5=Melhoria 5
 
-### TagService (`src/Services/TagService.php`) — Após Melhoria 5
+### TagService (`src/Services/TagService.php`) — Após Melhoria 6
 
 | Método | Retorno | Fase | Descrição |
 |--------|---------|------|-----------|
@@ -551,6 +621,7 @@ return $this->view('tags/show', [
 | `mergeTags(int, int)` | array | **M4** | Valida + delega merge ao Repository |
 | `getEstatisticasTag(int)` | array | **M5** | Busca dados + calcula métricas derivadas (%, margem, R$/h) |
 | `getMaisUsadas(int)` | array\<Tag> | Base | Top N |
+| `getContagemPorTag()` | array | **M6** | Dados para gráfico Chart.js [{nome, cor, quantidade}] |
 | `getParaSelect()` | array | Base | Para dropdowns |
 | `getCoresPredefinidas()` | array | Base | Paleta de cores |
 | `getIconesDisponiveis()` | array | **M3** | Ícones Bootstrap disponíveis |
@@ -559,11 +630,11 @@ return $this->view('tags/show', [
 | `pesquisar(string, int)` | array | **F1** | Busca LIKE + contagem |
 | `getArtesComTag(int)` | array | **F1** | Artes da tag |
 
-### TagController (`src/Controllers/TagController.php`) — Após Melhoria 5
+### TagController (`src/Controllers/TagController.php`) — Após Melhoria 6
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `index()` | GET /tags | Lista paginada + busca + ordenação + tags mais usadas |
+| `index()` | GET /tags | Lista paginada + busca + ordenação + tags mais usadas + gráfico (M6) |
 | `create()` | GET /tags/criar | Formulário com cores + ícones (M3) |
 | `store()` | POST /tags | Valida + cria (nome, cor, descricao, icone) |
 | `show($id)` | GET /tags/{id} | Detalhes + artes + descrição (M3) + merge (M4) + estatísticas (M5) |
@@ -653,7 +724,7 @@ TAGS — Resource (7 rotas automáticas)
 6. redirectTo('/tags')
 ```
 
-### Listar Tags (GET /tags) — Após Melhorias 1+2
+### Listar Tags (GET /tags) — Após Melhorias 1+2+6
 
 ```
 1. TagController::index() recebe Request
@@ -662,7 +733,8 @@ TAGS — Resource (7 rotas automáticas)
 4. Senão → TagService::listarPaginado(page, 12, filtros)
    → TagRepository::allWithCountPaginated() com LIMIT/OFFSET + ORDER BY dinâmico
 5. TagService::getMaisUsadas(5) → top 5 para sidebar
-6. View recebe: $tags, $paginacao, $tagsMaisUsadas, $filtros
+6. TagService::getContagemPorTag() → dados para gráfico Chart.js (M6)
+7. View recebe: $tags, $paginacao, $tagsMaisUsadas, $contagemPorTag, $filtros
 ```
 
 ### Ver Detalhes (GET /tags/{id}) — Após Melhorias 4+5
@@ -758,34 +830,26 @@ O controller de Metas passa `'anosDisponiveis'` (renomeado de `'anos'`). Se filt
 ### Estatísticas: Proteção Contra Divisão por Zero (M5)
 O Service calcula métricas derivadas com verificação prévia: `total_artes > 0`, `faturamento_total > 0`, `horas_totais > 0`. A view usa flags `tem_dados` e `tem_vendas` para decidir o que exibir.
 
----
+### Gráfico: Wrapper Ausente no Service (M6)
+`TagRepository::getContagemPorTag()` existia desde a base mas nunca teve wrapper no Service. Mesmo padrão dos Bugs 1 e 2 (Fase 1). Lição: sempre validar que métodos do Repository têm correspondente no Service antes de chamar no Controller.
 
-## 📮 MELHORIAS FUTURAS — ESPECIFICAÇÕES
-
-### Melhoria 6: Tag Cloud / Gráfico (Complexidade: Média)
-
-**Objetivo:** Visualização gráfica da distribuição de tags.
-
-**Implementação prevista:**
-- Chart.js doughnut ou bar chart usando `getContagemPorTag()` (já existe no Repository)
-- View index.php: seção com gráfico acima ou ao lado da listagem
-- Dados: nome, cor, quantidade (já retornados pelo método existente)
-- Responsividade: container com altura fixa para evitar loop de redimensionamento
+### Gráfico: Chart.js via CDN (M6)
+Chart.js 4.4.7 carregado via `cdn.jsdelivr.net` — mesmo padrão do módulo Metas. O script só é incluído se `$temDadosGrafico` for true (evita carregamento desnecessário). Container com altura fixa de 300px previne loop de redimensionamento.
 
 ---
 
 ## 📌 PRÓXIMAS AÇÕES (para nova conversa)
 
-1. **Melhoria 6 (Tag Cloud):** Implementar gráfico de distribuição de tags na index.php com Chart.js usando `getContagemPorTag()` que já existe no Repository.
-
-2. **Limpeza opcional:** Existem tags de teste no banco (Teste2, Teste5, Teste6, Teste7, Teste8) com 0 artes que podem ser removidas:
+1. **Limpeza opcional:** Existem tags de teste no banco (Teste2, Teste5, Teste6, Teste7, Teste8) com 0 artes que podem ser removidas:
    ```sql
    DELETE FROM tags WHERE nome LIKE 'Teste%' AND id NOT IN (
        SELECT DISTINCT tag_id FROM arte_tags
    );
    ```
 
-3. **Próximo módulo:** Considerar iniciar ciclo de melhorias em outro módulo (Artes, Clientes, Vendas) seguindo o mesmo padrão: estabilização → melhorias incrementais → documentação.
+2. **Módulo Tags COMPLETO:** Todas as 6 melhorias planejadas foram implementadas. O módulo está estável e funcional.
+
+3. **Próximo módulo:** Iniciar ciclo de melhorias em outro módulo (Artes, Clientes ou Vendas) seguindo o mesmo padrão: estabilização → melhorias incrementais → documentação.
 
 ---
 
@@ -832,5 +896,5 @@ O Service calcula métricas derivadas com verificação prévia: `total_artes > 
 ---
 
 **Última atualização:** 12/02/2026  
-**Status:** ✅ Módulo Tags — 5 melhorias completas, totalmente funcional  
-**Próxima ação:** Melhoria 6 (Tag Cloud / Gráfico) ou próximo módulo
+**Status:** ✅ Módulo Tags — 6 melhorias completas, MÓDULO COMPLETO  
+**Próxima ação:** Próximo módulo (Artes, Clientes ou Vendas)

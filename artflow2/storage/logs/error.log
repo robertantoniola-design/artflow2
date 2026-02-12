@@ -1292,3 +1292,12 @@ Stack trace:
 #13 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
 #14 {main}
 
+[2026-02-12 15:18:45] Error: Call to undefined method App\Services\TagService::getContagemPorTag() in C:\xampp\htdocs\artflow2\src\Controllers\TagController.php:68
+Stack trace:
+#0 C:\xampp\htdocs\artflow2\src\Core\Router.php(300): App\Controllers\TagController->index(Object(App\Core\Request))
+#1 C:\xampp\htdocs\artflow2\src\Core\Router.php(226): App\Core\Router->callHandler(Array, Object(App\Core\Request), Array)
+#2 C:\xampp\htdocs\artflow2\src\Core\Application.php(269): App\Core\Router->dispatch(Object(App\Core\Request))
+#3 C:\xampp\htdocs\artflow2\public\index.php(56): App\Core\Application->run()
+#4 C:\xampp\htdocs\artflow2\index.php(15): require_once('C:\\xampp\\htdocs...')
+#5 {main}
+

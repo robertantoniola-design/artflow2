@@ -10,7 +10,7 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * TAG CONTROLLER (Melhoria 3 — + Descrição e Ícone)
+ * TAG CONTROLLER (Melhoria 6 — + Gráfico de Distribuição)
  * ============================================
  * 
  * Gerencia rotas do módulo Tags.
@@ -19,6 +19,7 @@ use App\Exceptions\NotFoundException;
  * - Melhoria 2: index() usa listarPaginado() com paginação/ordenação
  * - Melhoria 3: store()/update() agora leem 'descricao' e 'icone'
  * - Melhoria 3: create()/edit() passam lista de ícones para as views
+ * - Melhoria 6: index() passa $contagemPorTag para gráfico Chart.js
  */
 class TagController extends BaseController
 {
@@ -36,6 +37,8 @@ class TagController extends BaseController
     /**
      * Lista tags com paginação e ordenação (Melhoria 2)
      * GET /tags
+     * 
+     * MELHORIA 6: Agora também passa $contagemPorTag para gráfico de distribuição
      */
     public function index(Request $request): Response
     {
@@ -58,11 +61,17 @@ class TagController extends BaseController
         // Tags mais usadas (sidebar — independente dos filtros)
         $tagsMaisUsadas = $this->tagService->getMaisUsadas(5);
         
+        // ── MELHORIA 6: Dados para gráfico de distribuição ──
+        // Retorna [{nome, cor, quantidade}] ordenado por quantidade DESC
+        // Usa método que já existe no Repository/Service
+        $contagemPorTag = $this->tagService->getContagemPorTag();
+        
         return $this->view('tags/index', [
             'titulo' => 'Tags',
             'tags' => $resultado['tags'],
             'paginacao' => $resultado['paginacao'],
             'tagsMaisUsadas' => $tagsMaisUsadas,
+            'contagemPorTag' => $contagemPorTag,  // MELHORIA 6: para Chart.js
             // Mantém filtros na view para preservar nos links
             'filtros' => [
                 'ordenar' => $ordenar,

@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================
- * VIEW: Listagem de Tags (Melhoria 3 — CORRIGIDA)
+ * VIEW: Listagem de Tags (Melhoria 6 — Gráfico de Distribuição)
  * ============================================
  * 
  * GET /tags
@@ -11,26 +11,23 @@
  * - $tags (array<Tag>)            — Tags da página atual (objetos Tag com artesCount)
  * - $paginacao (array)            — Metadados de paginação
  * - $tagsMaisUsadas (array<Tag>)  — Top 5 tags mais populares
+ * - $contagemPorTag (array)       — MELHORIA 6: [{nome, cor, quantidade}] para gráfico
  * - $filtros (array)              — Filtros ativos: termo, ordenar, direcao, page
  * 
  * MELHORIAS IMPLEMENTADAS:
  * - [Melhoria 1] Paginação com controles Bootstrap 5 (12 tags/página)
  * - [Melhoria 2] Ordenação clicável (Nome, Data, Contagem) com setas visuais
  * - [Melhoria 3] Ícones nos badges + descrição resumida nos cards
+ * - [Melhoria 6] Gráfico de distribuição (Doughnut ↔ Barras) com Chart.js
  * 
- * CORREÇÕES APLICADAS (11/02/2026):
+ * CORREÇÕES PRESERVADAS (11/02/2026):
  * - [R1] Restaurado dropdown three-dots (...) com menu de ações
  * - [R2] Restaurado link "Ver Artes com esta Tag" no card-footer
  * - [R3] Restaurado botão "Excluir" com modal de confirmação
  * - [FIX] Função tagUrl() corrigida: recebe $filtros como parâmetro
  *         (não usa 'global' — compatível com extract() do View::renderFile)
  * 
- * NOTA TÉCNICA: As funções helper recebem $filtros como parâmetro
- * porque View::renderFile() usa extract() em escopo local —
- * variáveis NÃO ficam no escopo global.
- * 
  * ARQUIVO: views/tags/index.php
- * SUBSTITUI: versão da Melhoria 3 que tinha regressões de UI
  */
 $currentPage = 'tags';
 
@@ -137,6 +134,12 @@ $temProxima     = $pag['tem_proxima'] ?? false;
 $ordenarAtual = $filtros['ordenar'] ?? 'nome';
 $direcaoAtual = $filtros['direcao'] ?? 'ASC';
 $termoAtual   = $filtros['termo'] ?? '';
+
+// ── MELHORIA 6: Prepara dados do gráfico ──
+// Filtra tags que possuem pelo menos 1 arte (evita gráfico poluído com zeros)
+$dadosGrafico = array_filter($contagemPorTag ?? [], fn($item) => (int)$item['quantidade'] > 0);
+// Indica se há dados suficientes para exibir o gráfico (mínimo 1 tag com artes)
+$temDadosGrafico = count($dadosGrafico) >= 1;
 ?>
 
 <!-- ═══════════════════════════════════════════════ -->
@@ -181,6 +184,90 @@ $termoAtual   = $filtros['termo'] ?? '';
                         <span class="badge bg-dark ms-1"><?= $tagPopular->getArtesCount() ?></span>
                     </a>
                 <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MELHORIA 6: GRÁFICO DE DISTRIBUIÇÃO DE TAGS               -->
+<!-- Chart.js — Doughnut ↔ Barras (toggle)                     -->
+<!-- Só exibe se existirem tags com pelo menos 1 arte associada -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<?php if ($temDadosGrafico): ?>
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-pie-chart"></i> Distribuição de Tags
+            </h5>
+            <div class="d-flex align-items-center gap-2">
+                <!-- Toggle tipo de gráfico: Doughnut ↔ Barras -->
+                <div class="btn-group btn-group-sm" role="group" aria-label="Tipo de gráfico">
+                    <button type="button" class="btn btn-outline-primary active" id="btnDoughnut" 
+                            onclick="trocarTipoGrafico('doughnut')" title="Gráfico de Rosca">
+                        <i class="bi bi-pie-chart"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-primary" id="btnBar"
+                            onclick="trocarTipoGrafico('bar')" title="Gráfico de Barras">
+                        <i class="bi bi-bar-chart-line"></i>
+                    </button>
+                </div>
+                <!-- Botão collapse: permite recolher o gráfico -->
+                <button class="btn btn-sm btn-outline-secondary" type="button" 
+                        data-bs-toggle="collapse" data-bs-target="#graficoCollapse"
+                        aria-expanded="true" aria-controls="graficoCollapse"
+                        title="Mostrar/ocultar gráfico">
+                    <i class="bi bi-chevron-up" id="collapseIcon"></i>
+                </button>
+            </div>
+        </div>
+        <div class="collapse show" id="graficoCollapse">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <!-- Canvas do gráfico — altura fixa evita loop de redimensionamento -->
+                    <div class="col-lg-8">
+                        <div style="position: relative; height: 300px;">
+                            <canvas id="tagDistribuicaoChart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Legenda lateral com porcentagens -->
+                    <div class="col-lg-4 mt-3 mt-lg-0">
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-info-circle"></i> Resumo
+                        </h6>
+                        <?php 
+                        // Calcula total de artes para porcentagem
+                        $totalArtesGrafico = array_sum(array_column($dadosGrafico, 'quantidade'));
+                        foreach ($dadosGrafico as $item): 
+                            $percentual = $totalArtesGrafico > 0 
+                                ? round(($item['quantidade'] / $totalArtesGrafico) * 100, 1) 
+                                : 0;
+                        ?>
+                            <div class="d-flex align-items-center mb-2">
+                                <!-- Quadrado colorido como indicador visual -->
+                                <span class="d-inline-block me-2 rounded" 
+                                      style="width: 14px; height: 14px; background-color: <?= e($item['cor']) ?>; flex-shrink: 0;">
+                                </span>
+                                <span class="text-truncate me-auto" title="<?= e($item['nome']) ?>">
+                                    <?= e($item['nome']) ?>
+                                </span>
+                                <span class="badge bg-light text-dark ms-2">
+                                    <?= (int)$item['quantidade'] ?>
+                                </span>
+                                <small class="text-muted ms-1" style="min-width: 40px; text-align: right;">
+                                    <?= $percentual ?>%
+                                </small>
+                            </div>
+                        <?php endforeach; ?>
+                        
+                        <!-- Total geral -->
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>Total</strong>
+                            <strong><?= $totalArtesGrafico ?> arte(s)</strong>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -529,3 +616,183 @@ function confirmarExclusao(id, nome) {
     new bootstrap.Modal(document.getElementById('modalExcluir')).show();
 }
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MELHORIA 6: JavaScript — Chart.js para Gráfico de Tags    -->
+<!-- Carrega Chart.js via CDN + inicializa Doughnut com toggle  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<?php if ($temDadosGrafico): ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+/**
+ * ============================================
+ * MELHORIA 6: Gráfico de Distribuição de Tags
+ * ============================================
+ * 
+ * Usa Chart.js para renderizar Doughnut ou Bar chart.
+ * Dados vêm do PHP ($contagemPorTag) via json_encode.
+ * Cores usam as cores reais de cada tag do banco de dados.
+ * 
+ * FUNCIONALIDADES:
+ * - Toggle Doughnut ↔ Barras (horizontal)
+ * - Tooltip com nome + quantidade + porcentagem
+ * - Cores reais das tags do banco
+ * - Responsivo com altura fixa (300px)
+ * - Collapse para recolher o gráfico
+ */
+
+// ── Dados vindos do PHP (injetados como JSON) ──
+const dadosGrafico = <?= json_encode(array_values($dadosGrafico), JSON_UNESCAPED_UNICODE) ?>;
+
+// ── Extrai arrays para Chart.js ──
+const labels = dadosGrafico.map(item => item.nome);
+const quantidades = dadosGrafico.map(item => parseInt(item.quantidade));
+const cores = dadosGrafico.map(item => item.cor);
+
+// ── Calcula total para porcentagem nos tooltips ──
+const totalArtes = quantidades.reduce((sum, val) => sum + val, 0);
+
+// ── Gera cores com transparência para hover ──
+const coresHover = cores.map(cor => cor + '99');
+
+// ── Variável global do gráfico (para destruir e recriar no toggle) ──
+let chartInstance = null;
+
+// ── Tipo de gráfico atual (default: doughnut) ──
+let tipoAtual = 'doughnut';
+
+/**
+ * Cria (ou recria) o gráfico no canvas.
+ * Destrói o anterior se existir para evitar memory leak do Chart.js.
+ * 
+ * @param {string} tipo - 'doughnut' ou 'bar'
+ */
+function criarGrafico(tipo) {
+    const ctx = document.getElementById('tagDistribuicaoChart').getContext('2d');
+    
+    // Destrói gráfico anterior se existir (previne memory leak)
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    
+    // ── Configuração específica por tipo de gráfico ──
+    const isDoughnut = (tipo === 'doughnut');
+    
+    const config = {
+        type: isDoughnut ? 'doughnut' : 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Artes',
+                data: quantidades,
+                backgroundColor: cores,
+                hoverBackgroundColor: coresHover,
+                borderColor: isDoughnut ? '#fff' : cores,
+                borderWidth: isDoughnut ? 2 : 1,
+                borderRadius: isDoughnut ? 0 : 4,
+                barPercentage: 0.7,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            
+            layout: {
+                padding: { top: 5, bottom: 5 }
+            },
+            
+            plugins: {
+                legend: {
+                    display: isDoughnut,
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true,
+                        pointStyleWidth: 12,
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const nome = context.label || '';
+                            const valor = context.parsed.y ?? context.parsed ?? 0;
+                            const pct = totalArtes > 0 
+                                ? ((valor / totalArtes) * 100).toFixed(1) 
+                                : 0;
+                            return ' ' + nome + ': ' + valor + ' arte(s) (' + pct + '%)';
+                        }
+                    }
+                }
+            },
+            
+            // Escalas: só para gráfico de barras
+            scales: isDoughnut ? {} : {
+                x: {
+                    beginAtZero: true,
+                    grid: { display: true, color: 'rgba(0,0,0,0.05)' },
+                    ticks: {
+                        callback: function(value) {
+                            return Number.isInteger(value) ? value : '';
+                        },
+                        font: { size: 11 }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Quantidade de Artes',
+                        font: { size: 12, weight: 'bold' }
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { font: { size: 12 } }
+                }
+            },
+            
+            // Barras horizontais
+            indexAxis: isDoughnut ? 'x' : 'y',
+            
+            // Doughnut: tamanho do "buraco" central
+            cutout: isDoughnut ? '55%' : undefined
+        }
+    };
+    
+    chartInstance = new Chart(ctx, config);
+}
+
+/**
+ * Alterna entre Doughnut e Barras.
+ * Atualiza os botões (active/inactive) e recria o gráfico.
+ * 
+ * @param {string} tipo - 'doughnut' ou 'bar'
+ */
+function trocarTipoGrafico(tipo) {
+    tipoAtual = tipo;
+    
+    // Atualiza estado visual dos botões
+    document.getElementById('btnDoughnut').classList.toggle('active', tipo === 'doughnut');
+    document.getElementById('btnBar').classList.toggle('active', tipo === 'bar');
+    
+    // Recria o gráfico com o novo tipo
+    criarGrafico(tipo);
+}
+
+// ── Inicializa o gráfico quando a página carrega ──
+document.addEventListener('DOMContentLoaded', function() {
+    criarGrafico('doughnut');
+});
+
+// ── Collapse: anima ícone da seta (chevron up ↔ down) ──
+const graficoCollapse = document.getElementById('graficoCollapse');
+if (graficoCollapse) {
+    graficoCollapse.addEventListener('hidden.bs.collapse', function() {
+        document.getElementById('collapseIcon').classList.replace('bi-chevron-up', 'bi-chevron-down');
+    });
+    graficoCollapse.addEventListener('shown.bs.collapse', function() {
+        document.getElementById('collapseIcon').classList.replace('bi-chevron-down', 'bi-chevron-up');
+        // Redimensiona o gráfico quando expandido (Chart.js precisa disso)
+        if (chartInstance) chartInstance.resize();
+    });
+}
+</script>
+<?php endif; ?>
