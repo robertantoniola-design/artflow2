@@ -85,6 +85,7 @@ $router->resource('/metas', MetaController::class);
 $router->get('/tags/buscar', [TagController::class, 'buscar']);
 $router->get('/tags/select', [TagController::class, 'select']);
 $router->post('/tags/rapida', [TagController::class, 'criarRapida']);
+$router->post('/tags/{id}/merge', [TagController::class, 'merge']);  // MELHORIA 4
 $router->resource('/tags', TagController::class);
 
 // ============================================

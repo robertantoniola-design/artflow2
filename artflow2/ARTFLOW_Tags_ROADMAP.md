@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Tags: Documentação Completa
 
-**Data:** 11/02/2026  
-**Status Geral:** ⚠️ Melhoria 3 deployada — 3 regressões de UI pendentes no index.php  
-**Versão Base:** CRUD estabilizado + Paginação + Ordenação + Descrição/Ícone  
+**Data:** 12/02/2026  
+**Status Geral:** ✅ Melhoria 4 (Merge de Tags) completa — Módulo estável  
+**Versão Base:** CRUD estabilizado + Paginação + Ordenação + Descrição/Ícone + Merge  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)
 
 ---
@@ -11,7 +11,7 @@
 
 O módulo de Tags do ArtFlow 2.0 gerencia etiquetas/categorias para organizar artes do negócio. Tags permitem classificar obras por técnica (Aquarela, Óleo, Digital), tema (Retrato, Paisagem, Abstrato), tipo (Encomenda, Favorito) ou qualquer critério personalizado. O módulo opera com relacionamento N:N com Artes através da tabela pivot `arte_tags`, e oferece endpoints AJAX para integração com formulários de outros módulos.
 
-O módulo passou por uma fase de estabilização (5 bugs corrigidos), duas melhorias funcionais (paginação + ordenação), e uma terceira melhoria de campos (descrição + ícone) que introduziu regressões de UI que precisam ser corrigidas.
+O módulo passou por uma fase de estabilização (5 bugs corrigidos), quatro melhorias funcionais (paginação, ordenação, descrição/ícone, merge de tags), e está em pleno funcionamento com todas as regressões de UI corrigidas.
 
 ### Status das Fases
 
@@ -20,49 +20,8 @@ O módulo passou por uma fase de estabilização (5 bugs corrigidos), duas melho
 | Fase 1 | Estabilização CRUD — 5 bugs corrigidos | ✅ COMPLETA (07/02/2026) |
 | Melhoria 1 | Paginação (12 itens/página) | ✅ COMPLETA (08/02/2026) |
 | Melhoria 2 | Ordenação dinâmica (nome, data, contagem) | ✅ COMPLETA (08/02/2026) |
-| Melhoria 3 | Campo descrição + ativação ícone | ⚠️ DEPLOYADA COM REGRESSÕES (09/02/2026) |
-
-### ⚠️ BUGS PENDENTES — Regressões da Melhoria 3
-
-Após o deploy da Melhoria 3, a view `index.php` perdeu 3 elementos de UI que existiam na versão original. Estes são **regressões** introduzidas quando o arquivo `09_views_tags_index.php` da Melhoria 3 reescreveu a estrutura dos cards:
-
-| # | Bug | Elemento Perdido | Arquivo Afetado | Prioridade |
-|---|-----|-----------------|-----------------|------------|
-| R1 | Menu dropdown (...) sumiu | Botão `⋯` (three-dots) com dropdown no card de cada tag | views/tags/index.php | 🔴 ALTA |
-| R2 | Botão "Ver Tags" sumiu | Link de detalhes que ficava abaixo do badge no card | views/tags/index.php | 🔴 ALTA |
-| R3 | Botão "Excluir" sumiu | Opção de exclusão que ficava dentro do dropdown (...) | views/tags/index.php | 🔴 ALTA |
-
-**Causa Raiz:** A Melhoria 3 reescreveu os tag cards no `index.php` com uma estrutura simplificada (apenas ícones de olho e lápis no footer), perdendo o layout original que tinha:
-- Header: badge + dropdown three-dots com opções (Ver Artes, Editar, Excluir)
-- Body: contagem de artes
-- O botão Excluir usava `onclick="confirmarExclusao(id, 'nome')"` com formulário hidden
-
-**O que a versão original do card tinha:**
-```php
-<div class="d-flex justify-content-between align-items-start mb-3">
-    <span class="badge fs-5" style="background-color: ...">Nome</span>
-    <div class="dropdown">
-        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-            <i class="bi bi-three-dots"></i>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-            <li><a href="/tags/{id}" class="dropdown-item"><i class="bi bi-eye"></i> Ver Artes</a></li>
-            <li><a href="/tags/{id}/editar" class="dropdown-item"><i class="bi bi-pencil"></i> Editar</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" onclick="confirmarExclusao(id, 'nome')">
-                <i class="bi bi-trash"></i> Excluir
-            </button></li>
-        </ul>
-    </div>
-</div>
-```
-
-**Solução necessária:** Restaurar o dropdown three-dots nos cards do `index.php`, preservando as adições da Melhoria 3 (ícone no badge + descrição resumida). A versão corrigida deve ter:
-1. Badge com ícone (Melhoria 3) ✅
-2. Dropdown three-dots com Ver Artes, Editar, Excluir (original) ❌ restaurar
-3. Contagem de artes (original) ✅
-4. Descrição resumida (Melhoria 3) ✅
-5. Formulário hidden + JavaScript `confirmarExclusao()` para o botão Excluir ❌ restaurar
+| Melhoria 3 | Campo descrição + ativação ícone | ✅ COMPLETA (09/02/2026 — regressões corrigidas 11/02/2026) |
+| Melhoria 4 | Merge de tags (mesclar/absorver tags) | ✅ COMPLETA (12/02/2026) |
 
 ### Melhorias Futuras
 
@@ -70,8 +29,8 @@ Após o deploy da Melhoria 3, a view `index.php` perdeu 3 elementos de UI que ex
 |---|----------|--------------|--------|
 | 1 | Paginação na listagem (12/página) | Baixa | ✅ COMPLETA |
 | 2 | Ordenação dinâmica (nome, data, contagem) | Baixa | ✅ COMPLETA |
-| 3 | Campo descrição e ícone customizado | Baixa | ⚠️ DEPLOYADA — regressões UI |
-| 4 | Merge de tags duplicadas | Média | 📲 PLANEJADA |
+| 3 | Campo descrição e ícone customizado | Baixa | ✅ COMPLETA |
+| 4 | Merge de tags duplicadas | Média | ✅ COMPLETA |
 | 5 | Estatísticas por tag (valor médio, técnica popular) | Média | 📲 PLANEJADA |
 | 6 | Tag cloud visual / gráfico de distribuição | Média | 📲 PLANEJADA |
 
@@ -86,19 +45,19 @@ src/
 ├── Models/
 │   └── Tag.php                       ✅ Melhoria 3 (+ descricao, hasIcone, hasDescricao, getDescricaoResumida)
 ├── Repositories/
-│   └── TagRepository.php             ✅ Melhoria 3 (+ fillable: descricao, icone + allWithCountPaginated, countAll)
+│   └── TagRepository.php             ✅ Melhoria 4 (+ mergeTags — transação com tratamento de duplicatas)
 ├── Services/
-│   └── TagService.php                ✅ Melhoria 3 (+ normalizarDados icone/descricao + listarPaginado)
+│   └── TagService.php                ✅ Melhoria 4 (+ mergeTags — validação origem≠destino + findOrFail)
 ├── Controllers/
-│   └── TagController.php             ✅ Melhoria 3 (+ icones para views, only() com 4 campos)
+│   └── TagController.php             ✅ Melhoria 4 (+ merge() + show() passa $todasTags)
 └── Validators/
     └── TagValidator.php              ✅ Melhoria 3 (+ validação descricao/icone + getIconesDisponiveis)
 
 views/
 └── tags/
-    ├── index.php                     ⚠️ Melhoria 3 — REGRESSÕES (dropdown/excluir perdidos)
+    ├── index.php                     ✅ Melhoria 3 corrigida (dropdown three-dots + excluir restaurados)
     ├── create.php                    ✅ Melhoria 3 (+ textarea descricao + select icone + preview)
-    ├── show.php                      ✅ Melhoria 3 (+ card descrição + ícone no badge + info lateral)
+    ├── show.php                      ✅ Melhoria 4 (+ card Mesclar Tag + modal confirmação + JS)
     └── edit.php                      ✅ Melhoria 3 (+ textarea descricao + select icone + preview)
 
 database/
@@ -109,7 +68,7 @@ database/
     └── TagSeeder.php                 ✅ Executado (8 tags iniciais)
 
 config/
-└── routes.php                        ✅ Rotas de Tags registradas
+└── routes.php                        ✅ Melhoria 4 (+ POST /tags/{id}/merge)
 ```
 
 ### Dependências entre Classes
@@ -123,6 +82,8 @@ ArteService    → TagRepository (associação N:N via arte_tags)
 
 ArteController::index() usa tag_id para filtrar artes por tag
 TagController::show() usa getArtesByTag() para listar artes da tag
+TagController::show() usa listarComContagem() para dropdown de merge (M4)
+TagController::merge() usa TagService::mergeTags() para mesclar tags (M4)
 ```
 
 **Nota sobre acoplamento:** O módulo Tags é o mais independente do sistema. Ele NÃO depende de nenhum outro módulo, mas OUTROS módulos dependem dele (Artes usa Tags para categorização).
@@ -204,16 +165,17 @@ CREATE TABLE arte_tags (
 ### O que foi feito:
 - Controller lê `?ordenar=nome|data|contagem` e `?direcao=ASC|DESC`
 - Repository aplica ORDER BY dinâmico com whitelist de colunas válidas
-- View exibe botões de ordenação (Nome ↑↓, Data ↑↓, Artes ↑↓) com estado ativo
+- View exibe botões de ordenação (Nome ↕, Data ↕, Artes ↕) com estado ativo
 - Toggle de direção: clicar no botão ativo inverte ASC↔DESC
 - Helper `tagUrl()` na view monta URLs preservando todos os parâmetros
 
 ---
 
-## ⚠️ MELHORIA 3 — DESCRIÇÃO + ÍCONE (DEPLOYADA COM REGRESSÕES)
+## ✅ MELHORIA 3 — DESCRIÇÃO + ÍCONE (COMPLETA)
 
 **Implementada em:** 09/02/2026  
-**Status:** Backend OK, Views create/edit/show OK, **View index.php com regressões de UI**
+**Regressões corrigidas em:** 11/02/2026  
+**Status:** ✅ Totalmente funcional — backend + todas as views
 
 ### O que foi feito:
 
@@ -228,13 +190,18 @@ CREATE TABLE arte_tags (
 - **TagController:** `store()/update()` extraem `['nome', 'cor', 'descricao', 'icone']`, `create()/edit()` passam `$icones` para views
 - **TagRepository:** `$fillable` inclui `'descricao'` e `'icone'` (CRÍTICO para mass assignment)
 
-**Views (funcionando):**
+**Views (todas funcionando):**
 - `create.php` — textarea descrição (500 chars, contador live) + select ícone (50+ opções) + preview em tempo real
 - `edit.php` — mesma UI, pré-preenchida com valores atuais
 - `show.php` — badge com ícone, card "Descrição" condicional, info de ícone na sidebar
+- `index.php` — ícones nos badges ✅, descrição resumida ✅, dropdown three-dots ✅, botão Excluir ✅ (regressões corrigidas)
 
-**View com regressões:**
-- `index.php` — ícones nos badges ✅ e descrição resumida ✅ funcionam, MAS perdeu dropdown (...), link Ver Tags e botão Excluir
+### Regressões da Melhoria 3 (RESOLVIDAS)
+
+Três elementos de UI foram perdidos no index.php durante o deploy da Melhoria 3 e restaurados em 11/02/2026:
+1. ✅ Menu dropdown three-dots (...) restaurado nos cards
+2. ✅ Botão "Ver Tags" restaurado
+3. ✅ Botão "Excluir" com `confirmarExclusao()` + formulário hidden restaurado
 
 ### Arquivos da Melhoria 3 (10 arquivos entregues)
 
@@ -249,7 +216,7 @@ CREATE TABLE arte_tags (
 | 06_views_tags_create.php | views/tags/create.php | 304 | ✅ OK |
 | 07_views_tags_edit.php | views/tags/edit.php | 317 | ✅ OK |
 | 08_views_tags_show.php | views/tags/show.php | 216 | ✅ OK |
-| 09_views_tags_index.php | views/tags/index.php | 240 | ⚠️ REGRESSÕES |
+| 09_views_tags_index.php | views/tags/index.php | 240 | ✅ OK (regressões corrigidas) |
 
 ### Detalhes Técnicos da Melhoria 3
 
@@ -260,6 +227,120 @@ CREATE TABLE arte_tags (
 **Backward Compatibility:** Tags sem descricao/icone exibem exatamente como antes (campos são NULL por default).
 
 **$fillable CRÍTICO:** Sem `'descricao'` e `'icone'` no array `$fillable` do Repository, o `BaseRepository::filterFillable()` descarta silenciosamente esses campos nos INSERT/UPDATE.
+
+---
+
+## ✅ MELHORIA 4 — MERGE DE TAGS (COMPLETA)
+
+**Implementada em:** 12/02/2026  
+**Arquivos alterados:** TagRepository, TagService, TagController, views/tags/show.php, config/routes.php  
+**Correções visuais:** Botão cinza/amarelo toggle + badges com inline style (v2 — 12/02/2026)
+
+### Objetivo
+
+Permitir mesclar (absorver) uma tag em outra, transferindo todas as associações de `arte_tags` da tag origem para a tag destino, tratando duplicatas (artes que já possuem ambas as tags) sem violar a constraint de chave primária composta, e deletando a tag origem ao final.
+
+### Lógica de Merge — Transação com Tratamento de Duplicatas
+
+**Problema resolvido:** Se arte #1 tem tags [A, B] e fazemos merge de A → B, um UPDATE direto causaria `Duplicate entry (1, B)` na chave primária de `arte_tags`.
+
+**Solução em 3 passos (dentro de transação):**
+
+```
+BEGIN TRANSACTION
+  1. COUNT transferíveis  → artes que têm APENAS a tag origem
+  2. COUNT duplicatas      → artes que têm AMBAS as tags
+  3. UPDATE arte_tags SET tag_id = destino 
+     WHERE tag_id = origem 
+     AND arte_id NOT IN (SELECT arte_id WHERE tag_id = destino)  ← transfere só não-conflitantes
+  4. DELETE FROM arte_tags WHERE tag_id = origem                  ← remove duplicatas restantes
+  5. DELETE FROM tags WHERE id = origem                           ← deleta a tag origem
+COMMIT
+```
+
+**Retorno:** `['transferidas' => int, 'duplicatas' => int]`
+
+### Arquivos Alterados (5 arquivos)
+
+| # | Arquivo | O que foi alterado |
+|---|---------|-------------------|
+| 1 | `config/routes.php` | + `POST /tags/{id}/merge` (ANTES do resource) |
+| 2 | `src/Repositories/TagRepository.php` | + `mergeTags($origemId, $destinoId)` — transação SQL |
+| 3 | `src/Services/TagService.php` | + `mergeTags($origemId, $destinoId)` — validações |
+| 4 | `src/Controllers/TagController.php` | + `merge()` method + `show()` passa `$todasTags` |
+| 5 | `views/tags/show.php` | + Card "Mesclar Tag" + Modal confirmação + JavaScript |
+
+### Detalhes por Camada
+
+**TagRepository::mergeTags(int $origemId, int $destinoId): array**
+- Localização: após `getArtesByTag()`
+- Transação completa com try/catch + rollback
+- Contagem prévia de transferíveis vs duplicatas via subqueries
+- UPDATE seletivo (só não-conflitantes) + DELETE residual + DELETE tag
+- Retorna `['transferidas' => int, 'duplicatas' => int]`
+
+**TagService::mergeTags(int $origemId, int $destinoId): array**
+- Localização: após `remover()`
+- Validações:
+  - `$origemId === $destinoId` → ValidationException ("Não pode mesclar consigo mesma")
+  - `findOrFail($origemId)` → NotFoundException se origem não existe
+  - `findOrFail($destinoId)` → NotFoundException se destino não existe
+- Retorna: `['tag_origem' => Tag, 'tag_destino' => Tag, 'transferidas' => int, 'duplicatas' => int]`
+
+**TagController::merge(Request $request, int $id)**
+- Localização: após `destroy()`, antes dos métodos AJAX
+- Valida CSRF + extrai `tag_destino_id` do POST
+- Chama `TagService::mergeTags()`
+- Flash message detalhada: "X arte(s) transferida(s). Y duplicata(s) ignorada(s)."
+- Redireciona para show da tag destino (a origem foi deletada)
+- Catches: ValidationException → flash error + redirect show, NotFoundException → flash error + redirect /tags
+
+**TagController::show() — Modificação**
+- Adicionado: `$todasTags = $this->tagService->listarComContagem();`
+- Passa `$todasTags` para a view (dropdown de merge precisa de todas as tags)
+
+**views/tags/show.php — UI do Merge**
+- Card "Mesclar Tag" (borda amarela) na sidebar, APÓS o card "Ações" (estrutura HTML correta)
+- Select dropdown: todas as tags exceto a atual, com contagem de artes
+- Botão: inicia `btn-secondary` (cinza) disabled, toggle para `btn-warning` (amarelo) ao selecionar
+- Modal "Confirmar Mesclagem":
+  - Badge origem com `$styleOrigem` (fallback se `getStyleInline()` vazio)
+  - Seta → no meio
+  - Badge destino com inline style (sem `bg-secondary` que usa `!important`)
+  - Contagem de artes de cada tag
+  - Alerta amarelo com 3 pontos sobre a irreversibilidade
+  - Form POST com hidden `tag_destino_id` + CSRF
+- JavaScript:
+  - `addEventListener('change')`: toggle `btn-secondary` ↔ `btn-warning` + disabled
+  - `abrirModalMerge()`: lê data-attributes, preenche badge, calcula contraste (luminância ITU-R BT.601)
+
+### Correções Visuais (v2)
+
+| Bug | Causa | Correção |
+|-----|-------|---------|
+| Botão amarelo-claro quando desabilitado | Bootstrap `btn-warning` + `disabled` só reduz opacidade | Classe inicial `btn-secondary`, JS alterna para `btn-warning` |
+| Badges cinzas no modal | `bg-secondary` do BS5 usa `!important`, JS não sobrescreve | Inline style em vez de classe `bg-*` |
+| Badge origem sem cor | `getStyleInline()` retornava vazio | Fallback com `getCor()` + `getCorTexto()` |
+| Card merge dentro do card Ações | HTML aninhado incorretamente | Card merge como irmão (após) o card Ações |
+
+### Testes Realizados
+
+| Fase | Cenário | Resultado |
+|------|---------|-----------|
+| 1 | UI — view carrega, select, botão, modal, cancelar | ✅ PASSOU |
+| 2 | Merge simples (sem duplicatas) | ✅ PASSOU |
+| 3 | Merge com duplicatas (arte com ambas as tags) | ✅ PASSOU |
+| 3.2 | Verificação SQL pós-merge (integridade banco) | ✅ PASSOU |
+| — | Limpeza de dados de teste | ✅ EXECUTADA |
+
+**Teste 3 (Cenário Crítico — Duplicatas):**
+- Setup: Arte 1 com tags [Dup-Origem, Dup-Destino], Arte 2 só com Dup-Origem, Arte 5 só com Dup-Destino
+- Merge Dup-Origem → Dup-Destino executado com sucesso
+- Resultado verificado no phpMyAdmin:
+  - Dup-Destino ficou com artes 1, 2, 5 ✅
+  - Arte 1 com APENAS UMA entrada para Dup-Destino (sem duplicata) ✅
+  - Dup-Origem deletada ✅
+  - Nenhuma referência órfã em `arte_tags` ✅
 
 ---
 
@@ -331,7 +412,7 @@ CREATE TABLE arte_tags (
 | `toArray()` | array | **M3** | Inclui descricao no array |
 | `fromArray(array)` | Tag | **M3** | Hidrata descricao do array |
 
-### TagRepository (`src/Repositories/TagRepository.php`)
+### TagRepository (`src/Repositories/TagRepository.php`) — Após Melhoria 4
 
 | Método | Retorno | Fase | Descrição |
 |--------|---------|------|-----------|
@@ -356,10 +437,11 @@ CREATE TABLE arte_tags (
 | `deleteWithRelations(int)` | bool | Base | Transação: pivot + tag |
 | `searchWithCount(string, int)` | array | **F1** | LIKE + LEFT JOIN + COUNT |
 | `getArtesByTag(int)` | array | **F1** | Artes via INNER JOIN (FETCH_ASSOC) |
+| `mergeTags(int, int)` | array | **M4** | Transação: transfere artes + trata duplicatas + deleta origem |
 
-**Legenda:** F1=Fase 1, M1=Melhoria 1, M3=Melhoria 3
+**Legenda:** F1=Fase 1, M1=Melhoria 1, M3=Melhoria 3, M4=Melhoria 4
 
-### TagService (`src/Services/TagService.php`)
+### TagService (`src/Services/TagService.php`) — Após Melhoria 4
 
 | Método | Retorno | Fase | Descrição |
 |--------|---------|------|-----------|
@@ -370,6 +452,7 @@ CREATE TABLE arte_tags (
 | `criar(array)` | Tag | Base→**M3** | Agora aceita descricao/icone |
 | `atualizar(int, array)` | Tag | Base→**M3** | Agora aceita descricao/icone |
 | `remover(int)` | bool | Base | Remove com transação |
+| `mergeTags(int, int)` | array | **M4** | Valida + delega merge ao Repository |
 | `getMaisUsadas(int)` | array\<Tag> | Base | Top N |
 | `getParaSelect()` | array | Base | Para dropdowns |
 | `getCoresPredefinidas()` | array | Base | Paleta de cores |
@@ -379,17 +462,18 @@ CREATE TABLE arte_tags (
 | `pesquisar(string, int)` | array | **F1** | Busca LIKE + contagem |
 | `getArtesComTag(int)` | array | **F1** | Artes da tag |
 
-### TagController (`src/Controllers/TagController.php`)
+### TagController (`src/Controllers/TagController.php`) — Após Melhoria 4
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `index()` | GET /tags | Lista paginada + busca + ordenação + tags mais usadas |
 | `create()` | GET /tags/criar | Formulário com cores + ícones (M3) |
 | `store()` | POST /tags | Valida + cria (nome, cor, descricao, icone) |
-| `show($id)` | GET /tags/{id} | Detalhes + artes + descrição (M3) |
+| `show($id)` | GET /tags/{id} | Detalhes + artes + descrição (M3) + dropdown merge (M4) |
 | `edit($id)` | GET /tags/{id}/editar | Form edição com ícones (M3) |
 | `update($id)` | PUT /tags/{id} | Atualiza 4 campos |
 | `destroy($id)` | DELETE /tags/{id} | Remove + flash |
+| `merge($request, $id)` | POST /tags/{id}/merge | **M4** — Mescla tag origem na destino |
 | `buscar()` | GET /tags/buscar | AJAX autocomplete |
 | `select()` | GET /tags/select | AJAX dropdown |
 | `criarRapida()` | POST /tags/rapida | AJAX criação inline |
@@ -415,17 +499,20 @@ TAGS — Rotas AJAX (declaradas ANTES do resource)
   GET  /tags/select     → TagController@select        (dropdown JSON)
   POST /tags/rapida     → TagController@criarRapida   (criação inline)
 
+TAGS — Rota de Merge (declarada ANTES do resource) — MELHORIA 4
+  POST /tags/{id}/merge → TagController@merge         (mesclar tags)
+
 TAGS — Resource (7 rotas automáticas)
   GET    /tags           → TagController@index         (listar paginado)
   GET    /tags/criar     → TagController@create        (formulário)
   POST   /tags           → TagController@store         (salvar)
-  GET    /tags/{id}      → TagController@show          (detalhes)
+  GET    /tags/{id}      → TagController@show          (detalhes + merge UI)
   GET    /tags/{id}/editar → TagController@edit        (form editar)
   PUT    /tags/{id}      → TagController@update        (atualizar)
   DELETE /tags/{id}      → TagController@destroy       (excluir)
 ```
 
-**REGRA CRÍTICA:** Rotas AJAX ANTES de `$router->resource(...)`. Caso contrário, Router interpreta "buscar" como `{id}`.
+**REGRA CRÍTICA:** Rotas AJAX e Merge ANTES de `$router->resource(...)`. Caso contrário, Router interpreta "buscar" ou "merge" como `{id}`.
 
 ---
 
@@ -448,61 +535,6 @@ TAGS — Resource (7 rotas automáticas)
 | cor | `ltrim('#')` + expande `#RGB` → `#RRGGBB` + `strtoupper()` |
 | descricao | **M3** `trim()` + empty → `NULL` |
 | icone | **M3** `trim()` + empty → `NULL` |
-
----
-
-## 📝 NOTAS TÉCNICAS IMPORTANTES
-
-### View show.php — Sempre Usar Acesso por Array
-As artes em show.php vêm do `TagRepository::getArtesByTag()` que retorna `FETCH_ASSOC`. Usar `$arte['nome']`, NUNCA `$arte->getNome()`.
-
-### Rotas AJAX Antes do Resource
-As 3 rotas AJAX DEVEM ser declaradas ANTES de `$router->resource(...)`. Se movidas para depois, Router interpreta "buscar" como `{id}`.
-
-### Transação na Exclusão
-`deleteWithRelations()` usa `BEGIN TRANSACTION` + `COMMIT/ROLLBACK` mesmo com CASCADE nas FKs.
-
-### Contagem de Artes — LEFT JOIN vs INNER JOIN
-- `allWithCount()` / `allWithCountPaginated()` = LEFT JOIN (todas as tags)
-- `getMaisUsadas()` = INNER JOIN (apenas com artes)
-
-### Contraste Automático de Texto
-`Tag::getCorTexto()` calcula luminância (ITU-R BT.601) para decidir texto preto/branco.
-
-### Router Bug Fix — Conversão de Tipos
-O Router tem fix que converte parâmetros string de URL para int, prevenindo TypeErrors em `findOrFail()`.
-
-### Variável de Anos no Metas
-O controller de Metas passa `'anosDisponiveis'` (renomeado de `'anos'`). Se filtro de anos quebrar, reverter nome da variável.
-
----
-
-## 📮 MELHORIAS FUTURAS — ESPECIFICAÇÕES
-
-### Melhoria 4: Merge de Tags (Complexidade: Média)
-
-**Objetivo:** Unificar tags duplicadas ou similares, transferindo associações.
-
-**Implementação prevista:**
-- Nova rota: `POST /tags/{id}/merge`
-- Service: transfere todas `arte_tags` da tag origem para a tag destino, depois deleta a origem
-- UI: Select na view show.php para escolher tag de destino
-
-### Melhoria 5: Estatísticas por Tag (Complexidade: Média)
-
-**Objetivo:** Exibir métricas como valor médio das artes, técnica mais usada, etc.
-
-**Implementação prevista:**
-- TagRepository: queries com AVG, SUM, COUNT agrupados por tag
-- View show.php: cards de estatísticas (similar ao módulo Metas)
-
-### Melhoria 6: Tag Cloud / Gráfico (Complexidade: Média)
-
-**Objetivo:** Visualização gráfica da distribuição de tags.
-
-**Implementação prevista:**
-- Chart.js doughnut ou bar chart usando `getContagemPorTag()` (já existe no Repository)
-- View index.php: seção com gráfico acima ou ao lado da listagem
 
 ---
 
@@ -552,28 +584,101 @@ O controller de Metas passa `'anosDisponiveis'` (renomeado de `'anos'`). Se filt
 5. redirectTo('/tags')
 ```
 
+### Mesclar Tags (POST /tags/{id}/merge) — MELHORIA 4
+
+```
+1. TagController::merge() recebe Request + id (origem)
+2. validateCsrf($request) → protege contra CSRF
+3. Extrai tag_destino_id do POST
+4. Validação: destino_id vazio → flash error + redirect show
+5. TagService::mergeTags($id, $destinoId)
+   5a. Valida: $origemId === $destinoId → ValidationException
+   5b. findOrFail($origemId) → NotFoundException se não existe
+   5c. findOrFail($destinoId) → NotFoundException se não existe
+   5d. TagRepository::mergeTags($origemId, $destinoId)
+       → BEGIN TRANSACTION
+       → COUNT transferíveis (artes SÓ na origem)
+       → COUNT duplicatas (artes em AMBAS)
+       → UPDATE arte_tags: transfere não-conflitantes (origem → destino)
+       → DELETE arte_tags: remove duplicatas restantes da origem
+       → DELETE tags: remove tag origem
+       → COMMIT
+   5e. Retorna ['tag_origem', 'tag_destino', 'transferidas', 'duplicatas']
+6. flashSuccess("Tag mesclada! X transferida(s), Y duplicata(s) ignorada(s)")
+7. redirectTo('/tags/' . $destinoId) → abre show da tag destino
+```
+
+---
+
+## 🔍 NOTAS TÉCNICAS IMPORTANTES
+
+### View show.php — Sempre Usar Acesso por Array
+As artes em show.php vêm do `TagRepository::getArtesByTag()` que retorna `FETCH_ASSOC`. Usar `$arte['nome']`, NUNCA `$arte->getNome()`.
+
+### Rotas AJAX e Merge Antes do Resource
+As 3 rotas AJAX + rota de merge DEVEM ser declaradas ANTES de `$router->resource(...)`. Se movidas para depois, Router interpreta "buscar" ou parâmetros como `{id}`.
+
+### Transação na Exclusão
+`deleteWithRelations()` usa `BEGIN TRANSACTION` + `COMMIT/ROLLBACK` mesmo com CASCADE nas FKs.
+
+### Transação no Merge (M4)
+`mergeTags()` usa transação completa com try/catch. Se qualquer passo falhar, faz ROLLBACK. A ordem das operações é crítica: UPDATE antes de DELETE para evitar perda de dados.
+
+### Contagem de Artes — LEFT JOIN vs INNER JOIN
+- `allWithCount()` / `allWithCountPaginated()` = LEFT JOIN (todas as tags)
+- `getMaisUsadas()` = INNER JOIN (apenas com artes)
+
+### Contraste Automático de Texto
+`Tag::getCorTexto()` calcula luminância (ITU-R BT.601) para decidir texto preto/branco. Mesmo algoritmo replicado no JavaScript do modal de merge.
+
+### Bootstrap 5 — bg-* Classes Usam !important
+Classes como `bg-secondary` aplicam `background-color: ... !important;`. Para badges que precisam de cor dinâmica via JavaScript, usar inline style em vez de classes `bg-*`.
+
+### Router Bug Fix — Conversão de Tipos
+O Router tem fix que converte parâmetros string de URL para int, prevenindo TypeErrors em `findOrFail()`.
+
+### Variável de Anos no Metas
+O controller de Metas passa `'anosDisponiveis'` (renomeado de `'anos'`). Se filtro de anos quebrar, reverter nome da variável.
+
+---
+
+## 📮 MELHORIAS FUTURAS — ESPECIFICAÇÕES
+
+### Melhoria 5: Estatísticas por Tag (Complexidade: Média)
+
+**Objetivo:** Exibir métricas como valor médio das artes, técnica mais usada, etc.
+
+**Implementação prevista:**
+- TagRepository: queries com AVG, SUM, COUNT agrupados por tag
+- View show.php: cards de estatísticas (similar ao módulo Metas)
+
+### Melhoria 6: Tag Cloud / Gráfico (Complexidade: Média)
+
+**Objetivo:** Visualização gráfica da distribuição de tags.
+
+**Implementação prevista:**
+- Chart.js doughnut ou bar chart usando `getContagemPorTag()` (já existe no Repository)
+- View index.php: seção com gráfico acima ou ao lado da listagem
+
 ---
 
 ## 📌 PRÓXIMAS AÇÕES (para nova conversa)
 
-1. **PRIORIDADE 1:** Corrigir as 3 regressões de UI no `views/tags/index.php`:
-   - Restaurar dropdown three-dots (...) nos cards de tag
-   - Restaurar link "Ver Artes" / detalhes
-   - Restaurar botão "Excluir" com `confirmarExclusao()` + formulário hidden
-   - Preservar adições da Melhoria 3 (ícone no badge + descrição resumida)
+1. **Melhoria 5 (Estatísticas):** Implementar cards de métricas na view show.php — valor médio das artes, total vendido, técnica mais comum, etc.
 
-2. **Testar CRUD completo** após correção do index.php:
-   - ✅ GET /tags — index carrega com dropdown funcional
-   - ✅ Dropdown (...) → Ver Artes, Editar, Excluir
-   - ✅ Excluir via dropdown funciona (confirm + DELETE)
-   - ✅ Ícones visíveis nos badges
-   - ✅ Descrição resumida visível nos cards
-   - ✅ Paginação + Ordenação preservadas
+2. **Melhoria 6 (Tag Cloud):** Implementar gráfico de distribuição de tags na index.php com Chart.js.
 
-3. **Após estabilizar Melhoria 3:** Avançar para Melhoria 4 (Merge de Tags) ou próximo módulo
+3. **Limpeza opcional:** Existem tags de teste no banco (Teste2, Teste5, Teste6, Teste7, Teste8) com 0 artes que podem ser removidas:
+   ```sql
+   DELETE FROM tags WHERE nome LIKE 'Teste%' AND id NOT IN (
+       SELECT DISTINCT tag_id FROM arte_tags
+   );
+   ```
+
+4. **Próximo módulo:** Considerar iniciar ciclo de melhorias em outro módulo (Artes, Clientes, Vendas) seguindo o mesmo padrão: estabilização → melhorias incrementais → documentação.
 
 ---
 
-**Última atualização:** 11/02/2026  
-**Status:** ⚠️ Módulo Tags — Melhoria 3 deployada, 3 regressões de UI no index.php pendentes  
-**Próxima ação:** Corrigir index.php restaurando dropdown + excluir, mantendo ícone + descrição
+**Última atualização:** 12/02/2026  
+**Status:** ✅ Módulo Tags — 4 melhorias completas, totalmente funcional  
+**Próxima ação:** Melhoria 5 (Estatísticas por Tag) ou próximo módulo
