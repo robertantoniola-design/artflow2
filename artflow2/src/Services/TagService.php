@@ -263,6 +263,75 @@ class TagService
     }
 
     // ==========================================
+    // ESTATÍSTICAS POR TAG (Melhoria 5)
+    // ==========================================
+
+    /**
+     * ============================================
+     * MELHORIA 5: Retorna estatísticas formatadas de uma tag
+     * ============================================
+     * 
+     * Delega a query ao Repository e adiciona dados calculados
+     * que facilitam a exibição na view (percentuais, labels, etc).
+     * 
+     * RESPONSABILIDADE DO SERVICE:
+     * - Validar que a tag existe (findOrFail)
+     * - Buscar dados brutos no Repository
+     * - Calcular métricas derivadas (% vendidas, margem de lucro, R$/hora)
+     * - Formatar labels para exibição
+     * 
+     * O Controller recebe tudo pronto — a view só exibe.
+     * 
+     * @param int $tagId ID da tag
+     * @return array Estatísticas brutas + calculadas
+     * @throws NotFoundException Se tag não existe
+     */
+    public function getEstatisticasTag(int $tagId): array
+    {
+        // Valida existência — lança NotFoundException se inválido
+        $this->tagRepository->findOrFail($tagId);
+        
+        // Busca dados brutos do banco
+        $stats = $this->tagRepository->getEstatisticasByTag($tagId);
+        
+        // ── Métricas calculadas (derivadas dos dados brutos) ──
+        
+        // Percentual de artes vendidas: (vendidas / total) * 100
+        // Proteção contra divisão por zero quando tag não tem artes
+        $stats['percentual_vendidas'] = $stats['total_artes'] > 0
+            ? round(($stats['artes_vendidas'] / $stats['total_artes']) * 100, 1)
+            : 0;
+        
+        // Margem de lucro: (lucro_total / faturamento_total) * 100
+        // Indica eficiência financeira das artes com esta tag
+        $stats['margem_lucro'] = $stats['faturamento_total'] > 0
+            ? round(($stats['lucro_total'] / $stats['faturamento_total']) * 100, 1)
+            : 0;
+        
+        // Valor médio por hora: custo_total / horas_totais
+        // Indica quanto custa em média cada hora investida nestas artes
+        $stats['custo_por_hora'] = $stats['horas_totais'] > 0
+            ? round($stats['custo_total'] / $stats['horas_totais'], 2)
+            : 0;
+        
+        // Label legível para complexidade mais comum
+        // Traduz o ENUM do banco para português
+        $stats['complexidade_label'] = match($stats['complexidade_mais_comum']) {
+            'baixa' => 'Baixa',
+            'media' => 'Média',
+            'alta'  => 'Alta',
+            default => '—',
+        };
+        
+        // Flag: tag tem dados suficientes para exibir estatísticas?
+        // Usado na view para decidir se mostra cards ou mensagem vazia
+        $stats['tem_dados'] = $stats['total_artes'] > 0;
+        $stats['tem_vendas'] = $stats['total_vendas'] > 0;
+        
+        return $stats;
+    }
+
+    // ==========================================
     // BUSCA E PESQUISA
     // ==========================================
     

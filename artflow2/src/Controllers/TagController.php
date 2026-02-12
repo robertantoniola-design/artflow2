@@ -129,6 +129,7 @@ class TagController extends BaseController
      * 
      * MELHORIA 3: Mostra descrição e ícone
      * MELHORIA 4: Passa lista de tags para dropdown de merge
+     * MELHORIA 5: Passa estatísticas (métricas financeiras e de produção)
      */
     public function show(Request $request, int $id): Response
     {
@@ -137,20 +138,32 @@ class TagController extends BaseController
             $artes = $this->tagService->getArtesComTag($id);
             
             // MELHORIA 4: Busca todas as tags para o dropdown de merge
-            // allWithCount() retorna Tag objects com artesCount para exibir no select
             $todasTags = $this->tagService->listarComContagem();
             
+            // MELHORIA 5: Busca estatísticas da tag (métricas de artes + vendas)
+            // Retorna array com total_artes, faturamento_total, margem_lucro, etc.
+            // Se a tag não tem artes, retorna zeros — a view trata com mensagem vazia
+            $estatisticas = $this->tagService->getEstatisticasTag($id);
+            
             return $this->view('tags/show', [
-                'titulo' => 'Tag: ' . $tag->getNome(),
-                'tag'    => $tag,
-                'artes'  => $artes,
-                'todasTags' => $todasTags,  // MELHORIA 4: para dropdown de merge
+                'titulo'       => 'Tag: ' . $tag->getNome(),
+                'tag'          => $tag,
+                'artes'        => $artes,
+                'todasTags'    => $todasTags,      // MELHORIA 4: dropdown de merge
+                'estatisticas' => $estatisticas,    // MELHORIA 5: cards de estatísticas
             ]);
             
         } catch (NotFoundException $e) {
             return $this->notFound('Tag não encontrada');
         }
     }
+
+
+
+
+
+
+
     
     /**
      * Formulário de edição

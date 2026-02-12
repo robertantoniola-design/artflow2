@@ -595,4 +595,141 @@ class TagRepository extends BaseRepository
             throw $e;
         }
     }
+
+        // ==========================================
+    // ESTATÍSTICAS POR TAG (Melhoria 5)
+    // ==========================================
+
+    /**
+     * ============================================
+     * MELHORIA 5: Retorna estatísticas completas de uma tag
+     * ============================================
+     * 
+     * Executa 2 queries otimizadas para obter métricas das artes
+     * associadas a uma tag e suas vendas correspondentes.
+     * 
+     * QUERY 1 — Estatísticas das ARTES:
+     *   - total_artes: quantas artes têm esta tag
+     *   - artes_vendidas: quantas com status = 'vendida'
+     *   - artes_disponiveis: quantas com status = 'disponivel'
+     *   - artes_producao: quantas com status = 'em_producao'
+     *   - custo_medio: AVG(preco_custo) das artes
+     *   - custo_total: SUM(preco_custo) das artes
+     *   - horas_totais: SUM(horas_trabalhadas) das artes
+     *   - complexidade_mais_comum: complexidade com maior contagem
+     * 
+     * QUERY 2 — Estatísticas das VENDAS (artes vendidas com esta tag):
+     *   - total_vendas: quantas vendas existem
+     *   - faturamento_total: SUM(vendas.valor)
+     *   - lucro_total: SUM(vendas.lucro_calculado)
+     *   - ticket_medio: AVG(vendas.valor)
+     *   - lucro_medio: AVG(vendas.lucro_calculado)
+     *   - rentabilidade_media: AVG(vendas.rentabilidade_hora)
+     *   - primeira_venda: MIN(vendas.data_venda)
+     *   - ultima_venda: MAX(vendas.data_venda)
+     * 
+     * POR QUE 2 QUERIES SEPARADAS?
+     * Se fizéssemos um único JOIN de artes + vendas, artes com
+     * múltiplas vendas seriam contadas múltiplas vezes no AVG/SUM
+     * de artes, distorcendo os resultados. Separar garante precisão.
+     * 
+     * @param int $tagId ID da tag
+     * @return array Array associativo com todas as métricas (valores default 0/null se sem dados)
+     */
+    public function getEstatisticasByTag(int $tagId): array
+    {
+        $conn = $this->getConnection();
+        
+        // ── QUERY 1: Estatísticas das Artes ──
+        // LEFT JOIN garante que mesmo tags sem artes retornem resultado (zeros)
+        // CASE WHEN conta artes por status sem precisar de queries separadas
+        $sqlArtes = "
+            SELECT 
+                COUNT(a.id) AS total_artes,
+                SUM(CASE WHEN a.status = 'vendida' THEN 1 ELSE 0 END) AS artes_vendidas,
+                SUM(CASE WHEN a.status = 'disponivel' THEN 1 ELSE 0 END) AS artes_disponiveis,
+                SUM(CASE WHEN a.status = 'em_producao' THEN 1 ELSE 0 END) AS artes_producao,
+                COALESCE(AVG(a.preco_custo), 0) AS custo_medio,
+                COALESCE(SUM(a.preco_custo), 0) AS custo_total,
+                COALESCE(SUM(a.horas_trabalhadas), 0) AS horas_totais
+            FROM arte_tags at
+            INNER JOIN artes a ON a.id = at.arte_id
+            WHERE at.tag_id = :tag_id
+        ";
+        
+        $stmt = $conn->prepare($sqlArtes);
+        $stmt->execute(['tag_id' => $tagId]);
+        $estatArtes = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        // ── Complexidade mais comum (query separada por causa do GROUP BY) ──
+        // Só executa se a tag tem artes (evita query desnecessária)
+        $complexidadeMaisComum = null;
+        if ((int)$estatArtes['total_artes'] > 0) {
+            $sqlComplexidade = "
+                SELECT a.complexidade, COUNT(*) AS total
+                FROM arte_tags at
+                INNER JOIN artes a ON a.id = at.arte_id
+                WHERE at.tag_id = :tag_id
+                  AND a.complexidade IS NOT NULL
+                GROUP BY a.complexidade
+                ORDER BY total DESC
+                LIMIT 1
+            ";
+            $stmt = $conn->prepare($sqlComplexidade);
+            $stmt->execute(['tag_id' => $tagId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $complexidadeMaisComum = $row ? $row['complexidade'] : null;
+        }
+        
+        // ── QUERY 2: Estatísticas das Vendas ──
+        // JOIN triplo: arte_tags → artes → vendas
+        // Só conta vendas de artes que TÊM esta tag
+        $sqlVendas = "
+            SELECT 
+                COUNT(v.id) AS total_vendas,
+                COALESCE(SUM(v.valor), 0) AS faturamento_total,
+                COALESCE(SUM(v.lucro_calculado), 0) AS lucro_total,
+                COALESCE(AVG(v.valor), 0) AS ticket_medio,
+                COALESCE(AVG(v.lucro_calculado), 0) AS lucro_medio,
+                COALESCE(AVG(v.rentabilidade_hora), 0) AS rentabilidade_media,
+                MIN(v.data_venda) AS primeira_venda,
+                MAX(v.data_venda) AS ultima_venda
+            FROM arte_tags at
+            INNER JOIN artes a ON a.id = at.arte_id
+            INNER JOIN vendas v ON v.arte_id = a.id
+            WHERE at.tag_id = :tag_id
+        ";
+        
+        $stmt = $conn->prepare($sqlVendas);
+        $stmt->execute(['tag_id' => $tagId]);
+        $estatVendas = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        // ── Monta array consolidado ──
+        // Converte tipos para evitar problemas na view (string → int/float)
+        return [
+            // Contagens de artes
+            'total_artes'         => (int) $estatArtes['total_artes'],
+            'artes_vendidas'      => (int) $estatArtes['artes_vendidas'],
+            'artes_disponiveis'   => (int) $estatArtes['artes_disponiveis'],
+            'artes_producao'      => (int) $estatArtes['artes_producao'],
+            
+            // Valores financeiros das artes
+            'custo_medio'         => round((float) $estatArtes['custo_medio'], 2),
+            'custo_total'         => round((float) $estatArtes['custo_total'], 2),
+            'horas_totais'        => round((float) $estatArtes['horas_totais'], 1),
+            
+            // Complexidade
+            'complexidade_mais_comum' => $complexidadeMaisComum,
+            
+            // Vendas
+            'total_vendas'        => (int) $estatVendas['total_vendas'],
+            'faturamento_total'   => round((float) $estatVendas['faturamento_total'], 2),
+            'lucro_total'         => round((float) $estatVendas['lucro_total'], 2),
+            'ticket_medio'        => round((float) $estatVendas['ticket_medio'], 2),
+            'lucro_medio'         => round((float) $estatVendas['lucro_medio'], 2),
+            'rentabilidade_media' => round((float) $estatVendas['rentabilidade_media'], 2),
+            'primeira_venda'      => $estatVendas['primeira_venda'],  // string DATE ou null
+            'ultima_venda'        => $estatVendas['ultima_venda'],    // string DATE ou null
+        ];
+    }
 }

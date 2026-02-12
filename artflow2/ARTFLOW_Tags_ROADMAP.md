@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Tags: Documentação Completa
 
 **Data:** 12/02/2026  
-**Status Geral:** ✅ Melhoria 4 (Merge de Tags) completa — Módulo estável  
-**Versão Base:** CRUD estabilizado + Paginação + Ordenação + Descrição/Ícone + Merge  
+**Status Geral:** ✅ Melhoria 5 (Estatísticas por Tag) completa — Módulo estável  
+**Versão Base:** CRUD estabilizado + Paginação + Ordenação + Descrição/Ícone + Merge + Estatísticas  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)
 
 ---
@@ -11,7 +11,7 @@
 
 O módulo de Tags do ArtFlow 2.0 gerencia etiquetas/categorias para organizar artes do negócio. Tags permitem classificar obras por técnica (Aquarela, Óleo, Digital), tema (Retrato, Paisagem, Abstrato), tipo (Encomenda, Favorito) ou qualquer critério personalizado. O módulo opera com relacionamento N:N com Artes através da tabela pivot `arte_tags`, e oferece endpoints AJAX para integração com formulários de outros módulos.
 
-O módulo passou por uma fase de estabilização (5 bugs corrigidos), quatro melhorias funcionais (paginação, ordenação, descrição/ícone, merge de tags), e está em pleno funcionamento com todas as regressões de UI corrigidas.
+O módulo passou por uma fase de estabilização (5 bugs corrigidos), cinco melhorias funcionais (paginação, ordenação, descrição/ícone, merge de tags, estatísticas por tag), e está em pleno funcionamento com todas as regressões de UI corrigidas.
 
 ### Status das Fases
 
@@ -22,8 +22,9 @@ O módulo passou por uma fase de estabilização (5 bugs corrigidos), quatro mel
 | Melhoria 2 | Ordenação dinâmica (nome, data, contagem) | ✅ COMPLETA (08/02/2026) |
 | Melhoria 3 | Campo descrição + ativação ícone | ✅ COMPLETA (09/02/2026 — regressões corrigidas 11/02/2026) |
 | Melhoria 4 | Merge de tags (mesclar/absorver tags) | ✅ COMPLETA (12/02/2026) |
+| Melhoria 5 | Estatísticas por tag (métricas financeiras e produção) | ✅ COMPLETA (12/02/2026) |
 
-### Melhorias Futuras
+### Melhorias — Visão Geral
 
 | # | Melhoria | Complexidade | Status |
 |---|----------|--------------|--------|
@@ -31,7 +32,7 @@ O módulo passou por uma fase de estabilização (5 bugs corrigidos), quatro mel
 | 2 | Ordenação dinâmica (nome, data, contagem) | Baixa | ✅ COMPLETA |
 | 3 | Campo descrição e ícone customizado | Baixa | ✅ COMPLETA |
 | 4 | Merge de tags duplicadas | Média | ✅ COMPLETA |
-| 5 | Estatísticas por tag (valor médio, técnica popular) | Média | 📲 PLANEJADA |
+| 5 | Estatísticas por tag (produção + vendas) | Média | ✅ COMPLETA |
 | 6 | Tag cloud visual / gráfico de distribuição | Média | 📲 PLANEJADA |
 
 ---
@@ -45,11 +46,11 @@ src/
 ├── Models/
 │   └── Tag.php                       ✅ Melhoria 3 (+ descricao, hasIcone, hasDescricao, getDescricaoResumida)
 ├── Repositories/
-│   └── TagRepository.php             ✅ Melhoria 4 (+ mergeTags — transação com tratamento de duplicatas)
+│   └── TagRepository.php             ✅ Melhoria 5 (+ getEstatisticasByTag — 2 queries + complexidade)
 ├── Services/
-│   └── TagService.php                ✅ Melhoria 4 (+ mergeTags — validação origem≠destino + findOrFail)
+│   └── TagService.php                ✅ Melhoria 5 (+ getEstatisticasTag — métricas derivadas)
 ├── Controllers/
-│   └── TagController.php             ✅ Melhoria 4 (+ merge() + show() passa $todasTags)
+│   └── TagController.php             ✅ Melhoria 5 (+ show() passa $estatisticas)
 └── Validators/
     └── TagValidator.php              ✅ Melhoria 3 (+ validação descricao/icone + getIconesDisponiveis)
 
@@ -57,7 +58,7 @@ views/
 └── tags/
     ├── index.php                     ✅ Melhoria 3 corrigida (dropdown three-dots + excluir restaurados)
     ├── create.php                    ✅ Melhoria 3 (+ textarea descricao + select icone + preview)
-    ├── show.php                      ✅ Melhoria 4 (+ card Mesclar Tag + modal confirmação + JS)
+    ├── show.php                      ✅ Melhoria 5 (+ mini-cards + card estatísticas detalhadas)
     └── edit.php                      ✅ Melhoria 3 (+ textarea descricao + select icone + preview)
 
 database/
@@ -83,10 +84,13 @@ ArteService    → TagRepository (associação N:N via arte_tags)
 ArteController::index() usa tag_id para filtrar artes por tag
 TagController::show() usa getArtesByTag() para listar artes da tag
 TagController::show() usa listarComContagem() para dropdown de merge (M4)
+TagController::show() usa getEstatisticasTag() para cards de métricas (M5)
 TagController::merge() usa TagService::mergeTags() para mesclar tags (M4)
 ```
 
 **Nota sobre acoplamento:** O módulo Tags é o mais independente do sistema. Ele NÃO depende de nenhum outro módulo, mas OUTROS módulos dependem dele (Artes usa Tags para categorização).
+
+**Nota sobre Melhoria 5:** As queries de estatísticas fazem JOIN com as tabelas `artes` e `vendas`, mas isso é acesso SOMENTE LEITURA via SQL — não há dependência de código PHP (não importa Models/Services de outros módulos).
 
 ### Tabela `tags` (Banco de Dados — após Melhoria 3)
 
@@ -335,56 +339,147 @@ COMMIT
 
 **Teste 3 (Cenário Crítico — Duplicatas):**
 - Setup: Arte 1 com tags [Dup-Origem, Dup-Destino], Arte 2 só com Dup-Origem, Arte 5 só com Dup-Destino
-- Merge Dup-Origem → Dup-Destino executado com sucesso
-- Resultado verificado no phpMyAdmin:
-  - Dup-Destino ficou com artes 1, 2, 5 ✅
-  - Arte 1 com APENAS UMA entrada para Dup-Destino (sem duplicata) ✅
-  - Dup-Origem deletada ✅
-  - Nenhuma referência órfã em `arte_tags` ✅
+- Merge Dup-Origem → Dup-Destino
+- Resultado: Arte 2 transferida (1), Arte 1 duplicata ignorada (1)
+- Verificação SQL: 3 registros em arte_tags com tag Dup-Destino (Artes 1, 2, 5) ✅
 
 ---
 
-## 🔧 FASE 1 — ESTABILIZAÇÃO CRUD (5 BUGS CORRIGIDOS)
+## ✅ MELHORIA 5 — ESTATÍSTICAS POR TAG (COMPLETA)
 
-### Status dos Testes CRUD (Fase 1)
+**Implementada em:** 12/02/2026  
+**Arquivos alterados:** TagRepository, TagService, TagController, views/tags/show.php  
+**Nenhuma migration necessária** — usa dados existentes via JOINs SQL
 
-| Operação | Rota | Status |
-|----------|------|--------|
-| Listar | `GET /tags` | ✅ OK |
-| Criar | `POST /tags` | ✅ OK |
-| Visualizar | `GET /tags/{id}` | ✅ OK (corrigido) |
-| Editar | `PUT /tags/{id}` | ✅ OK |
-| Excluir | `DELETE /tags/{id}` | ✅ OK |
-| Buscar | `GET /tags?termo=X` | ✅ OK (corrigido) |
-| Ver Artes com Tag | `GET /artes?tag_id=X` | ✅ OK (corrigido) |
+### Objetivo
 
-### Bug 1: TagService::pesquisar() Undefined (Fatal Error)
+Exibir métricas financeiras e de produção na página de detalhes de cada tag (`show.php`), cruzando dados das tabelas `artes` e `vendas` com a tabela pivot `arte_tags`. Permite ao usuário avaliar a performance de cada categoria/tag em termos de produção, custos, vendas, lucro e rentabilidade.
 
-**Problema:** Buscar tags na listagem (`/tags?termo=X`) causava Fatal Error.  
-**Causa:** Método declarado no Controller mas nunca implementado no Service.  
-**Correção:** Adicionado `pesquisar()` no TagService + `searchWithCount()` no TagRepository.
+### Arquivos Alterados (4 arquivos)
 
-### Bug 2: TagService::getArtesComTag() Undefined (Fatal Error)
+| # | Arquivo | O que foi alterado |
+|---|---------|-------------------|
+| 1 | `src/Repositories/TagRepository.php` | + `getEstatisticasByTag(int $tagId): array` — 2 queries SQL + complexidade |
+| 2 | `src/Services/TagService.php` | + `getEstatisticasTag(int $tagId): array` — métricas derivadas |
+| 3 | `src/Controllers/TagController.php` | `show()` agora passa `$estatisticas` à view |
+| 4 | `views/tags/show.php` | + seção de mini-cards (4 colunas) + card estatísticas detalhadas |
 
-**Problema:** Acessar detalhes de uma tag (`/tags/{id}`) causava Fatal Error.  
-**Causa:** Método declarado no Controller mas nunca implementado no Service.  
-**Correção:** Adicionado `getArtesComTag()` no TagService + `getArtesByTag()` no TagRepository.
+### Detalhes por Camada
 
-### Bug 3: show.php — Acesso Objeto em Array (Fatal Error)
+#### TagRepository::getEstatisticasByTag(int $tagId): array
 
-**Problema:** View show.php falhava ao tentar chamar `$arte->getStatus()`.  
-**Causa:** `getArtesByTag()` retorna `FETCH_ASSOC` (arrays), mas a view usava acesso a objetos.  
-**Correção:** Convertidas todas as referências de `$arte->getX()` para `$arte['x']` com proteções null coalescing.
+**Localização:** após `mergeTags()`, nova seção "ESTATÍSTICAS POR TAG (Melhoria 5)"
 
-### Bug 4: normalizarDados() — Cor Default Silenciosa
+**Estratégia de 2 queries separadas** (não um único JOIN):
+- **Query 1 — Artes:** `arte_tags` INNER JOIN `artes` → contagens por status, AVG/SUM custos, SUM horas
+- **Query Complexidade:** GROUP BY `complexidade` ORDER BY COUNT DESC LIMIT 1 (separada por causa do GROUP BY)
+- **Query 2 — Vendas:** `arte_tags` INNER JOIN `artes` INNER JOIN `vendas` → SUM valor/lucro, AVG ticket, MIN/MAX data
 
-**Problema:** Bloco `else` para cor padrão continha `$dados['cor'] ?? '#6c757d'` mas `$dados['cor']` era undefined.  
-**Correção:** Simplificado para `$dados['cor'] = '#6c757d'` direto.
+**Por que 2 queries separadas?** Se fizéssemos um único JOIN de artes + vendas, artes com múltiplas vendas seriam contadas múltiplas vezes no AVG/SUM de artes, distorcendo os resultados.
 
-### Bug 5: ArteController — Parâmetros Incompatíveis
+**Dados retornados (array associativo):**
 
-**Problema:** Controller lia `$request->get('q')` mas view enviava `name="termo"`. Controller lia `$request->get('tag')` mas links usavam `?tag_id=X`.  
-**Correção:** Alterados parâmetros no ArteController para `'termo'` e `'tag_id'`.
+| Chave | Tipo | Query | Descrição |
+|-------|------|-------|-----------|
+| `total_artes` | int | Q1 | Total de artes com esta tag |
+| `artes_vendidas` | int | Q1 | Artes com status='vendida' |
+| `artes_disponiveis` | int | Q1 | Artes com status='disponivel' |
+| `artes_producao` | int | Q1 | Artes com status='em_producao' |
+| `custo_medio` | float | Q1 | AVG(preco_custo) |
+| `custo_total` | float | Q1 | SUM(preco_custo) |
+| `horas_totais` | float | Q1 | SUM(horas_trabalhadas) |
+| `complexidade_mais_comum` | ?string | QC | ENUM com maior contagem |
+| `total_vendas` | int | Q2 | Quantidade de registros em vendas |
+| `faturamento_total` | float | Q2 | SUM(vendas.valor) |
+| `lucro_total` | float | Q2 | SUM(vendas.lucro_calculado) |
+| `ticket_medio` | float | Q2 | AVG(vendas.valor) |
+| `lucro_medio` | float | Q2 | AVG(vendas.lucro_calculado) |
+| `rentabilidade_media` | float | Q2 | AVG(vendas.rentabilidade_hora) |
+| `primeira_venda` | ?string | Q2 | MIN(vendas.data_venda) |
+| `ultima_venda` | ?string | Q2 | MAX(vendas.data_venda) |
+
+**Detalhes SQL importantes:**
+- COALESCE garante valores 0 em vez de NULL quando não há dados
+- CASE WHEN conta artes por status sem queries separadas
+- Tipos explicitamente convertidos: `(int)`, `(float)`, `round()` para evitar problemas na view
+
+#### TagService::getEstatisticasTag(int $tagId): array
+
+**Localização:** após `mergeTags()`, nova seção "ESTATÍSTICAS POR TAG (Melhoria 5)"
+
+**Responsabilidades do Service (não do Repository):**
+1. Valida existência da tag via `findOrFail()` (lança NotFoundException)
+2. Busca dados brutos no Repository
+3. Calcula **métricas derivadas**:
+
+| Chave adicionada | Fórmula | Descrição |
+|-----------------|---------|-----------|
+| `percentual_vendidas` | `(artes_vendidas / total_artes) * 100` | % de artes vendidas |
+| `margem_lucro` | `(lucro_total / faturamento_total) * 100` | Eficiência financeira |
+| `custo_por_hora` | `custo_total / horas_totais` | R$/hora investido |
+| `complexidade_label` | match expression | "Baixa", "Média", "Alta" ou "—" |
+| `tem_dados` | `total_artes > 0` | Flag para exibição na view |
+| `tem_vendas` | `total_vendas > 0` | Flag para seção de vendas |
+
+#### TagController::show() — Modificação
+
+```php
+// MELHORIA 5: Busca estatísticas da tag
+$estatisticas = $this->tagService->getEstatisticasTag($id);
+
+return $this->view('tags/show', [
+    'titulo'       => 'Tag: ' . $tag->getNome(),
+    'tag'          => $tag,
+    'artes'        => $artes,
+    'todasTags'    => $todasTags,      // MELHORIA 4
+    'estatisticas' => $estatisticas,    // MELHORIA 5
+]);
+```
+
+#### views/tags/show.php — UI das Estatísticas
+
+**Posição no layout:** ANTES da tabela de artes, dentro da `col-lg-8` (coluna principal).
+
+**Estrutura visual (2 componentes):**
+
+**1. Mini-cards de Resumo (row com 4 colunas `col-6 col-md-3`):**
+- **Total Artes** — ícone `bi-palette`, valor em azul (text-primary)
+- **Vendidas** — ícone `bi-bag-check`, valor em verde (text-success) + "X% do total"
+- **Faturamento** — ícone `bi-currency-dollar`, valor em cyan (text-info) com `number_format`
+- **Lucro** — ícone `bi-graph-up-arrow`, cor dinâmica (verde positivo / vermelho negativo) + margem %
+
+**2. Card Estatísticas Detalhadas (2 colunas internas):**
+
+**Coluna Produção (`col-md-6`):**
+- Badges de distribuição por status (disponível/produção/vendida) — condicionais
+- Custo médio por arte
+- Custo total investido
+- Horas trabalhadas
+- Custo médio por hora (R$/h) — condicional
+- Complexidade predominante com ícone colorido (match expression)
+
+**Coluna Vendas (`col-md-6`):**
+- Se `tem_vendas`:
+  - Vendas realizadas
+  - Ticket médio
+  - Lucro médio por venda (cor verde/vermelha)
+  - Rentabilidade média (R$/h) — condicional
+  - Barra visual de margem de lucro (progress bar: verde >30%, amarelo 10-30%, vermelho <10%)
+  - Período de vendas (primeira — última, formatado "jan/2026 — fev/2026")
+- Se NÃO `tem_vendas`:
+  - Estado vazio: ícone `bi-cart-x` + mensagem informativa
+
+**Estado vazio global:** Se `!$estatisticas['tem_dados']`, exibe alert cinza com ícone e mensagem "Estatísticas serão exibidas quando artes forem associadas a esta tag."
+
+### Testes Realizados
+
+| Cenário | Resultado |
+|---------|-----------|
+| Tag com artes e vendas — cards completos | ✅ PASSOU |
+| Tag com artes sem vendas — seção vendas mostra estado vazio | ✅ PASSOU |
+| Tag sem artes — alert informativo, sem cards | ✅ PASSOU |
+| Valores financeiros (R$, %, margem) formatados corretamente | ✅ PASSOU |
+| Mini-cards responsivos (2 colunas mobile, 4 desktop) | ✅ PASSOU |
 
 ---
 
@@ -412,7 +507,7 @@ COMMIT
 | `toArray()` | array | **M3** | Inclui descricao no array |
 | `fromArray(array)` | Tag | **M3** | Hidrata descricao do array |
 
-### TagRepository (`src/Repositories/TagRepository.php`) — Após Melhoria 4
+### TagRepository (`src/Repositories/TagRepository.php`) — Após Melhoria 5
 
 | Método | Retorno | Fase | Descrição |
 |--------|---------|------|-----------|
@@ -438,10 +533,11 @@ COMMIT
 | `searchWithCount(string, int)` | array | **F1** | LIKE + LEFT JOIN + COUNT |
 | `getArtesByTag(int)` | array | **F1** | Artes via INNER JOIN (FETCH_ASSOC) |
 | `mergeTags(int, int)` | array | **M4** | Transação: transfere artes + trata duplicatas + deleta origem |
+| `getEstatisticasByTag(int)` | array | **M5** | 2 queries: artes (status/custo/horas) + vendas (valor/lucro/ticket) |
 
-**Legenda:** F1=Fase 1, M1=Melhoria 1, M3=Melhoria 3, M4=Melhoria 4
+**Legenda:** F1=Fase 1, M1=Melhoria 1, M3=Melhoria 3, M4=Melhoria 4, M5=Melhoria 5
 
-### TagService (`src/Services/TagService.php`) — Após Melhoria 4
+### TagService (`src/Services/TagService.php`) — Após Melhoria 5
 
 | Método | Retorno | Fase | Descrição |
 |--------|---------|------|-----------|
@@ -453,6 +549,7 @@ COMMIT
 | `atualizar(int, array)` | Tag | Base→**M3** | Agora aceita descricao/icone |
 | `remover(int)` | bool | Base | Remove com transação |
 | `mergeTags(int, int)` | array | **M4** | Valida + delega merge ao Repository |
+| `getEstatisticasTag(int)` | array | **M5** | Busca dados + calcula métricas derivadas (%, margem, R$/h) |
 | `getMaisUsadas(int)` | array\<Tag> | Base | Top N |
 | `getParaSelect()` | array | Base | Para dropdowns |
 | `getCoresPredefinidas()` | array | Base | Paleta de cores |
@@ -462,14 +559,14 @@ COMMIT
 | `pesquisar(string, int)` | array | **F1** | Busca LIKE + contagem |
 | `getArtesComTag(int)` | array | **F1** | Artes da tag |
 
-### TagController (`src/Controllers/TagController.php`) — Após Melhoria 4
+### TagController (`src/Controllers/TagController.php`) — Após Melhoria 5
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `index()` | GET /tags | Lista paginada + busca + ordenação + tags mais usadas |
 | `create()` | GET /tags/criar | Formulário com cores + ícones (M3) |
 | `store()` | POST /tags | Valida + cria (nome, cor, descricao, icone) |
-| `show($id)` | GET /tags/{id} | Detalhes + artes + descrição (M3) + dropdown merge (M4) |
+| `show($id)` | GET /tags/{id} | Detalhes + artes + descrição (M3) + merge (M4) + estatísticas (M5) |
 | `edit($id)` | GET /tags/{id}/editar | Form edição com ícones (M3) |
 | `update($id)` | PUT /tags/{id} | Atualiza 4 campos |
 | `destroy($id)` | DELETE /tags/{id} | Remove + flash |
@@ -506,7 +603,7 @@ TAGS — Resource (7 rotas automáticas)
   GET    /tags           → TagController@index         (listar paginado)
   GET    /tags/criar     → TagController@create        (formulário)
   POST   /tags           → TagController@store         (salvar)
-  GET    /tags/{id}      → TagController@show          (detalhes + merge UI)
+  GET    /tags/{id}      → TagController@show          (detalhes + merge + estatísticas)
   GET    /tags/{id}/editar → TagController@edit        (form editar)
   PUT    /tags/{id}      → TagController@update        (atualizar)
   DELETE /tags/{id}      → TagController@destroy       (excluir)
@@ -566,6 +663,21 @@ TAGS — Resource (7 rotas automáticas)
    → TagRepository::allWithCountPaginated() com LIMIT/OFFSET + ORDER BY dinâmico
 5. TagService::getMaisUsadas(5) → top 5 para sidebar
 6. View recebe: $tags, $paginacao, $tagsMaisUsadas, $filtros
+```
+
+### Ver Detalhes (GET /tags/{id}) — Após Melhorias 4+5
+
+```
+1. TagController::show() recebe Request + id
+2. TagService::buscar($id) → findOrFail() → Tag
+3. TagService::getArtesComTag($id) → arrays FETCH_ASSOC
+4. TagService::listarComContagem() → todas as tags para dropdown merge (M4)
+5. TagService::getEstatisticasTag($id) → dados brutos + métricas derivadas (M5)
+   5a. findOrFail($tagId) → valida existência
+   5b. TagRepository::getEstatisticasByTag($tagId) → 2 queries SQL
+   5c. Calcula: percentual_vendidas, margem_lucro, custo_por_hora, complexidade_label
+   5d. Flags: tem_dados, tem_vendas
+6. View recebe: $tag, $artes, $todasTags, $estatisticas
 ```
 
 ### Excluir Tag (DELETE /tags/{id})
@@ -640,17 +752,15 @@ O Router tem fix que converte parâmetros string de URL para int, prevenindo Typ
 ### Variável de Anos no Metas
 O controller de Metas passa `'anosDisponiveis'` (renomeado de `'anos'`). Se filtro de anos quebrar, reverter nome da variável.
 
+### Estatísticas: 2 Queries Separadas (M5)
+`getEstatisticasByTag()` usa 2 queries em vez de 1 JOIN grande. Motivo: artes com múltiplas vendas distorceriam AVG/SUM das artes se feitas em uma única query. Separar garante precisão.
+
+### Estatísticas: Proteção Contra Divisão por Zero (M5)
+O Service calcula métricas derivadas com verificação prévia: `total_artes > 0`, `faturamento_total > 0`, `horas_totais > 0`. A view usa flags `tem_dados` e `tem_vendas` para decidir o que exibir.
+
 ---
 
 ## 📮 MELHORIAS FUTURAS — ESPECIFICAÇÕES
-
-### Melhoria 5: Estatísticas por Tag (Complexidade: Média)
-
-**Objetivo:** Exibir métricas como valor médio das artes, técnica mais usada, etc.
-
-**Implementação prevista:**
-- TagRepository: queries com AVG, SUM, COUNT agrupados por tag
-- View show.php: cards de estatísticas (similar ao módulo Metas)
 
 ### Melhoria 6: Tag Cloud / Gráfico (Complexidade: Média)
 
@@ -659,26 +769,68 @@ O controller de Metas passa `'anosDisponiveis'` (renomeado de `'anos'`). Se filt
 **Implementação prevista:**
 - Chart.js doughnut ou bar chart usando `getContagemPorTag()` (já existe no Repository)
 - View index.php: seção com gráfico acima ou ao lado da listagem
+- Dados: nome, cor, quantidade (já retornados pelo método existente)
+- Responsividade: container com altura fixa para evitar loop de redimensionamento
 
 ---
 
 ## 📌 PRÓXIMAS AÇÕES (para nova conversa)
 
-1. **Melhoria 5 (Estatísticas):** Implementar cards de métricas na view show.php — valor médio das artes, total vendido, técnica mais comum, etc.
+1. **Melhoria 6 (Tag Cloud):** Implementar gráfico de distribuição de tags na index.php com Chart.js usando `getContagemPorTag()` que já existe no Repository.
 
-2. **Melhoria 6 (Tag Cloud):** Implementar gráfico de distribuição de tags na index.php com Chart.js.
-
-3. **Limpeza opcional:** Existem tags de teste no banco (Teste2, Teste5, Teste6, Teste7, Teste8) com 0 artes que podem ser removidas:
+2. **Limpeza opcional:** Existem tags de teste no banco (Teste2, Teste5, Teste6, Teste7, Teste8) com 0 artes que podem ser removidas:
    ```sql
    DELETE FROM tags WHERE nome LIKE 'Teste%' AND id NOT IN (
        SELECT DISTINCT tag_id FROM arte_tags
    );
    ```
 
-4. **Próximo módulo:** Considerar iniciar ciclo de melhorias em outro módulo (Artes, Clientes, Vendas) seguindo o mesmo padrão: estabilização → melhorias incrementais → documentação.
+3. **Próximo módulo:** Considerar iniciar ciclo de melhorias em outro módulo (Artes, Clientes, Vendas) seguindo o mesmo padrão: estabilização → melhorias incrementais → documentação.
+
+---
+
+### Status dos Testes CRUD (Fase 1)
+
+| Operação | Rota | Status |
+|----------|------|--------|
+| Listar | `GET /tags` | ✅ OK |
+| Criar | `POST /tags` | ✅ OK |
+| Visualizar | `GET /tags/{id}` | ✅ OK (corrigido) |
+| Editar | `PUT /tags/{id}` | ✅ OK |
+| Excluir | `DELETE /tags/{id}` | ✅ OK |
+| Buscar | `GET /tags?termo=X` | ✅ OK (corrigido) |
+| Ver Artes com Tag | `GET /artes?tag_id=X` | ✅ OK (corrigido) |
+
+### Bug 1: TagService::pesquisar() Undefined (Fatal Error)
+
+**Problema:** Buscar tags na listagem (`/tags?termo=X`) causava Fatal Error.  
+**Causa:** Método declarado no Controller mas nunca implementado no Service.  
+**Correção:** Adicionado `pesquisar()` no TagService + `searchWithCount()` no TagRepository.
+
+### Bug 2: TagService::getArtesComTag() Undefined (Fatal Error)
+
+**Problema:** Acessar detalhes de uma tag (`/tags/{id}`) causava Fatal Error.  
+**Causa:** Método declarado no Controller mas nunca implementado no Service.  
+**Correção:** Adicionado `getArtesComTag()` no TagService + `getArtesByTag()` no TagRepository.
+
+### Bug 3: show.php — Acesso Objeto em Array (Fatal Error)
+
+**Problema:** View show.php falhava ao tentar chamar `$arte->getStatus()`.  
+**Causa:** `getArtesByTag()` retorna `FETCH_ASSOC` (arrays), mas a view usava acesso a objetos.  
+**Correção:** Convertidas todas as referências de `$arte->getX()` para `$arte['x']` com proteções null coalescing.
+
+### Bug 4: normalizarDados() — Cor Default Silenciosa
+
+**Problema:** Bloco `else` para cor padrão continha `$dados['cor'] ?? '#6c757d'` mas `$dados['cor']` era undefined.  
+**Correção:** Simplificado para `$dados['cor'] = '#6c757d'` direto.
+
+### Bug 5: ArteController — Parâmetros Incompatíveis
+
+**Problema:** Controller lia `$request->get('q')` mas view enviava `name="termo"`. Controller lia `$request->get('tag')` mas links usavam `?tag_id=X`.  
+**Correção:** Alterados parâmetros no ArteController para `'termo'` e `'tag_id'`.
 
 ---
 
 **Última atualização:** 12/02/2026  
-**Status:** ✅ Módulo Tags — 4 melhorias completas, totalmente funcional  
-**Próxima ação:** Melhoria 5 (Estatísticas por Tag) ou próximo módulo
+**Status:** ✅ Módulo Tags — 5 melhorias completas, totalmente funcional  
+**Próxima ação:** Melhoria 6 (Tag Cloud / Gráfico) ou próximo módulo

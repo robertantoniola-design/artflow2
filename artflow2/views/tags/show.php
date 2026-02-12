@@ -64,7 +64,267 @@ $totalArtes = count($artes ?? []);
     <!-- COLUNA PRINCIPAL: Artes Associadas                -->
     <!-- ══════════════════════════════════════════════════ -->
     <div class="col-lg-8">
-        <div class="card">
+        
+                    <!-- ══════════════════════════════════════════════════ -->
+        <!-- MELHORIA 5: Estatísticas da Tag                   -->
+        <!-- ══════════════════════════════════════════════════ -->
+        <?php if (!empty($estatisticas) && $estatisticas['tem_dados']): ?>
+        
+        <!-- ── Mini-cards de Resumo (4 colunas) ── -->
+        <div class="row g-3 mb-4">
+            <!-- Total de Artes -->
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-0 shadow-sm">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1">
+                            <i class="bi bi-palette"></i> Total Artes
+                        </div>
+                        <div class="fs-3 fw-bold text-primary">
+                            <?= $estatisticas['total_artes'] ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Artes Vendidas -->
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-0 shadow-sm">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1">
+                            <i class="bi bi-bag-check"></i> Vendidas
+                        </div>
+                        <div class="fs-3 fw-bold text-success">
+                            <?= $estatisticas['artes_vendidas'] ?>
+                        </div>
+                        <!-- Percentual de vendidas sobre o total -->
+                        <?php if ($estatisticas['total_artes'] > 0): ?>
+                            <small class="text-muted">
+                                <?= $estatisticas['percentual_vendidas'] ?>% do total
+                            </small>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Faturamento Total -->
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-0 shadow-sm">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1">
+                            <i class="bi bi-currency-dollar"></i> Faturamento
+                        </div>
+                        <div class="fs-4 fw-bold text-info">
+                            R$ <?= number_format($estatisticas['faturamento_total'], 2, ',', '.') ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Lucro Total -->
+            <div class="col-6 col-md-3">
+                <div class="card text-center h-100 border-0 shadow-sm">
+                    <div class="card-body py-3">
+                        <div class="text-muted small mb-1">
+                            <i class="bi bi-graph-up-arrow"></i> Lucro
+                        </div>
+                        <div class="fs-4 fw-bold <?= $estatisticas['lucro_total'] >= 0 ? 'text-success' : 'text-danger' ?>">
+                            R$ <?= number_format($estatisticas['lucro_total'], 2, ',', '.') ?>
+                        </div>
+                        <!-- Margem de lucro -->
+                        <?php if ($estatisticas['tem_vendas']): ?>
+                            <small class="text-muted">
+                                Margem: <?= $estatisticas['margem_lucro'] ?>%
+                            </small>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /row mini-cards -->
+        
+        <!-- ── Card Detalhado de Estatísticas ── -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bar-chart-line"></i> Estatísticas Detalhadas
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Coluna: Produção -->
+                    <div class="col-md-6">
+                        <h6 class="text-muted border-bottom pb-2 mb-3">
+                            <i class="bi bi-brush"></i> Produção
+                        </h6>
+                        
+                        <!-- Distribuição por Status -->
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-1">Distribuição por Status</small>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <?php if ($estatisticas['artes_disponiveis'] > 0): ?>
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> 
+                                        <?= $estatisticas['artes_disponiveis'] ?> disponível(is)
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($estatisticas['artes_producao'] > 0): ?>
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-gear"></i> 
+                                        <?= $estatisticas['artes_producao'] ?> em produção
+                                    </span>
+                                <?php endif; ?>
+                                <?php if ($estatisticas['artes_vendidas'] > 0): ?>
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-bag-check"></i> 
+                                        <?= $estatisticas['artes_vendidas'] ?> vendida(s)
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        
+                        <!-- Custo Médio -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Custo médio por arte:</span>
+                            <strong>R$ <?= number_format($estatisticas['custo_medio'], 2, ',', '.') ?></strong>
+                        </div>
+                        
+                        <!-- Custo Total -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Custo total investido:</span>
+                            <strong>R$ <?= number_format($estatisticas['custo_total'], 2, ',', '.') ?></strong>
+                        </div>
+                        
+                        <!-- Horas Totais -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Horas trabalhadas:</span>
+                            <strong><?= number_format($estatisticas['horas_totais'], 1, ',', '.') ?>h</strong>
+                        </div>
+                        
+                        <!-- Custo por Hora -->
+                        <?php if ($estatisticas['custo_por_hora'] > 0): ?>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Custo médio por hora:</span>
+                            <strong>R$ <?= number_format($estatisticas['custo_por_hora'], 2, ',', '.') ?>/h</strong>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Complexidade Mais Comum -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Complexidade predominante:</span>
+                            <strong>
+                                <?php
+                                // Ícone + cor dinâmica conforme complexidade
+                                $compIcone = match($estatisticas['complexidade_mais_comum']) {
+                                    'baixa' => '<i class="bi bi-speedometer text-success"></i>',
+                                    'media' => '<i class="bi bi-speedometer2 text-warning"></i>',
+                                    'alta'  => '<i class="bi bi-speedometer2 text-danger"></i>',
+                                    default => '',
+                                };
+                                echo $compIcone . ' ' . $estatisticas['complexidade_label'];
+                                ?>
+                            </strong>
+                        </div>
+                    </div><!-- /col Produção -->
+                    
+                    <!-- Coluna: Vendas -->
+                    <div class="col-md-6">
+                        <h6 class="text-muted border-bottom pb-2 mb-3">
+                            <i class="bi bi-cart3"></i> Vendas
+                        </h6>
+                        
+                        <?php if ($estatisticas['tem_vendas']): ?>
+                        
+                        <!-- Total de Vendas -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Vendas realizadas:</span>
+                            <strong><?= $estatisticas['total_vendas'] ?></strong>
+                        </div>
+                        
+                        <!-- Ticket Médio -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Ticket médio:</span>
+                            <strong>R$ <?= number_format($estatisticas['ticket_medio'], 2, ',', '.') ?></strong>
+                        </div>
+                        
+                        <!-- Lucro Médio -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Lucro médio por venda:</span>
+                            <strong class="<?= $estatisticas['lucro_medio'] >= 0 ? 'text-success' : 'text-danger' ?>">
+                                R$ <?= number_format($estatisticas['lucro_medio'], 2, ',', '.') ?>
+                            </strong>
+                        </div>
+                        
+                        <!-- Rentabilidade Média (R$/hora) -->
+                        <?php if ($estatisticas['rentabilidade_media'] > 0): ?>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Rentabilidade média:</span>
+                            <strong class="text-success">
+                                R$ <?= number_format($estatisticas['rentabilidade_media'], 2, ',', '.') ?>/h
+                            </strong>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <!-- Margem de Lucro -->
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Margem de lucro:</span>
+                            <strong>
+                                <!-- Barra visual da margem -->
+                                <div class="progress mt-1" style="height: 6px; width: 80px; display: inline-block; vertical-align: middle;">
+                                    <?php 
+                                    // Cor da barra: verde >30%, amarelo 10-30%, vermelho <10%
+                                    $margemCor = $estatisticas['margem_lucro'] >= 30 ? 'bg-success' 
+                                        : ($estatisticas['margem_lucro'] >= 10 ? 'bg-warning' : 'bg-danger');
+                                    // Limita a 100% para não estourar a barra
+                                    $margemWidth = min(100, max(0, $estatisticas['margem_lucro']));
+                                    ?>
+                                    <div class="progress-bar <?= $margemCor ?>" 
+                                         style="width: <?= $margemWidth ?>%"></div>
+                                </div>
+                                <span class="ms-1"><?= $estatisticas['margem_lucro'] ?>%</span>
+                            </strong>
+                        </div>
+                        
+                        <!-- Período de Vendas -->
+                        <?php if ($estatisticas['primeira_venda']): ?>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Período:</span>
+                            <strong>
+                                <?php
+                                // Formata datas: "jan/2026 — fev/2026"
+                                // Se primeira == última, mostra só uma data
+                                $dtPrimeira = date('M/Y', strtotime($estatisticas['primeira_venda']));
+                                $dtUltima = date('M/Y', strtotime($estatisticas['ultima_venda']));
+                                echo $dtPrimeira === $dtUltima 
+                                    ? $dtPrimeira 
+                                    : $dtPrimeira . ' — ' . $dtUltima;
+                                ?>
+                            </strong>
+                        </div>
+                        <?php endif; ?>
+                        
+                        <?php else: ?>
+                        <!-- Estado vazio: tag tem artes mas nenhuma vendida -->
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+                            <p class="mb-0">Nenhuma venda registrada para artes com esta tag.</p>
+                        </div>
+                        <?php endif; ?>
+                        
+                    </div><!-- /col Vendas -->
+                </div><!-- /row -->
+            </div><!-- /card-body -->
+        </div><!-- /card Estatísticas Detalhadas -->
+        
+        <?php else: ?>
+        <!-- Estado vazio: tag sem nenhuma arte associada -->
+        <div class="alert alert-light border mb-4 text-center">
+            <i class="bi bi-bar-chart-line fs-4 d-block mb-2 text-muted"></i>
+            <p class="mb-0 text-muted">
+                Estatísticas serão exibidas quando artes forem associadas a esta tag.
+            </p>
+        </div>
+        <?php endif; ?>
+        <!-- ══════ FIM MELHORIA 5 ══════ -->
+            <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                     <i class="bi bi-palette"></i> Artes com esta Tag
