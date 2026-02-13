@@ -20,6 +20,8 @@ use App\Exceptions\NotFoundException;
  * - B8: Erros/old input salvos direto em $_SESSION
  * - B9: limparDadosFormulario() em edit/index/show (NÃO em create!)
  * 
+ * MELHORIA 1 (13/02/2026): Paginação no index()
+ * 
  * FLUXO DE VALIDAÇÃO:
  *   POST store() → ValidationException → $_SESSION['_errors'] + back()
  *   → GET create() → form lê errors()/old() → exibe erros + dados anteriores
@@ -38,18 +40,6 @@ class ClienteController extends BaseController
      * Limpa dados residuais de formulários anteriores
      * 
      * IMPORTANTE: Chamado em index(), edit() e show() — NUNCA em create()!
-     * 
-     * Motivo: Quando store() falha na validação, ele define:
-     *   $_SESSION['_errors']    = erros do formulário
-     *   $_SESSION['_old_input'] = dados preenchidos pelo usuário
-     * E redireciona com back() para GET /clientes/criar (create).
-     * 
-     * Se create() limpasse esses dados, o formulário renderizaria
-     * SEM erros e SEM os dados anteriores — o usuário pensaria que
-     * salvou quando na verdade a validação rejeitou silenciosamente.
-     * 
-     * Em compensação, edit() PRECISA limpar para não herdar dados
-     * de um create() que falhou anteriormente.
      */
     private function limparDadosFormulario(): void
     {
@@ -57,33 +47,42 @@ class ClienteController extends BaseController
     }
     
     /**
-     * Lista todos os clientes
+     * Lista todos os clientes (COM PAGINAÇÃO)
      * GET /clientes
+     * GET /clientes?termo=X&pagina=2
+     * 
+     * MELHORIA 1: Agora usa listarPaginado() do Service
      */
     public function index(Request $request): Response
     {
         // Limpa dados residuais ao navegar para a lista
         $this->limparDadosFormulario();
         
-        // CORREÇÃO B1: 'termo' para corresponder ao name="" da view
+        // MELHORIA 1: Filtros com suporte a paginação
         $filtros = [
-            'termo' => $request->get('termo')
+            'termo'   => $request->get('termo'),
+            'pagina'  => (int) ($request->get('pagina') ?? 1),
+            'ordenar' => $request->get('ordenar') ?? 'nome',
+            'direcao' => $request->get('direcao') ?? 'ASC'
         ];
         
-        $clientes = $this->clienteService->listar($filtros);
+        // MELHORIA 1: Usa listarPaginado() em vez de listar()
+        $resultado = $this->clienteService->listarPaginado($filtros);
         
         if ($request->wantsJson()) {
             return $this->json([
                 'success' => true,
-                'data' => array_map(fn($c) => $c->toArray(), $clientes)
+                'data' => array_map(fn($c) => $c->toArray(), $resultado['clientes']),
+                'paginacao' => $resultado['paginacao']
             ]);
         }
         
         return $this->view('clientes/index', [
-            'titulo' => 'Clientes',
-            'clientes' => $clientes,
-            'filtros' => $filtros,
-            'total' => count($clientes)
+            'titulo'    => 'Clientes',
+            'clientes'  => $resultado['clientes'],
+            'paginacao' => $resultado['paginacao'],
+            'filtros'   => $filtros,
+            'total'     => $resultado['paginacao']['total']
         ]);
     }
     
@@ -92,10 +91,6 @@ class ClienteController extends BaseController
      * GET /clientes/criar
      * 
      * NÃO limpa $_SESSION aqui!
-     * Quando store() redireciona de volta após erro de validação,
-     * os dados de $_SESSION['_errors'] e $_SESSION['_old_input']
-     * precisam estar disponíveis para o form exibir os erros
-     * e repopular os campos.
      */
     public function create(Request $request): Response
     {
@@ -140,12 +135,9 @@ class ClienteController extends BaseController
             }
             
             // CORREÇÃO B8: Escreve direto na sessão (padrão VendaController)
-            // Os helpers old()/errors() leem de $_SESSION, não de $_SESSION['_flash']
             $_SESSION['_errors'] = $e->getErrors();
             $_SESSION['_old_input'] = $request->all();
             
-            // back() redireciona para GET /clientes/criar
-            // create() NÃO limpa esses dados → form exibe erros corretamente
             return $this->back();
         }
     }
@@ -165,18 +157,38 @@ class ClienteController extends BaseController
             // CORREÇÃO B4: Busca histórico de compras do cliente
             $historicoCompras = $this->clienteService->getHistoricoCompras($id);
             
+            // Calcula estatísticas para os cards
+            $estatisticas = [
+                'total_compras' => count($historicoCompras),
+                'valor_total' => array_sum(array_column($historicoCompras, 'valor')),
+                'ticket_medio' => count($historicoCompras) > 0 
+                    ? array_sum(array_column($historicoCompras, 'valor')) / count($historicoCompras) 
+                    : 0
+            ];
+            
+            // Converte vendas para objetos Venda (para a view)
+            // Usa Venda::fromArray() para evitar propriedades dinâmicas (PHP 8.2+)
+            $vendas = [];
+            foreach ($historicoCompras as $venda) {
+                $obj = \App\Models\Venda::fromArray($venda);
+                $vendas[] = $obj;
+            }
+            
             if ($request->wantsJson()) {
                 return $this->json([
                     'success' => true, 
                     'data' => $cliente->toArray(),
-                    'historico_compras' => $historicoCompras
+                    'historico_compras' => $historicoCompras,
+                    'estatisticas' => $estatisticas
                 ]);
             }
             
             return $this->view('clientes/show', [
                 'titulo' => $cliente->getNome(),
                 'cliente' => $cliente,
-                'historicoCompras' => $historicoCompras
+                'vendas' => $vendas,
+                'historicoCompras' => $historicoCompras, // Array original para compatibilidade
+                'estatisticas' => $estatisticas
             ]);
             
         } catch (NotFoundException $e) {
@@ -187,15 +199,10 @@ class ClienteController extends BaseController
     /**
      * Formulário de edição
      * GET /clientes/{id}/editar
-     * 
-     * LIMPA dados residuais — impede que dados de um create()
-     * que falhou contaminem os campos do edit.
      */
     public function edit(Request $request, int $id): Response
     {
         // Limpa dados residuais — CRÍTICO aqui!
-        // Sem isso, old('nome', $cliente->getNome()) retornaria dados
-        // do último create() que falhou, não os dados do cliente
         $this->limparDadosFormulario();
         
         try {
@@ -248,18 +255,7 @@ class ClienteController extends BaseController
             $_SESSION['_errors'] = $e->getErrors();
             $_SESSION['_old_input'] = $request->all();
             
-            // back() redireciona para GET /clientes/{id}/editar
-            // edit() limpa esses dados... MAS o update falhou,
-            // então precisamos que o edit NÃO limpe neste caso.
-            // Solução: edit() sempre limpa, mas como o update
-            // escreve os erros ANTES do redirect e edit() limpa
-            // DEPOIS... Na verdade, o redirect faz uma NOVA request.
-            // 
-            // Fluxo: update() sets errors → redirect → NEW GET request → edit() clears → form renders clean
-            // Isso significa que erros de update() também somem!
-            // 
-            // Correção: NÃO redirecionar com back() para o edit.
-            // Em vez disso, re-renderizar a view diretamente:
+            // Re-renderiza a view diretamente (não usa back)
             try {
                 $cliente = $this->clienteService->buscar($id);
                 return $this->view('clientes/edit', [

@@ -2,9 +2,6 @@
 /**
  * VIEW: Detalhes do Cliente
  * GET /clientes/{id}
- * 
- * MELHORIA 3 (Complemento): Adicionados campos de endereço, cidade, estado e observações
- * Data: 13/02/2026
  */
 $currentPage = 'clientes';
 ?>
@@ -40,91 +37,36 @@ $currentPage = 'clientes';
             </div>
             <div class="card-body">
                 <dl class="mb-0">
-                    <!-- Email -->
-                    <dt class="text-muted">
-                        <i class="bi bi-envelope"></i> Email
-                    </dt>
+                    <dt class="text-muted">Email</dt>
                     <dd>
                         <?php if ($cliente->getEmail()): ?>
                             <a href="mailto:<?= e($cliente->getEmail()) ?>">
                                 <?= e($cliente->getEmail()) ?>
                             </a>
                         <?php else: ?>
-                            <span class="text-muted fst-italic">Não informado</span>
+                            <span class="text-muted">Não informado</span>
                         <?php endif; ?>
                     </dd>
                     
-                    <!-- Telefone -->
-                    <dt class="text-muted mt-3">
-                        <i class="bi bi-telephone"></i> Telefone
-                    </dt>
+                    <dt class="text-muted mt-3">Telefone</dt>
                     <dd>
                         <?php if ($cliente->getTelefone()): ?>
                             <a href="tel:<?= e($cliente->getTelefone()) ?>">
                                 <?= e($cliente->getTelefoneFormatado()) ?>
                             </a>
                         <?php else: ?>
-                            <span class="text-muted fst-italic">Não informado</span>
+                            <span class="text-muted">Não informado</span>
                         <?php endif; ?>
                     </dd>
                     
-                    <!-- Empresa -->
-                    <dt class="text-muted mt-3">
-                        <i class="bi bi-building"></i> Empresa
-                    </dt>
+                    <dt class="text-muted mt-3">Empresa</dt>
                     <dd>
-                        <?php if ($cliente->getEmpresa()): ?>
-                            <?= e($cliente->getEmpresa()) ?>
-                        <?php else: ?>
-                            <span class="text-muted fst-italic">Não informada</span>
-                        <?php endif; ?>
+                        <?= e($cliente->getEmpresa()) ?: '<span class="text-muted">Não informada</span>' ?>
                     </dd>
                     
-                    <!-- ==========================================
-                         NOVOS CAMPOS - MELHORIA 3
-                         ========================================== -->
-                    
-                    <!-- Localização (Cidade/UF) -->
-                    <dt class="text-muted mt-3">
-                        <i class="bi bi-geo-alt"></i> Localização
-                    </dt>
-                    <dd>
-                        <?php if ($cliente->getCidade() || $cliente->getEstado()): ?>
-                            <?= e($cliente->getLocalizacao()) ?>
-                        <?php else: ?>
-                            <span class="text-muted fst-italic">Não informada</span>
-                        <?php endif; ?>
-                    </dd>
-                    
-                    <!-- Endereço Completo -->
-                    <?php if ($cliente->getEndereco()): ?>
-                        <dt class="text-muted mt-3">
-                            <i class="bi bi-house-door"></i> Endereço
-                        </dt>
-                        <dd><?= e($cliente->getEndereco()) ?></dd>
-                    <?php endif; ?>
-                    
-                    <!-- Cliente desde -->
-                    <dt class="text-muted mt-3">
-                        <i class="bi bi-calendar-event"></i> Cliente desde
-                    </dt>
+                    <dt class="text-muted mt-3">Cliente desde</dt>
                     <dd><?= date_br($cliente->getCreatedAt()) ?></dd>
                 </dl>
-                
-                <!-- ==========================================
-                     OBSERVAÇÕES (se houver)
-                     ========================================== -->
-                <?php if ($cliente->getObservacoes()): ?>
-                    <hr class="my-3">
-                    <dt class="text-muted">
-                        <i class="bi bi-chat-left-text"></i> Observações
-                    </dt>
-                    <dd class="mt-2">
-                        <div class="p-2 bg-light rounded small">
-                            <?= nl2br(e($cliente->getObservacoes())) ?>
-                        </div>
-                    </dd>
-                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -191,34 +133,23 @@ $currentPage = 'clientes';
                             </tr>
                         </thead>
                         <tbody>
-                            <?php 
-                            // Usa $vendas (objetos) se disponível, senão usa $historicoCompras (arrays)
-                            $listaVendas = $vendas ?? $historicoCompras ?? [];
-                            foreach ($listaVendas as $venda): 
-                                // Suporta tanto objetos Venda quanto arrays
-                                $isArray = is_array($venda);
-                                $vendaId = $isArray ? ($venda['id'] ?? null) : $venda->getId();
-                                $arteId = $isArray ? ($venda['arte_id'] ?? null) : $venda->getArteId();
-                                $arteNome = $isArray ? ($venda['arte_nome'] ?? null) : ($venda->arte_nome ?? null);
-                                $valor = $isArray ? ($venda['valor'] ?? 0) : $venda->getValor();
-                                $dataVenda = $isArray ? ($venda['data_venda'] ?? null) : $venda->getDataVenda();
-                            ?>
+                            <?php foreach ($vendas as $venda): ?>
                                 <tr>
-                                    <td><?= date_br($dataVenda) ?></td>
+                                    <td><?= date_br($venda->getDataVenda()) ?></td>
                                     <td>
-                                        <?php if ($arteId): ?>
-                                            <a href="<?= url("/artes/{$arteId}") ?>">
-                                                <?= e($arteNome ?? 'Arte #' . $arteId) ?>
+                                        <?php if ($venda->getArteId()): ?>
+                                            <a href="<?= url("/artes/{$venda->getArteId()}") ?>">
+                                                <?= e($venda->arte_nome ?? 'Arte #' . $venda->getArteId()) ?>
                                             </a>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-success fw-medium">
-                                        <?= money($valor) ?>
+                                        <?= money($venda->getValor()) ?>
                                     </td>
                                     <td>
-                                        <a href="<?= url("/vendas/{$vendaId}") ?>" 
+                                        <a href="<?= url("/vendas/{$venda->getId()}") ?>" 
                                            class="btn btn-sm btn-outline-info" 
                                            title="Ver detalhes">
                                             <i class="bi bi-eye"></i>

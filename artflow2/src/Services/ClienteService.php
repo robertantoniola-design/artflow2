@@ -13,21 +13,18 @@ use App\Exceptions\NotFoundException;
  * CLIENTE SERVICE
  * ============================================
  * 
+ * FASE 1 (12/02/2026): Correções B4, normalizarDados expandido
+ * MELHORIA 1 (13/02/2026): Adicionado listarPaginado()
+ * 
  * Camada de lógica de negócio para Clientes.
- * 
- * FASE 1 - CORREÇÕES (12/02/2026):
- * - B4: Adicionado getHistoricoCompras() para buscar vendas do cliente
- * - normalizarDados() agora trata campos cidade, estado, endereco, observacoes
- * 
- * Responsabilidades:
- * - Validar dados de entrada
- * - Garantir unicidade de email
- * - Coordenar operações CRUD
  */
 class ClienteService
 {
     private ClienteRepository $clienteRepository;
     private ClienteValidator $validator;
+    
+    // Configuração de paginação (mesmo padrão do Tags)
+    private const POR_PAGINA = 12;
     
     public function __construct(
         ClienteRepository $clienteRepository,
@@ -38,11 +35,79 @@ class ClienteService
     }
     
     // ==========================================
-    // OPERAÇÕES CRUD
+    // LISTAGEM COM PAGINAÇÃO (MELHORIA 1)
     // ==========================================
     
     /**
-     * Lista todos os clientes
+     * Lista clientes com paginação
+     * 
+     * Retorna array com clientes e dados de paginação.
+     * Padrão: 12 clientes por página (mesmo que Tags).
+     * 
+     * @param array $filtros [
+     *     'termo'     => string|null,  // Termo de busca
+     *     'pagina'    => int,          // Página atual (default: 1)
+     *     'ordenar'   => string,       // Campo: nome, email, cidade, created_at
+     *     'direcao'   => string        // ASC ou DESC
+     * ]
+     * @return array [
+     *     'clientes'  => array,        // Objetos Cliente da página atual
+     *     'paginacao' => [
+     *         'total'       => int,    // Total de registros
+     *         'porPagina'   => int,    // Itens por página (12)
+     *         'paginaAtual' => int,    // Página atual
+     *         'totalPaginas'=> int,    // Total de páginas
+     *         'temAnterior' => bool,   // Tem página anterior?
+     *         'temProxima'  => bool    // Tem próxima página?
+     *     ]
+     * ]
+     */
+    public function listarPaginado(array $filtros = []): array
+    {
+        // Extrai parâmetros com defaults
+        $termo = $filtros['termo'] ?? null;
+        $pagina = max(1, (int)($filtros['pagina'] ?? 1));
+        $ordenar = $filtros['ordenar'] ?? 'nome';
+        $direcao = $filtros['direcao'] ?? 'ASC';
+        
+        // Busca total de registros (com ou sem filtro)
+        $total = $this->clienteRepository->countAll($termo);
+        
+        // Calcula total de páginas
+        $totalPaginas = (int) ceil($total / self::POR_PAGINA);
+        
+        // Ajusta página se exceder o total
+        if ($totalPaginas > 0 && $pagina > $totalPaginas) {
+            $pagina = $totalPaginas;
+        }
+        
+        // Busca clientes da página atual
+        $clientes = $this->clienteRepository->allPaginated(
+            $pagina,
+            self::POR_PAGINA,
+            $termo,
+            $ordenar,
+            $direcao
+        );
+        
+        return [
+            'clientes' => $clientes,
+            'paginacao' => [
+                'total'        => $total,
+                'porPagina'    => self::POR_PAGINA,
+                'paginaAtual'  => $pagina,
+                'totalPaginas' => $totalPaginas,
+                'temAnterior'  => $pagina > 1,
+                'temProxima'   => $pagina < $totalPaginas
+            ]
+        ];
+    }
+    
+    /**
+     * Lista todos os clientes (sem paginação)
+     * 
+     * Mantido para compatibilidade. Para listagens grandes,
+     * prefira listarPaginado().
      * 
      * @param array $filtros
      * @return array
@@ -57,6 +122,10 @@ class ClienteService
         // Lista todos ordenados por nome
         return $this->clienteRepository->allOrdered();
     }
+    
+    // ==========================================
+    // OPERAÇÕES CRUD
+    // ==========================================
     
     /**
      * Busca cliente por ID
@@ -87,7 +156,7 @@ class ClienteService
             $this->validarEmailUnico($dados['email']);
         }
         
-        // Normaliza dados
+        // Normaliza dados antes de salvar
         $dados = $this->normalizarDados($dados);
         
         return $this->clienteRepository->create($dados);
@@ -99,19 +168,18 @@ class ClienteService
      * @param int $id
      * @param array $dados
      * @return Cliente
-     * @throws ValidationException|NotFoundException
+     * @throws ValidationException
+     * @throws NotFoundException
      */
     public function atualizar(int $id, array $dados): Cliente
     {
-        // Verifica se existe
+        // Busca cliente existente
         $cliente = $this->clienteRepository->findOrFail($id);
         
-        // Validação
-        if (!$this->validator->validateUpdate($dados)) {
-            throw new ValidationException($this->validator->getErrors());
-        }
+        // Validação flexível para update
+        $this->validator->validateUpdate($dados);
         
-        // Verifica unicidade do email (excluindo cliente atual)
+        // Verifica unicidade do email (exceto o próprio)
         if (!empty($dados['email']) && $dados['email'] !== $cliente->getEmail()) {
             $this->validarEmailUnico($dados['email'], $id);
         }
@@ -119,9 +187,7 @@ class ClienteService
         // Normaliza dados
         $dados = $this->normalizarDados($dados);
         
-        $this->clienteRepository->update($id, $dados);
-        
-        return $this->clienteRepository->find($id);
+        return $this->clienteRepository->update($id, $dados);
     }
     
     /**
@@ -129,17 +195,18 @@ class ClienteService
      * 
      * @param int $id
      * @return bool
-     * @throws NotFoundException|ValidationException
+     * @throws NotFoundException
+     * @throws ValidationException Se cliente tem vendas
      */
     public function remover(int $id): bool
     {
-        // Verifica se existe
+        // Verifica existência
         $this->clienteRepository->findOrFail($id);
         
-        // Verifica se tem vendas associadas
+        // CORREÇÃO B6: Verifica se tem vendas antes de excluir
         if ($this->clienteRepository->hasVendas($id)) {
             throw new ValidationException([
-                'cliente' => 'Este cliente possui vendas registradas e não pode ser removido'
+                'cliente' => 'Este cliente possui vendas registradas e não pode ser excluído.'
             ]);
         }
         
@@ -151,71 +218,67 @@ class ClienteService
     // ==========================================
     
     /**
-     * Valida se email é único
+     * Valida unicidade de email
+     * 
+     * CORREÇÃO B6: emailExists() não existia no Repository.
      * 
      * @param string $email
-     * @param int|null $exceptId
+     * @param int|null $exceptId ID a ignorar (para edição)
      * @throws ValidationException
      */
     private function validarEmailUnico(string $email, ?int $exceptId = null): void
     {
         if ($this->clienteRepository->emailExists($email, $exceptId)) {
             throw new ValidationException([
-                'email' => 'Este e-mail já está cadastrado'
+                'email' => 'Este e-mail já está cadastrado para outro cliente.'
             ]);
         }
     }
     
-    // ==========================================
-    // NORMALIZAÇÃO
-    // ==========================================
-    
     /**
-     * Normaliza dados do cliente
+     * Normaliza dados antes de salvar
      * 
-     * CORREÇÃO: Agora normaliza também cidade, estado, endereco, observacoes
-     * 
-     * @param array $dados
-     * @return array
+     * FASE 1: Agora trata todos os 8 campos
      */
     private function normalizarDados(array $dados): array
     {
-        // Capitaliza nome
+        // Nome: Title Case
         if (isset($dados['nome'])) {
             $dados['nome'] = mb_convert_case(trim($dados['nome']), MB_CASE_TITLE, 'UTF-8');
         }
         
-        // Email em minúsculas
+        // Email: minúsculas
         if (isset($dados['email'])) {
             $dados['email'] = strtolower(trim($dados['email']));
         }
         
-        // Remove formatação do telefone para armazenamento
+        // Telefone: apenas dígitos (mantém formatação no banco)
         if (isset($dados['telefone'])) {
-            $dados['telefone'] = preg_replace('/[^0-9]/', '', $dados['telefone']);
+            // Remove tudo exceto dígitos para validação, mas mantém original
+            $dados['telefone'] = trim($dados['telefone']);
         }
         
-        // Trim em campos texto
+        // Empresa: trim
         if (isset($dados['empresa'])) {
             $dados['empresa'] = trim($dados['empresa']);
         }
         
-        // NOVOS: Normalização dos campos adicionais
+        // Endereço: trim
         if (isset($dados['endereco'])) {
             $dados['endereco'] = trim($dados['endereco']);
         }
         
-        // Capitaliza cidade
+        // Cidade: Title Case
         if (isset($dados['cidade'])) {
             $dados['cidade'] = mb_convert_case(trim($dados['cidade']), MB_CASE_TITLE, 'UTF-8');
         }
         
-        // Estado em maiúsculas (UF: PR, SP, RJ...)
+        // Estado: MAIÚSCULAS (UF: PR, SP, RJ...)
         if (isset($dados['estado'])) {
             $dados['estado'] = mb_strtoupper(trim($dados['estado']), 'UTF-8');
         }
         
-        // Trim em observações
+        // Observações: trim
         if (isset($dados['observacoes'])) {
             $dados['observacoes'] = trim($dados['observacoes']);
         }
@@ -229,9 +292,6 @@ class ClienteService
     
     /**
      * Busca cliente por email
-     * 
-     * @param string $email
-     * @return Cliente|null
      */
     public function buscarPorEmail(string $email): ?Cliente
     {
@@ -239,10 +299,7 @@ class ClienteService
     }
     
     /**
-     * Pesquisa clientes
-     * 
-     * @param string $termo
-     * @return array
+     * Pesquisa clientes por termo
      */
     public function pesquisar(string $termo): array
     {
@@ -252,11 +309,7 @@ class ClienteService
     /**
      * Retorna histórico de compras de um cliente
      * 
-     * CORREÇÃO B4: Método novo — o Controller.show() precisava
-     * exibir vendas do cliente, conforme documentação original.
-     * 
-     * @param int $clienteId ID do cliente
-     * @return array Arrays com dados das vendas
+     * CORREÇÃO B4: Método para buscar vendas do cliente.
      */
     public function getHistoricoCompras(int $clienteId): array
     {
@@ -269,8 +322,6 @@ class ClienteService
     
     /**
      * Retorna total de clientes
-     * 
-     * @return int
      */
     public function getTotal(): int
     {
@@ -279,9 +330,6 @@ class ClienteService
     
     /**
      * Retorna clientes com mais compras
-     * 
-     * @param int $limit
-     * @return array
      */
     public function getTopClientes(int $limit = 10): array
     {
@@ -289,9 +337,7 @@ class ClienteService
     }
     
     /**
-     * Retorna clientes para select (ID e nome)
-     * 
-     * @return array [id => nome]
+     * Retorna clientes para select (ID => nome)
      */
     public function getParaSelect(): array
     {

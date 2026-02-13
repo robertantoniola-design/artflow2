@@ -9,19 +9,13 @@ use PDO;
  * REPOSITORY: CLIENTES
  * ============================================
  * 
- * CORREÇÕES FASE 1 (12/02/2026):
- * - B5: Adicionado getTopCompradores() como método real (antes era alias inexistente
- *       que causava "Call to undefined method" no DashboardController)
- * - B6: Adicionados hasVendas() e emailExists() — usados pelo ClienteService
- *       mas que não existiam, causando erros no remover() e validarEmailUnico()
- * - B7: search() agora busca também por telefone e cidade (antes só nome/email/empresa)
- * - BX: Adicionado allOrdered() — BaseRepository só tem all($orderBy, $direction),
- *        não tem allOrdered(). ClienteService.listar() chamava allOrdered() que
- *        não existia, causando Fatal Error ao acessar /clientes.
+ * FASE 1 (12/02/2026): Correções B5, B6, B7, BX
+ * MELHORIA 1 (13/02/2026): Paginação padronizada (padrão Tags)
  * 
- * CORREÇÃO ANTERIOR (31/01/2026):
- * - topClientes(): Retorna arrays ao invés de objetos hydrated
- *   para preservar campos calculados (total_compras, valor_total_compras)
+ * Métodos de paginação:
+ * - allPaginated(): Lista paginada com filtros
+ * - countAll(): Conta total de registros (com ou sem filtro)
+ * - searchPaginated(): Busca paginada por termo
  */
 class ClienteRepository extends BaseRepository
 {
@@ -33,17 +27,113 @@ class ClienteRepository extends BaseRepository
     ];
     
     // ==========================================
-    // LISTAGEM
+    // LISTAGEM E PAGINAÇÃO (MELHORIA 1)
     // ==========================================
+    
+    /**
+     * Lista clientes paginados com filtros opcionais
+     * 
+     * @param int $pagina Página atual (1-based)
+     * @param int $porPagina Itens por página
+     * @param string|null $termo Termo de busca (opcional)
+     * @param string $ordenarPor Campo para ordenação
+     * @param string $direcao ASC ou DESC
+     * @return array Array de objetos Cliente
+     */
+    public function allPaginated(
+        int $pagina = 1,
+        int $porPagina = 12,
+        ?string $termo = null,
+        string $ordenarPor = 'nome',
+        string $direcao = 'ASC'
+    ): array {
+        // Valida campos de ordenação permitidos
+        $camposPermitidos = ['nome', 'email', 'cidade', 'created_at'];
+        if (!in_array($ordenarPor, $camposPermitidos)) {
+            $ordenarPor = 'nome';
+        }
+        
+        // Sanitiza direção
+        $direcao = strtoupper($direcao) === 'DESC' ? 'DESC' : 'ASC';
+        
+        // Calcula offset
+        $offset = ($pagina - 1) * $porPagina;
+        
+        // Monta query base
+        $sql = "SELECT * FROM {$this->table}";
+        $params = [];
+        
+        // Adiciona filtro de busca se houver termo
+        if ($termo) {
+            $sql .= " WHERE (
+                nome LIKE :termo1 
+                OR email LIKE :termo2 
+                OR telefone LIKE :termo3
+                OR empresa LIKE :termo4
+                OR cidade LIKE :termo5
+            )";
+            $params['termo1'] = "%{$termo}%";
+            $params['termo2'] = "%{$termo}%";
+            $params['termo3'] = "%{$termo}%";
+            $params['termo4'] = "%{$termo}%";
+            $params['termo5'] = "%{$termo}%";
+        }
+        
+        // Ordenação e paginação
+        $sql .= " ORDER BY {$ordenarPor} {$direcao} LIMIT :limit OFFSET :offset";
+        
+        $stmt = $this->db->prepare($sql);
+        
+        // Bind dos parâmetros de busca
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value, PDO::PARAM_STR);
+        }
+        
+        // Bind de limit e offset (devem ser INT)
+        $stmt->bindValue(':limit', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+    
+    /**
+     * Conta total de clientes (com ou sem filtro)
+     * 
+     * @param string|null $termo Termo de busca (opcional)
+     * @return int Total de registros
+     */
+    public function countAll(?string $termo = null): int
+    {
+        $sql = "SELECT COUNT(*) FROM {$this->table}";
+        $params = [];
+        
+        if ($termo) {
+            $sql .= " WHERE (
+                nome LIKE :termo1 
+                OR email LIKE :termo2 
+                OR telefone LIKE :termo3
+                OR empresa LIKE :termo4
+                OR cidade LIKE :termo5
+            )";
+            $params['termo1'] = "%{$termo}%";
+            $params['termo2'] = "%{$termo}%";
+            $params['termo3'] = "%{$termo}%";
+            $params['termo4'] = "%{$termo}%";
+            $params['termo5'] = "%{$termo}%";
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        
+        return (int) $stmt->fetchColumn();
+    }
     
     /**
      * Lista todos os clientes ordenados por nome (A-Z)
      * 
-     * CORREÇÃO BX: BaseRepository::all() existe com parâmetros ($orderBy, $direction),
-     * mas NÃO existe allOrdered(). O ClienteService.listar() chamava allOrdered()
-     * causando "Call to undefined method". Este método resolve isso.
-     * 
-     * Padrão igual ao TagRepository.allOrdered().
+     * Mantido para compatibilidade com código existente.
      * 
      * @return array Array de objetos Cliente
      */
@@ -79,12 +169,14 @@ class ClienteRepository extends BaseRepository
      * Busca clientes com termo (nome, email, empresa, telefone, cidade)
      * 
      * CORREÇÃO B7: Agora busca também por telefone e cidade.
-     * Antes: Só buscava nome, email, empresa
-     * Agora: Inclui telefone e cidade para resultados mais completos
+     * Mantido para compatibilidade - para busca paginada use allPaginated()
+     * 
+     * @param string $termo
+     * @return array
      */
     public function search(string $termo): array
     {
-        $sql = "SELECT * FROM {$this->table}
+        $sql = "SELECT * FROM {$this->table} 
                 WHERE nome LIKE :t1 
                    OR email LIKE :t2 
                    OR empresa LIKE :t3
@@ -92,160 +184,130 @@ class ClienteRepository extends BaseRepository
                    OR cidade LIKE :t5
                 ORDER BY nome ASC";
         
-        $likeTermo = "%{$termo}%";
+        $like = "%{$termo}%";
         $stmt = $this->db->prepare($sql);
         $stmt->execute([
-            't1' => $likeTermo,
-            't2' => $likeTermo,
-            't3' => $likeTermo,
-            't4' => $likeTermo,
-            't5' => $likeTermo
+            't1' => $like,
+            't2' => $like,
+            't3' => $like,
+            't4' => $like,
+            't5' => $like
         ]);
         
         return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
     
     // ==========================================
-    // ESTATÍSTICAS
+    // RELACIONAMENTOS
     // ==========================================
     
     /**
-     * Lista clientes com estatísticas de compras
+     * Verifica se cliente tem vendas associadas
+     * 
+     * CORREÇÃO B6: Método usado pelo Service antes de excluir.
+     * Impede exclusão de cliente com histórico de vendas.
+     * 
+     * @param int $clienteId
+     * @return bool
      */
-    public function allWithStats(): array
+    public function hasVendas(int $clienteId): bool
     {
-        $sql = "SELECT c.*,
-                    COUNT(v.id) as total_compras,
-                    COALESCE(SUM(v.valor), 0) as valor_total_compras
-                FROM {$this->table} c
-                LEFT JOIN vendas v ON c.id = v.cliente_id
-                GROUP BY c.id
-                ORDER BY c.nome ASC";
+        $sql = "SELECT COUNT(*) FROM vendas WHERE cliente_id = ?";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId]);
         
-        $stmt = $this->db->query($sql);
-        return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
+        return (int) $stmt->fetchColumn() > 0;
+    }
+    
+    /**
+     * Retorna histórico de compras do cliente
+     * 
+     * CORREÇÃO B4: Usado pela show.php para exibir histórico.
+     * 
+     * @param int $clienteId
+     * @return array Vendas do cliente com dados da arte
+     */
+    public function getHistoricoCompras(int $clienteId): array
+    {
+        $sql = "SELECT v.*, a.nome as arte_nome
+                FROM vendas v
+                LEFT JOIN artes a ON v.arte_id = a.id
+                WHERE v.cliente_id = ?
+                ORDER BY v.data_venda DESC";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    // ==========================================
+    // ESTATÍSTICAS E RANKINGS
+    // ==========================================
+    
+    /**
+     * Verifica se email já existe (exceto para um ID específico)
+     * 
+     * CORREÇÃO B6: Usado na validação de unicidade de email.
+     * 
+     * @param string $email
+     * @param int|null $exceptId ID a ignorar (para edição)
+     * @return bool
+     */
+    public function emailExists(string $email, ?int $exceptId = null): bool
+    {
+        $sql = "SELECT COUNT(*) FROM {$this->table} WHERE email = ?";
+        $params = [$email];
+        
+        if ($exceptId) {
+            $sql .= " AND id != ?";
+            $params[] = $exceptId;
+        }
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        
+        return (int) $stmt->fetchColumn() > 0;
     }
     
     /**
      * Retorna top clientes por valor de compras
      * 
-     * Retorna ARRAYS (não objetos) para preservar os campos calculados
-     * total_compras e valor_total_compras. O hydrateMany() descartava
-     * esses campos extras.
+     * CORREÇÃO B5: getTopCompradores() não existia.
+     * Retorna ARRAYS (não objetos) para preservar campos calculados.
      * 
-     * @param int $limit Quantidade de clientes
-     * @return array Arrays associativos com dados + estatísticas
+     * @param int $limit
+     * @return array Arrays com dados do cliente + estatísticas
      */
-    public function topClientes(int $limit = 10): array
+    public function getTopCompradores(int $limit = 10): array
     {
-        $sql = "SELECT c.*,
+        $sql = "SELECT 
+                    c.id,
+                    c.nome,
+                    c.email,
+                    c.telefone,
+                    c.cidade,
+                    c.estado,
                     COUNT(v.id) as total_compras,
                     COALESCE(SUM(v.valor), 0) as valor_total_compras
                 FROM {$this->table} c
                 INNER JOIN vendas v ON c.id = v.cliente_id
-                GROUP BY c.id
+                GROUP BY c.id, c.nome, c.email, c.telefone, c.cidade, c.estado
                 ORDER BY valor_total_compras DESC
-                LIMIT :limit";
+                LIMIT :limite";
         
         $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':limite', $limit, PDO::PARAM_INT);
         $stmt->execute();
         
-        // Retorna arrays para preservar campos calculados
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     
     /**
-     * Alias para topClientes() — usado pelo ClienteService.getTopClientes()
-     * 
-     * CORREÇÃO B5: Este método não existia e causava:
-     * "Call to undefined method ClienteRepository::getTopCompradores()"
-     * no DashboardController quando chamava ClienteService.getTopClientes()
-     * 
-     * @param int $limit Quantidade de clientes
-     * @return array Arrays associativos
+     * Alias para getTopCompradores (compatibilidade)
      */
-    public function getTopCompradores(int $limit = 10): array
+    public function topClientes(int $limit = 10): array
     {
-        return $this->topClientes($limit);
-    }
-    
-    // ==========================================
-    // HISTÓRICO DE COMPRAS
-    // ==========================================
-    
-    /**
-     * Busca histórico de compras de um cliente
-     * 
-     * CORREÇÃO B4: Método documentado mas não implementado.
-     * Retorna vendas do cliente com dados da arte associada.
-     * 
-     * @param int $clienteId ID do cliente
-     * @return array Arrays com dados das vendas + nome da arte
-     */
-    public function getHistoricoCompras(int $clienteId): array
-    {
-        $sql = "SELECT v.*,
-                    a.nome as arte_nome,
-                    a.status as arte_status
-                FROM vendas v
-                LEFT JOIN artes a ON v.arte_id = a.id
-                WHERE v.cliente_id = :cliente_id
-                ORDER BY v.data_venda DESC";
-        
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(['cliente_id' => $clienteId]);
-        
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
-    // ==========================================
-    // VERIFICAÇÕES
-    // ==========================================
-    
-    /**
-     * Verifica se o cliente possui vendas associadas
-     * 
-     * CORREÇÃO B6: Método chamado pelo ClienteService.remover()
-     * para impedir exclusão de clientes com vendas, mas não existia.
-     * 
-     * @param int $clienteId ID do cliente
-     * @return bool true se tem vendas, false se não tem
-     */
-    public function hasVendas(int $clienteId): bool
-    {
-        $sql = "SELECT COUNT(*) FROM vendas WHERE cliente_id = :id";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(['id' => $clienteId]);
-        
-        return (int)$stmt->fetchColumn() > 0;
-    }
-    
-    /**
-     * Verifica se um email já existe no banco
-     * 
-     * CORREÇÃO B6: Método chamado pelo ClienteService.validarEmailUnico()
-     * mas não existia. Aceita $exceptId para ignorar o próprio registro
-     * durante edição (evita falso positivo de duplicação).
-     * 
-     * @param string $email Email a verificar
-     * @param int|null $exceptId ID a excluir da verificação (para update)
-     * @return bool true se já existe, false se disponível
-     */
-    public function emailExists(string $email, ?int $exceptId = null): bool
-    {
-        if ($exceptId) {
-            $sql = "SELECT COUNT(*) FROM {$this->table} 
-                    WHERE email = :email AND id != :id";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute(['email' => $email, 'id' => $exceptId]);
-        } else {
-            $sql = "SELECT COUNT(*) FROM {$this->table} 
-                    WHERE email = :email";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute(['email' => $email]);
-        }
-        
-        return (int)$stmt->fetchColumn() > 0;
+        return $this->getTopCompradores($limit);
     }
 }
