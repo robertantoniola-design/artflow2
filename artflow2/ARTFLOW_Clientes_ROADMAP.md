@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Clientes: Documentação Completa
 
 **Data:** 13/02/2026  
-**Status Geral:** ✅ Fase 1 COMPLETA + Melhorias 1 e 3 COMPLETAS  
-**Versão Base:** CRUD estabilizado com paginação e campos UI expandidos  
+**Status Geral:** ✅ Fase 1 COMPLETA + Melhorias 1, 2 e 3 COMPLETAS  
+**Versão Base:** CRUD estabilizado com paginação, ordenação dinâmica e campos UI expandidos  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)  
 **Banco de dados:** `artflow2_db`
 
@@ -12,7 +12,7 @@
 
 O módulo de Clientes do ArtFlow 2.0 gerencia a base de clientes do negócio de arte, incluindo dados de contato, localização e histórico de compras. O módulo opera de forma independente (não depende de outros módulos), mas é consumido pelo módulo de Vendas (select de clientes nos formulários) e pelo Dashboard (Top Clientes por valor de compras).
 
-O módulo passou por uma fase de estabilização com 9 bugs corrigidos, seguida de melhorias de UI e paginação.
+O módulo passou por uma fase de estabilização com 9 bugs corrigidos, seguida de melhorias de UI, paginação e ordenação dinâmica.
 
 ### Status das Fases
 
@@ -20,7 +20,7 @@ O módulo passou por uma fase de estabilização com 9 bugs corrigidos, seguida 
 |------|-----------|--------|
 | Fase 1 | Estabilização CRUD — 9 bugs corrigidos | ✅ COMPLETA (13/02/2026) |
 | Melhoria 1 | Paginação na listagem (12/página) | ✅ COMPLETA (13/02/2026) |
-| Melhoria 2 | Ordenação dinâmica | 📋 PLANEJADA |
+| Melhoria 2 | Ordenação dinâmica (nome, data, cidade) | ✅ COMPLETA (13/02/2026) |
 | Melhoria 3 | Campos adicionais no formulário UI | ✅ COMPLETA (13/02/2026) |
 | Melhoria 4 | Exibição do histórico de compras na view show.php | ✅ JÁ FUNCIONAL (Fase 1) |
 | Melhoria 5 | Estatísticas do cliente (cards com métricas) | ✅ JÁ FUNCIONAL (Fase 1) |
@@ -31,7 +31,7 @@ O módulo passou por uma fase de estabilização com 9 bugs corrigidos, seguida 
 | # | Melhoria | Complexidade | Status |
 |---|----------|--------------|--------|
 | 1 | Paginação na listagem (12/página) | Baixa | ✅ COMPLETA |
-| 2 | Ordenação dinâmica (nome, data, cidade) | Baixa | 📋 PLANEJADA |
+| 2 | Ordenação dinâmica (nome, data, cidade) | Baixa | ✅ COMPLETA |
 | 3 | Campos adicionais no formulário UI | Baixa | ✅ COMPLETA |
 | 4 | Exibição do histórico de compras no show.php | Baixa | ✅ JÁ FUNCIONAL |
 | 5 | Estatísticas do cliente (cards financeiros) | Média | ✅ JÁ FUNCIONAL |
@@ -52,13 +52,13 @@ src/
 ├── Services/
 │   └── ClienteService.php             ✅ Melhoria 1 (+ listarPaginado)
 ├── Controllers/
-│   └── ClienteController.php          ✅ Melhoria 1 (index com paginação)
+│   └── ClienteController.php          ✅ Melhoria 1 (index com paginação + ordenação)
 └── Validators/
     └── ClienteValidator.php           ✅ Fase 1
 
 views/
 └── clientes/
-    ├── index.php                      ✅ Melhoria 1 + 3 (paginação + localização nos cards)
+    ├── index.php                      ✅ Melhoria 1 + 2 + 3 (paginação + ordenação + localização)
     ├── create.php                     ✅ Melhoria 3 (+ endereço, cidade, estado, observações)
     ├── show.php                       ✅ Melhoria 3 (+ novos campos no card Informações)
     └── edit.php                       ✅ Melhoria 3 (+ endereço, cidade, estado, observações)
@@ -164,6 +164,63 @@ $resultado = $this->clienteService->listarPaginado($filtros);
 
 ---
 
+## ✅ MELHORIA 2 — ORDENAÇÃO DINÂMICA (COMPLETA)
+
+**Implementada em:** 13/02/2026  
+**Arquivos alterados:** views/clientes/index.php (apenas view — backend já suportava)
+
+### O Que Foi Implementado
+
+| Recurso | Descrição |
+|---------|-----------|
+| **3 botões de ordenação** | Nome (A-Z/Z-A), Data (recentes/antigos), Cidade (A-Z/Z-A) |
+| **Toggle automático** | Clicar na coluna ativa inverte ASC↔DESC |
+| **Indicador visual** | Botão ativo fica azul (`btn-primary`) + ícone de seta (▲/▼) |
+| **Preserva filtros** | Busca + paginação mantidos ao mudar ordenação |
+| **Setas contextuais** | `bi-sort-alpha-down/up` para texto, `bi-sort-down/up` para data |
+
+### Funções Helper Adicionadas na View
+
+```php
+// Monta URL preservando TODOS os parâmetros (busca + ordenação + paginação)
+clienteUrl(array $filtros, array $params = []): string
+
+// Gera URL de ordenação com toggle ASC↔DESC automático
+clienteSortUrl(array $filtros, string $coluna): string
+
+// Retorna ícone HTML de seta para a coluna (ativa = colorida, inativa = cinza)
+clienteSortIcon(array $filtros, string $coluna): string
+```
+
+### Colunas Suportadas (whitelist no Repository)
+
+| Botão | Coluna no BD | Direção padrão ao ativar |
+|-------|-------------|--------------------------|
+| Nome | `nome` | ASC (A→Z) |
+| Data | `created_at` | DESC (recentes primeiro) |
+| Cidade | `cidade` | ASC (A→Z) |
+
+### Correção Aplicada: Preservação de Filtros na Paginação
+
+A função `clienteUrl()` foi ajustada para **sempre incluir** `ordenar` e `direcao` na URL, sem lógica de limpeza de defaults. Isso garante que a ordenação é preservada ao navegar entre páginas.
+
+**Antes (problemático):**
+```
+/clientes?pagina=2          ← ordenar/direcao removidos por serem "default"
+```
+
+**Depois (correto):**
+```
+/clientes?ordenar=nome&direcao=ASC&pagina=2     ← sempre presente
+/clientes?ordenar=cidade&direcao=DESC&pagina=3   ← preserva tudo
+```
+
+### Integração com Busca
+
+O formulário de busca agora inclui campos `<input type="hidden">` para `ordenar` e `direcao`, garantindo que ao buscar um termo a ordenação ativa é mantida.
+
+---
+
 ## ✅ MELHORIA 3 — CAMPOS ADICIONAIS NO FORMULÁRIO UI (COMPLETA)
 
 **Implementada em:** 13/02/2026  
@@ -204,21 +261,6 @@ Cards de clientes agora exibem localização (Cidade/UF) quando disponível.
 ---
 
 ## 📋 MELHORIAS PENDENTES
-
-### Melhoria 2 — Ordenação Dinâmica
-
-**Complexidade:** Baixa  
-**Status:** 📋 PLANEJADA
-
-**O que fazer:**
-- Links clicáveis nos headers: Nome (A-Z/Z-A), Data de cadastro (recentes/antigos), Cidade
-- Indicador visual da ordenação ativa (seta ▲/▼)
-- Preservar filtros de busca e paginação
-- Backend já suporta (parâmetros `ordenar` e `direcao` no Controller)
-
-**Arquivos a alterar:** views/clientes/index.php (apenas view)
-
----
 
 ### Melhoria 6 — Máscara de Telefone + Validação Client-Side
 
@@ -285,6 +327,12 @@ Helper errors()         → lê de $_SESSION['_errors']
 | ClienteController.php | `src/Controllers/` |
 | index.php | `views/clientes/` |
 
+### Melhoria 2 (Ordenação Dinâmica)
+
+| Arquivo | Caminho |
+|---------|---------|
+| index.php | `views/clientes/` |
+
 ### Melhoria 3 (Campos UI)
 
 | Arquivo | Caminho |
@@ -298,12 +346,12 @@ Helper errors()         → lê de $_SESSION['_errors']
 
 ## 📌 PRÓXIMAS AÇÕES
 
-1. **Melhoria 2 (Ordenação)** — Apenas alteração na view index.php
-2. **Melhoria 6 (Máscara)** — Correção de alinhamento data-mask
-3. **Investigar bug sistêmico B8** — Verificar ArteController e MetaController
+1. **Melhoria 6 (Máscara)** — Verificar app.js + validação HTML5 de telefone
+2. **Investigar bug sistêmico B8** — Verificar ArteController e MetaController
+3. Com Melhoria 6 concluída, módulo Clientes fica **100% COMPLETO** (6/6)
 
 ---
 
 **Última atualização:** 13/02/2026  
-**Status:** ✅ Fase 1 + Melhorias 1 e 3 COMPLETAS  
-**Próxima ação:** Melhoria 2 (Ordenação) ou outro módulo
+**Status:** ✅ Fase 1 + Melhorias 1, 2 e 3 COMPLETAS  
+**Próxima ação:** Melhoria 6 (Máscara de Telefone) ou outro módulo

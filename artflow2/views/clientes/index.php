@@ -1,19 +1,141 @@
 <?php
 /**
- * VIEW: Listagem de Clientes
+ * ============================================
+ * VIEW: Listagem de Clientes (Melhoria 2 — Ordenação Dinâmica)
+ * ============================================
+ * 
  * GET /clientes
+ * GET /clientes?pagina=2&ordenar=cidade&direcao=ASC&termo=João
  * 
- * MELHORIA 1 (13/02/2026): Paginação com 12 itens por página
- * MELHORIA 3 (13/02/2026): Exibe localização nos cards
+ * VARIÁVEIS DISPONÍVEIS (via extract no View::renderFile):
+ * - $clientes (array<Cliente>)    — Clientes da página atual
+ * - $paginacao (array)            — Metadados de paginação
+ * - $filtros (array)              — Filtros ativos: termo, pagina, ordenar, direcao
+ * - $total (int)                  — Total de registros
  * 
- * Variáveis esperadas:
- * - $clientes: array de objetos Cliente
- * - $paginacao: array com dados de paginação (OPCIONAL - para compatibilidade)
- * - $filtros: array com filtros aplicados
- * - $total: total de registros
+ * MELHORIAS IMPLEMENTADAS:
+ * - [Melhoria 1] Paginação com controles Bootstrap 5 (12 clientes/página)
+ * - [Melhoria 2] Ordenação clicável (Nome, Data, Cidade) com setas visuais
+ * - [Melhoria 3] Campos UI expandidos (localização nos cards)
+ * 
+ * PADRÃO: Segue o mesmo modelo do módulo Tags (tagUrl → clienteUrl, etc.)
+ * DIFERENÇA: Clientes usa 'pagina' como param (Tags usa 'page')
+ * 
+ * ARQUIVO: views/clientes/index.php
  */
 $currentPage = 'clientes';
 
+// ══════════════════════════════════════════════════════════════
+// FUNÇÕES HELPER PARA URLs DE PAGINAÇÃO E ORDENAÇÃO
+// ══════════════════════════════════════════════════════════════
+// Recebem $filtros como parâmetro (não usam 'global')
+// porque View::renderFile() faz extract($data) em escopo local.
+// Padrão idêntico ao módulo Tags (tagUrl → clienteUrl).
+
+/**
+ * Monta URL preservando TODOS os parâmetros atuais.
+ * Permite trocar apenas um parâmetro sem perder os outros.
+ * 
+ * Exemplo: clienteUrl($filtros, ['pagina' => 3])
+ *   Se filtros = {termo: 'João', ordenar: 'nome', direcao: 'ASC'}
+ *   Resultado: /clientes?termo=João&ordenar=nome&direcao=ASC&pagina=3
+ * 
+ * @param array $filtros Filtros atuais vindos do controller
+ * @param array $params  Parâmetros a sobrescrever
+ * @return string URL completa
+ */
+function clienteUrl(array $filtros, array $params = []): string {
+    // Merge: parâmetros passados sobrescrevem os atuais
+    // SEMPRE inclui ordenar/direcao para garantir consistência na navegação
+    $merged = array_merge([
+        'termo'   => $filtros['termo'] ?? '',
+        'ordenar' => $filtros['ordenar'] ?? 'nome',
+        'direcao' => $filtros['direcao'] ?? 'ASC',
+        'pagina'  => $filtros['pagina'] ?? 1,
+    ], $params);
+    
+    // Monta query string SEMPRE com ordenar e direcao (evita perda de filtros)
+    $query = [];
+    
+    // Termo: só inclui se não vazio
+    if (!empty($merged['termo'])) {
+        $query['termo'] = $merged['termo'];
+    }
+    
+    // Ordenação: SEMPRE inclui para preservar estado entre páginas
+    $query['ordenar'] = $merged['ordenar'];
+    $query['direcao'] = $merged['direcao'];
+    
+    // Página: só inclui se > 1 (página 1 é o default)
+    if ((int)$merged['pagina'] > 1) {
+        $query['pagina'] = (int)$merged['pagina'];
+    }
+    
+    $qs = !empty($query) ? '?' . http_build_query($query) : '';
+    return url('/clientes') . $qs;
+}
+
+/**
+ * Gera URL de ordenação com toggle automático de direção.
+ * - Clicar na MESMA coluna: inverte ASC↔DESC
+ * - Clicar em OUTRA coluna: começa com ASC (exceto created_at → DESC)
+ * - Sempre volta para página 1 ao mudar ordenação
+ * 
+ * @param array  $filtros Filtros atuais
+ * @param string $coluna  Coluna clicada: 'nome'|'created_at'|'cidade'
+ * @return string URL com nova ordenação
+ */
+function clienteSortUrl(array $filtros, string $coluna): string {
+    $ordenarAtual  = $filtros['ordenar'] ?? 'nome';
+    $direcaoAtual  = $filtros['direcao'] ?? 'ASC';
+    
+    // Se já está ordenando por esta coluna, inverte a direção
+    if ($ordenarAtual === $coluna) {
+        $novaDirecao = ($direcaoAtual === 'ASC') ? 'DESC' : 'ASC';
+    } else {
+        // Coluna diferente: começa com ASC (exceto data, que faz mais sentido DESC = recentes primeiro)
+        $novaDirecao = ($coluna === 'created_at') ? 'DESC' : 'ASC';
+    }
+    
+    return clienteUrl($filtros, [
+        'ordenar' => $coluna,
+        'direcao' => $novaDirecao,
+        'pagina'  => 1  // Volta para página 1 ao trocar ordenação
+    ]);
+}
+
+/**
+ * Retorna ícone HTML de seta para indicar direção de ordenação.
+ * - Coluna ativa: seta colorida na direção atual
+ * - Coluna inativa: seta cinza neutra (↕)
+ * - Ícones específicos: alfa para nome/cidade, calendário para data
+ * 
+ * @param array  $filtros Filtros atuais
+ * @param string $coluna  Coluna a verificar
+ * @return string HTML do ícone Bootstrap
+ */
+function clienteSortIcon(array $filtros, string $coluna): string {
+    $ordenarAtual = $filtros['ordenar'] ?? 'nome';
+    $direcaoAtual = $filtros['direcao'] ?? 'ASC';
+    
+    // Coluna inativa: seta cinza neutra
+    if ($ordenarAtual !== $coluna) {
+        return '<i class="bi bi-arrow-down-up text-muted opacity-50"></i>';
+    }
+    
+    // Coluna ativa: ícone específico por tipo de coluna
+    if ($coluna === 'created_at') {
+        // Data: seta genérica (mais recente ↓ ou mais antigo ↑)
+        $icone = ($direcaoAtual === 'ASC') ? 'bi-sort-down' : 'bi-sort-up';
+    } else {
+        // Nome e Cidade: seta alfabética
+        $icone = ($direcaoAtual === 'ASC') ? 'bi-sort-alpha-down' : 'bi-sort-alpha-up';
+    }
+    
+    return '<i class="bi ' . $icone . ' text-primary"></i>';
+}
+
+// ── Extrai dados de paginação para uso no template ──
 // Compatibilidade: se não houver paginação, cria estrutura padrão
 $paginacao = $paginacao ?? [
     'total'        => $total ?? count($clientes ?? []),
@@ -23,9 +145,16 @@ $paginacao = $paginacao ?? [
     'temAnterior'  => false,
     'temProxima'   => false
 ];
+
+// Extrai filtros com valores padrão seguros
+$ordenarAtual = $filtros['ordenar'] ?? 'nome';
+$direcaoAtual = $filtros['direcao'] ?? 'ASC';
+$termoAtual   = $filtros['termo'] ?? '';
 ?>
 
-<!-- Header da Página -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- HEADER: Título + Botão Novo Cliente            -->
+<!-- ═══════════════════════════════════════════════ -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h2 class="mb-1">
@@ -44,10 +173,17 @@ $paginacao = $paginacao ?? [
     </a>
 </div>
 
-<!-- Filtros e Busca -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- BUSCA + CONTROLES DE ORDENAÇÃO (MELHORIA 2)    -->
+<!-- ═══════════════════════════════════════════════ -->
 <div class="card mb-4">
     <div class="card-body">
-        <form action="<?= url('/clientes') ?>" method="GET" class="row g-3">
+        <!-- Linha 1: Campo de busca -->
+        <form action="<?= url('/clientes') ?>" method="GET" class="row g-3 mb-3">
+            <!-- Preserva ordenação atual durante busca (campos hidden) -->
+            <input type="hidden" name="ordenar" value="<?= e($ordenarAtual) ?>">
+            <input type="hidden" name="direcao" value="<?= e($direcaoAtual) ?>">
+            
             <div class="col-md-8">
                 <div class="input-group">
                     <span class="input-group-text">
@@ -57,7 +193,7 @@ $paginacao = $paginacao ?? [
                            name="termo" 
                            class="form-control" 
                            placeholder="Buscar por nome, email, telefone ou cidade..."
-                           value="<?= e($filtros['termo'] ?? '') ?>">
+                           value="<?= e($termoAtual) ?>">
                 </div>
             </div>
             <div class="col-md-4">
@@ -65,7 +201,7 @@ $paginacao = $paginacao ?? [
                     <button type="submit" class="btn btn-outline-primary flex-grow-1">
                         <i class="bi bi-search"></i> Buscar
                     </button>
-                    <?php if (!empty($filtros['termo'])): ?>
+                    <?php if (!empty($termoAtual)): ?>
                         <a href="<?= url('/clientes') ?>" class="btn btn-outline-secondary" title="Limpar busca">
                             <i class="bi bi-x-lg"></i>
                         </a>
@@ -73,18 +209,64 @@ $paginacao = $paginacao ?? [
                 </div>
             </div>
         </form>
+        
+        <!-- ══════════════════════════════════════════ -->
+        <!-- MELHORIA 2: Botões de ordenação           -->
+        <!-- Linha 2: Botões clicáveis com setas ▲/▼   -->
+        <!-- Toggle: clicar no ativo inverte ASC↔DESC   -->
+        <!-- ══════════════════════════════════════════ -->
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small me-1">
+                <i class="bi bi-sort-down"></i> Ordenar:
+            </span>
+            
+            <!-- Botão Nome (A-Z / Z-A) -->
+            <a href="<?= clienteSortUrl($filtros, 'nome') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'nome' ? 'btn-primary' : 'btn-outline-secondary' ?>">
+                <i class="bi bi-person"></i> Nome
+                <?= clienteSortIcon($filtros, 'nome') ?>
+            </a>
+            
+            <!-- Botão Data (Recentes / Antigos) -->
+            <a href="<?= clienteSortUrl($filtros, 'created_at') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'created_at' ? 'btn-primary' : 'btn-outline-secondary' ?>">
+                <i class="bi bi-calendar"></i> Data
+                <?= clienteSortIcon($filtros, 'created_at') ?>
+            </a>
+            
+            <!-- Botão Cidade (A-Z / Z-A) -->
+            <a href="<?= clienteSortUrl($filtros, 'cidade') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'cidade' ? 'btn-primary' : 'btn-outline-secondary' ?>">
+                <i class="bi bi-geo-alt"></i> Cidade
+                <?= clienteSortIcon($filtros, 'cidade') ?>
+            </a>
+        </div>
     </div>
 </div>
 
-<!-- Lista de Clientes -->
+<!-- Resultado da busca (info contextual) -->
+<?php if (!empty($termoAtual)): ?>
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> 
+        <?= $paginacao['total'] ?> resultado(s) para "<strong><?= e($termoAtual) ?></strong>"
+        <a href="<?= clienteUrl($filtros, ['termo' => '']) ?>" class="float-end">
+            <i class="bi bi-x-circle"></i> Limpar busca
+        </a>
+    </div>
+<?php endif; ?>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- GRID DE CARDS DE CLIENTES                      -->
+<!-- ═══════════════════════════════════════════════ -->
 <?php if (empty($clientes)): ?>
+    <!-- Estado vazio -->
     <div class="card">
         <div class="card-body text-center py-5">
             <i class="bi bi-people display-4 text-muted"></i>
             <h5 class="mt-3">Nenhum cliente encontrado</h5>
             <p class="text-muted">
-                <?php if (!empty($filtros['termo'])): ?>
-                    Não encontramos clientes com o termo "<?= e($filtros['termo']) ?>".
+                <?php if (!empty($termoAtual)): ?>
+                    Não encontramos clientes com o termo "<?= e($termoAtual) ?>".
                     <br>
                     <a href="<?= url('/clientes') ?>" class="btn btn-outline-primary btn-sm mt-2">
                         <i class="bi bi-arrow-left"></i> Ver todos os clientes
@@ -100,13 +282,13 @@ $paginacao = $paginacao ?? [
         </div>
     </div>
 <?php else: ?>
-    <!-- Grid de Clientes -->
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    <!-- Grid responsivo: 1 col mobile, 2 cols md, 3 cols lg -->
+    <div class="row g-3">
         <?php foreach ($clientes as $cliente): ?>
-            <div class="col">
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 hover-shadow">
                     <div class="card-body">
-                        <!-- Nome e Empresa -->
+                        <!-- Nome + Empresa -->
                         <h5 class="card-title mb-1">
                             <a href="<?= url("/clientes/{$cliente->getId()}") ?>" class="text-decoration-none">
                                 <?= e($cliente->getNome()) ?>
@@ -118,45 +300,44 @@ $paginacao = $paginacao ?? [
                             </p>
                         <?php endif; ?>
                         
-                        <!-- Contatos -->
-                        <div class="small">
-                            <?php if ($cliente->getEmail()): ?>
-                                <div class="text-truncate mb-1">
-                                    <i class="bi bi-envelope text-muted"></i>
-                                    <a href="mailto:<?= e($cliente->getEmail()) ?>" class="text-decoration-none">
-                                        <?= e($cliente->getEmail()) ?>
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <?php if ($cliente->getTelefone()): ?>
-                                <div class="mb-1">
-                                    <i class="bi bi-telephone text-muted"></i>
-                                    <a href="tel:<?= e($cliente->getTelefone()) ?>" class="text-decoration-none">
-                                        <?= e($cliente->getTelefoneFormatado()) ?>
-                                    </a>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <?php if ($cliente->getCidade() || $cliente->getEstado()): ?>
-                                <div class="text-muted">
-                                    <i class="bi bi-geo-alt"></i>
-                                    <?= e($cliente->getLocalizacao()) ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
+                        <!-- Contato -->
+                        <?php if ($cliente->getEmail()): ?>
+                            <p class="mb-1 small">
+                                <i class="bi bi-envelope text-muted"></i> <?= e($cliente->getEmail()) ?>
+                            </p>
+                        <?php endif; ?>
+                        <?php if ($cliente->getTelefone()): ?>
+                            <p class="mb-1 small">
+                                <i class="bi bi-telephone text-muted"></i> <?= e($cliente->getTelefone()) ?>
+                            </p>
+                        <?php endif; ?>
+                        
+                        <!-- MELHORIA 3: Localização (Cidade/UF) -->
+                        <?php 
+                        $cidade = $cliente->getCidade();
+                        $estado = $cliente->getEstado();
+                        if ($cidade || $estado): 
+                        ?>
+                            <p class="mb-1 small">
+                                <i class="bi bi-geo-alt text-muted"></i> 
+                                <?= e(implode('/', array_filter([$cidade, $estado]))) ?>
+                            </p>
+                        <?php endif; ?>
                     </div>
                     
-                    <!-- Footer com Ações -->
-                    <div class="card-footer bg-transparent border-top-0">
+                    <!-- Footer: Ações -->
+                    <div class="card-footer bg-transparent">
                         <div class="d-flex justify-content-between align-items-center">
+                            <!-- Data de cadastro -->
                             <small class="text-muted">
-                                <i class="bi bi-calendar"></i>
-                                <?= date_br($cliente->getCreatedAt()) ?>
+                                <i class="bi bi-calendar-plus"></i>
+                                <?= date('d/m/Y', strtotime($cliente->getCreatedAt())) ?>
                             </small>
+                            
+                            <!-- Botões de ação -->
                             <div class="btn-group btn-group-sm">
                                 <a href="<?= url("/clientes/{$cliente->getId()}") ?>" 
-                                   class="btn btn-outline-info" 
+                                   class="btn btn-outline-secondary"
                                    title="Ver detalhes">
                                     <i class="bi bi-eye"></i>
                                 </a>
@@ -179,9 +360,10 @@ $paginacao = $paginacao ?? [
         <?php endforeach; ?>
     </div>
     
-    <!-- ==========================================
-         PAGINAÇÃO (só exibe se houver mais de 1 página)
-         ========================================== -->
+    <!-- ══════════════════════════════════════════════ -->
+    <!-- PAGINAÇÃO (só exibe se houver mais de 1 página) -->
+    <!-- MELHORIA 2: Agora usa clienteUrl() para preservar ordenação -->
+    <!-- ══════════════════════════════════════════════ -->
     <?php if ($paginacao['totalPaginas'] > 1): ?>
         <nav aria-label="Navegação de páginas" class="mt-4">
             <div class="d-flex justify-content-between align-items-center">
@@ -196,7 +378,7 @@ $paginacao = $paginacao ?? [
                     <!-- Primeira Página -->
                     <li class="page-item <?= !$paginacao['temAnterior'] ? 'disabled' : '' ?>">
                         <a class="page-link" 
-                           href="<?= url('/clientes?' . http_build_query(array_merge($filtros, ['pagina' => 1]))) ?>"
+                           href="<?= clienteUrl($filtros, ['pagina' => 1]) ?>"
                            title="Primeira página">
                             <i class="bi bi-chevron-double-left"></i>
                         </a>
@@ -205,31 +387,27 @@ $paginacao = $paginacao ?? [
                     <!-- Página Anterior -->
                     <li class="page-item <?= !$paginacao['temAnterior'] ? 'disabled' : '' ?>">
                         <a class="page-link" 
-                           href="<?= url('/clientes?' . http_build_query(array_merge($filtros, ['pagina' => $paginacao['paginaAtual'] - 1]))) ?>"
+                           href="<?= clienteUrl($filtros, ['pagina' => $paginacao['paginaAtual'] - 1]) ?>"
                            title="Página anterior">
                             <i class="bi bi-chevron-left"></i>
                         </a>
                     </li>
                     
+                    <!-- Números de Página (até 5 visíveis) -->
                     <?php
-                    // Calcula range de páginas a exibir (máximo 5)
+                    // Calcula range de páginas visíveis (janela de 5)
                     $inicio = max(1, $paginacao['paginaAtual'] - 2);
-                    $fim = min($paginacao['totalPaginas'], $paginacao['paginaAtual'] + 2);
-                    
-                    // Ajusta para sempre mostrar 5 páginas se possível
-                    if ($fim - $inicio < 4 && $paginacao['totalPaginas'] >= 5) {
-                        if ($inicio == 1) {
-                            $fim = min(5, $paginacao['totalPaginas']);
-                        } else {
-                            $inicio = max(1, $paginacao['totalPaginas'] - 4);
-                        }
+                    $fim = min($paginacao['totalPaginas'], $inicio + 4);
+                    // Ajusta início se estiver perto do final
+                    if ($fim - $inicio < 4) {
+                        $inicio = max(1, $fim - 4);
                     }
-                    ?>
                     
-                    <?php for ($i = $inicio; $i <= $fim; $i++): ?>
-                        <li class="page-item <?= $i == $paginacao['paginaAtual'] ? 'active' : '' ?>">
+                    for ($i = $inicio; $i <= $fim; $i++):
+                    ?>
+                        <li class="page-item <?= $i === $paginacao['paginaAtual'] ? 'active' : '' ?>">
                             <a class="page-link" 
-                               href="<?= url('/clientes?' . http_build_query(array_merge($filtros, ['pagina' => $i]))) ?>">
+                               href="<?= clienteUrl($filtros, ['pagina' => $i]) ?>">
                                 <?= $i ?>
                             </a>
                         </li>
@@ -238,7 +416,7 @@ $paginacao = $paginacao ?? [
                     <!-- Próxima Página -->
                     <li class="page-item <?= !$paginacao['temProxima'] ? 'disabled' : '' ?>">
                         <a class="page-link" 
-                           href="<?= url('/clientes?' . http_build_query(array_merge($filtros, ['pagina' => $paginacao['paginaAtual'] + 1]))) ?>"
+                           href="<?= clienteUrl($filtros, ['pagina' => $paginacao['paginaAtual'] + 1]) ?>"
                            title="Próxima página">
                             <i class="bi bi-chevron-right"></i>
                         </a>
@@ -247,7 +425,7 @@ $paginacao = $paginacao ?? [
                     <!-- Última Página -->
                     <li class="page-item <?= !$paginacao['temProxima'] ? 'disabled' : '' ?>">
                         <a class="page-link" 
-                           href="<?= url('/clientes?' . http_build_query(array_merge($filtros, ['pagina' => $paginacao['totalPaginas']]))) ?>"
+                           href="<?= clienteUrl($filtros, ['pagina' => $paginacao['totalPaginas']]) ?>"
                            title="Última página">
                             <i class="bi bi-chevron-double-right"></i>
                         </a>
@@ -258,7 +436,9 @@ $paginacao = $paginacao ?? [
     <?php endif; ?>
 <?php endif; ?>
 
-<!-- Modal de Confirmação de Exclusão -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- MODAL: Confirmação de Exclusão                 -->
+<!-- ═══════════════════════════════════════════════ -->
 <div class="modal fade" id="modalExcluir" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -289,6 +469,11 @@ $paginacao = $paginacao ?? [
 
 <!-- Script para Modal de Exclusão -->
 <script>
+/**
+ * Abre modal de confirmação de exclusão.
+ * @param {number} id   - ID do cliente
+ * @param {string} nome - Nome do cliente (exibido no modal)
+ */
 function confirmarExclusao(id, nome) {
     document.getElementById('nomeClienteExcluir').textContent = nome;
     document.getElementById('formExcluir').action = '<?= url('/clientes/') ?>' + id;
