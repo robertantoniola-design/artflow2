@@ -13,17 +13,7 @@ use App\Exceptions\NotFoundException;
  * CLIENTE CONTROLLER
  * ============================================
  * 
- * FASE 1 - CORREÇÕES (13/02/2026):
- * - B1: index() lê 'termo' (antes lia 'q')
- * - B2: store()/update() capturam TODOS os campos da migration
- * - B4: show() busca e passa histórico de compras
- * - B8: Erros/old input salvos direto em $_SESSION
- * - B9: limparDadosFormulario() em edit/index/show (NÃO em create!)
- * 
- * FLUXO DE VALIDAÇÃO:
- *   POST store() → ValidationException → $_SESSION['_errors'] + back()
- *   → GET create() → form lê errors()/old() → exibe erros + dados anteriores
- *   → Navegação para index/edit/show → limpa dados residuais
+ * Controller responsável pelas operações de Clientes.
  */
 class ClienteController extends BaseController
 {
@@ -35,39 +25,13 @@ class ClienteController extends BaseController
     }
     
     /**
-     * Limpa dados residuais de formulários anteriores
-     * 
-     * IMPORTANTE: Chamado em index(), edit() e show() — NUNCA em create()!
-     * 
-     * Motivo: Quando store() falha na validação, ele define:
-     *   $_SESSION['_errors']    = erros do formulário
-     *   $_SESSION['_old_input'] = dados preenchidos pelo usuário
-     * E redireciona com back() para GET /clientes/criar (create).
-     * 
-     * Se create() limpasse esses dados, o formulário renderizaria
-     * SEM erros e SEM os dados anteriores — o usuário pensaria que
-     * salvou quando na verdade a validação rejeitou silenciosamente.
-     * 
-     * Em compensação, edit() PRECISA limpar para não herdar dados
-     * de um create() que falhou anteriormente.
-     */
-    private function limparDadosFormulario(): void
-    {
-        unset($_SESSION['_old_input'], $_SESSION['_errors']);
-    }
-    
-    /**
      * Lista todos os clientes
      * GET /clientes
      */
     public function index(Request $request): Response
     {
-        // Limpa dados residuais ao navegar para a lista
-        $this->limparDadosFormulario();
-        
-        // CORREÇÃO B1: 'termo' para corresponder ao name="" da view
         $filtros = [
-            'termo' => $request->get('termo')
+            'termo' => $request->get('q')
         ];
         
         $clientes = $this->clienteService->listar($filtros);
@@ -90,18 +54,9 @@ class ClienteController extends BaseController
     /**
      * Formulário de criação
      * GET /clientes/criar
-     * 
-     * NÃO limpa $_SESSION aqui!
-     * Quando store() redireciona de volta após erro de validação,
-     * os dados de $_SESSION['_errors'] e $_SESSION['_old_input']
-     * precisam estar disponíveis para o form exibir os erros
-     * e repopular os campos.
      */
     public function create(Request $request): Response
     {
-        // ⚠️ NÃO chamar limparDadosFormulario() aqui!
-        // Os erros de validação do store() precisam chegar ao form.
-        
         return $this->view('clientes/create', [
             'titulo' => 'Novo Cliente'
         ]);
@@ -116,20 +71,12 @@ class ClienteController extends BaseController
         $this->validateCsrf($request);
         
         try {
-            // CORREÇÃO B2: Captura todos os campos da migration 002
-            $dados = $request->only([
-                'nome', 'email', 'telefone', 'empresa',
-                'endereco', 'cidade', 'estado', 'observacoes'
-            ]);
-            
+            $dados = $request->only(['nome', 'email', 'telefone', 'empresa']);
             $cliente = $this->clienteService->criar($dados);
             
             if ($request->wantsJson()) {
                 return $this->success('Cliente cadastrado!', ['id' => $cliente->getId()]);
             }
-            
-            // Sucesso: limpa qualquer resíduo antes de redirecionar
-            $this->limparDadosFormulario();
             
             $this->flashSuccess('Cliente "' . $cliente->getNome() . '" cadastrado!');
             return $this->redirectTo('/clientes');
@@ -139,14 +86,7 @@ class ClienteController extends BaseController
                 return $this->error('Erro de validação', $e->getErrors(), 422);
             }
             
-            // CORREÇÃO B8: Escreve direto na sessão (padrão VendaController)
-            // Os helpers old()/errors() leem de $_SESSION, não de $_SESSION['_flash']
-            $_SESSION['_errors'] = $e->getErrors();
-            $_SESSION['_old_input'] = $request->all();
-            
-            // back() redireciona para GET /clientes/criar
-            // create() NÃO limpa esses dados → form exibe erros corretamente
-            return $this->back();
+            return $this->back()->withErrors($e->getErrors())->withInput();
         }
     }
     
@@ -156,27 +96,16 @@ class ClienteController extends BaseController
      */
     public function show(Request $request, int $id): Response
     {
-        // Limpa dados residuais
-        $this->limparDadosFormulario();
-        
         try {
             $cliente = $this->clienteService->buscar($id);
             
-            // CORREÇÃO B4: Busca histórico de compras do cliente
-            $historicoCompras = $this->clienteService->getHistoricoCompras($id);
-            
             if ($request->wantsJson()) {
-                return $this->json([
-                    'success' => true, 
-                    'data' => $cliente->toArray(),
-                    'historico_compras' => $historicoCompras
-                ]);
+                return $this->json(['success' => true, 'data' => $cliente->toArray()]);
             }
             
             return $this->view('clientes/show', [
                 'titulo' => $cliente->getNome(),
-                'cliente' => $cliente,
-                'historicoCompras' => $historicoCompras
+                'cliente' => $cliente
             ]);
             
         } catch (NotFoundException $e) {
@@ -187,17 +116,9 @@ class ClienteController extends BaseController
     /**
      * Formulário de edição
      * GET /clientes/{id}/editar
-     * 
-     * LIMPA dados residuais — impede que dados de um create()
-     * que falhou contaminem os campos do edit.
      */
     public function edit(Request $request, int $id): Response
     {
-        // Limpa dados residuais — CRÍTICO aqui!
-        // Sem isso, old('nome', $cliente->getNome()) retornaria dados
-        // do último create() que falhou, não os dados do cliente
-        $this->limparDadosFormulario();
-        
         try {
             $cliente = $this->clienteService->buscar($id);
             
@@ -221,20 +142,12 @@ class ClienteController extends BaseController
         $this->validateCsrf($request);
         
         try {
-            // CORREÇÃO B2: Captura todos os campos da migration 002
-            $dados = $request->only([
-                'nome', 'email', 'telefone', 'empresa',
-                'endereco', 'cidade', 'estado', 'observacoes'
-            ]);
-            
+            $dados = $request->only(['nome', 'email', 'telefone', 'empresa']);
             $cliente = $this->clienteService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
                 return $this->success('Cliente atualizado!');
             }
-            
-            // Sucesso: limpa qualquer resíduo
-            $this->limparDadosFormulario();
             
             $this->flashSuccess('Cliente atualizado com sucesso!');
             return $this->redirectTo('/clientes/' . $id);
@@ -244,31 +157,7 @@ class ClienteController extends BaseController
                 return $this->error('Erro de validação', $e->getErrors(), 422);
             }
             
-            // CORREÇÃO B8: Escreve direto na sessão
-            $_SESSION['_errors'] = $e->getErrors();
-            $_SESSION['_old_input'] = $request->all();
-            
-            // back() redireciona para GET /clientes/{id}/editar
-            // edit() limpa esses dados... MAS o update falhou,
-            // então precisamos que o edit NÃO limpe neste caso.
-            // Solução: edit() sempre limpa, mas como o update
-            // escreve os erros ANTES do redirect e edit() limpa
-            // DEPOIS... Na verdade, o redirect faz uma NOVA request.
-            // 
-            // Fluxo: update() sets errors → redirect → NEW GET request → edit() clears → form renders clean
-            // Isso significa que erros de update() também somem!
-            // 
-            // Correção: NÃO redirecionar com back() para o edit.
-            // Em vez disso, re-renderizar a view diretamente:
-            try {
-                $cliente = $this->clienteService->buscar($id);
-                return $this->view('clientes/edit', [
-                    'titulo' => 'Editar: ' . $cliente->getNome(),
-                    'cliente' => $cliente
-                ]);
-            } catch (NotFoundException $e2) {
-                return $this->notFound('Cliente não encontrado');
-            }
+            return $this->back()->withErrors($e->getErrors())->withInput();
             
         } catch (NotFoundException $e) {
             return $this->notFound('Cliente não encontrado');

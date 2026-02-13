@@ -15,10 +15,6 @@ use App\Exceptions\NotFoundException;
  * 
  * Camada de lógica de negócio para Clientes.
  * 
- * FASE 1 - CORREÇÕES (12/02/2026):
- * - B4: Adicionado getHistoricoCompras() para buscar vendas do cliente
- * - normalizarDados() agora trata campos cidade, estado, endereco, observacoes
- * 
  * Responsabilidades:
  * - Validar dados de entrada
  * - Garantir unicidade de email
@@ -173,8 +169,6 @@ class ClienteService
     /**
      * Normaliza dados do cliente
      * 
-     * CORREÇÃO: Agora normaliza também cidade, estado, endereco, observacoes
-     * 
      * @param array $dados
      * @return array
      */
@@ -192,32 +186,13 @@ class ClienteService
         
         // Remove formatação do telefone para armazenamento
         if (isset($dados['telefone'])) {
+            // Mantém apenas números
             $dados['telefone'] = preg_replace('/[^0-9]/', '', $dados['telefone']);
         }
         
         // Trim em campos texto
         if (isset($dados['empresa'])) {
             $dados['empresa'] = trim($dados['empresa']);
-        }
-        
-        // NOVOS: Normalização dos campos adicionais
-        if (isset($dados['endereco'])) {
-            $dados['endereco'] = trim($dados['endereco']);
-        }
-        
-        // Capitaliza cidade
-        if (isset($dados['cidade'])) {
-            $dados['cidade'] = mb_convert_case(trim($dados['cidade']), MB_CASE_TITLE, 'UTF-8');
-        }
-        
-        // Estado em maiúsculas (UF: PR, SP, RJ...)
-        if (isset($dados['estado'])) {
-            $dados['estado'] = mb_strtoupper(trim($dados['estado']), 'UTF-8');
-        }
-        
-        // Trim em observações
-        if (isset($dados['observacoes'])) {
-            $dados['observacoes'] = trim($dados['observacoes']);
         }
         
         return $dados;
@@ -249,20 +224,6 @@ class ClienteService
         return $this->clienteRepository->search($termo);
     }
     
-    /**
-     * Retorna histórico de compras de um cliente
-     * 
-     * CORREÇÃO B4: Método novo — o Controller.show() precisava
-     * exibir vendas do cliente, conforme documentação original.
-     * 
-     * @param int $clienteId ID do cliente
-     * @return array Arrays com dados das vendas
-     */
-    public function getHistoricoCompras(int $clienteId): array
-    {
-        return $this->clienteRepository->getHistoricoCompras($clienteId);
-    }
-    
     // ==========================================
     // ESTATÍSTICAS
     // ==========================================
@@ -291,7 +252,7 @@ class ClienteService
     /**
      * Retorna clientes para select (ID e nome)
      * 
-     * @return array [id => nome]
+     * @return array
      */
     public function getParaSelect(): array
     {
