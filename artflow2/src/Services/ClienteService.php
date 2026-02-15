@@ -176,8 +176,12 @@ class ClienteService
         // Busca cliente existente
         $cliente = $this->clienteRepository->findOrFail($id);
         
-        // Validação flexível para update
-        $this->validator->validateUpdate($dados);
+        // CORREÇÃO (14/02/2026): validateUpdate() retorna bool, 
+        // precisa verificar e lançar exceção se falhou.
+        // ANTES: $this->validator->validateUpdate($dados); ← retorno ignorado!
+        if (!$this->validator->validateUpdate($dados)) {
+            throw new ValidationException($this->validator->getErrors());
+        }
         
         // Verifica unicidade do email (exceto o próprio)
         if (!empty($dados['email']) && $dados['email'] !== $cliente->getEmail()) {

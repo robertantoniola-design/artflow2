@@ -4,6 +4,7 @@
  * GET /clientes/{id}/editar
  * 
  * MELHORIA 3: Adicionados campos de endereço, cidade, estado e observações
+ * MELHORIA 6: Atributos HTML5 no telefone + script inline removido (14/02/2026)
  * Data: 13/02/2026
  * 
  * Variáveis esperadas:
@@ -107,7 +108,7 @@ $ufs = [
                     <?php endif; ?>
                 </div>
                 
-                <!-- Telefone -->
+                <!-- Telefone [MELHORIA 6] Adicionados: pattern, maxlength, minlength, title, autocomplete -->
                 <div class="col-md-6">
                     <label for="telefone" class="form-label">Telefone</label>
                     <input type="tel" 
@@ -116,7 +117,12 @@ $ufs = [
                            class="form-control <?= has_error('telefone') ? 'is-invalid' : '' ?>" 
                            value="<?= old('telefone', $cliente->getTelefone()) ?>"
                            placeholder="(00) 00000-0000"
-                           data-mask="telefone">
+                           data-mask="telefone"
+                           pattern="\(\d{2}\)\s?\d{4,5}-\d{4}"
+                           maxlength="15"
+                           minlength="14"
+                           title="Formato: (XX) XXXXX-XXXX ou (XX) XXXX-XXXX"
+                           autocomplete="tel">
                     <?php if (has_error('telefone')): ?>
                         <div class="invalid-feedback"><?= errors('telefone') ?></div>
                     <?php endif; ?>
@@ -236,25 +242,4 @@ $ufs = [
     </div>
 </div>
 
-<!-- ==========================================
-     SCRIPT: Máscara de Telefone
-     ========================================== -->
-<script>
-document.getElementById('telefone').addEventListener('input', function(e) {
-    let value = e.target.value.replace(/\D/g, '');
-    
-    // Limita a 11 dígitos (DDD + 9 dígitos)
-    if (value.length > 11) value = value.substring(0, 11);
-    
-    // Aplica máscara: (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
-    if (value.length > 6) {
-        value = '(' + value.substring(0,2) + ') ' + value.substring(2,7) + '-' + value.substring(7);
-    } else if (value.length > 2) {
-        value = '(' + value.substring(0,2) + ') ' + value.substring(2);
-    } else if (value.length > 0) {
-        value = '(' + value;
-    }
-    
-    e.target.value = value;
-});
-</script>
+<!-- [MELHORIA 6] Script inline removido — máscara centralizada no app.js -->

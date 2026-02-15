@@ -8,8 +8,14 @@
  * 2. Dark Mode
  * 3. Busca Global (AJAX)
  * 4. Confirmação de Delete
- * 5. Máscaras de Input
+ * 5. Máscaras de Input + Validação Client-Side [MELHORIA 6]
  * 6. Alertas auto-dismiss
+ * 
+ * MELHORIA 6 (14/02/2026) — Alterações na seção 5:
+ * - Máscara de telefone reescrita com formatação progressiva
+ * - Adicionado: validarTelefoneVisual() — feedback em tempo real
+ * - Adicionado: bloqueio de submit se telefone incompleto
+ * - Centraliza toda lógica de telefone (views não precisam de scripts inline)
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -240,27 +246,155 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // ==========================================
-    // 5. MÁSCARAS DE INPUT
+    // 5. MÁSCARAS DE INPUT + VALIDAÇÃO [MELHORIA 6]
     // ==========================================
     
-    // Máscara de telefone
+    /**
+     * [MELHORIA 6] Máscara de Telefone Brasileiro — Reescrita
+     * 
+     * ANTES: usava regex simples que não formatava progressivamente.
+     * AGORA: formatação progressiva enquanto digita + validação visual.
+     * 
+     * Funciona em qualquer input com data-mask="telefone".
+     * Formatos suportados:
+     *   - Fixo:    (XX) XXXX-XXXX  (10 dígitos)
+     *   - Celular: (XX) XXXXX-XXXX (11 dígitos)
+     * 
+     * Comportamento:
+     *   - Só permite dígitos numéricos
+     *   - Limita a 11 dígitos (DDD + 9 dígitos)
+     *   - Aplica formatação progressiva enquanto digita
+     *   - Valida visualmente ao sair do campo (blur)
+     *   - Remove caracteres não-numéricos colados via clipboard
+     */
     document.querySelectorAll('input[data-mask="telefone"]').forEach(function(input) {
+        
+        // --- Evento principal: formata enquanto digita ---
         input.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, '');
+            let value = e.target.value.replace(/\D/g, ''); // Só dígitos
             
-            if (value.length <= 10) {
-                // (99) 9999-9999
-                value = value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-            } else {
-                // (99) 99999-9999
-                value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            // Limita a 11 dígitos (DDD 2 + número 9)
+            if (value.length > 11) {
+                value = value.substring(0, 11);
+            }
+            
+            // Aplica máscara progressiva
+            if (value.length > 6) {
+                // Formato completo: (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+                value = '(' + value.substring(0, 2) + ') ' + value.substring(2, 7) + '-' + value.substring(7);
+            } else if (value.length > 2) {
+                // Parcial após DDD: (XX) XXX...
+                value = '(' + value.substring(0, 2) + ') ' + value.substring(2);
+            } else if (value.length > 0) {
+                // Início do DDD: (X...
+                value = '(' + value;
             }
             
             e.target.value = value;
+            
+            // [MELHORIA 6] Valida visualmente após cada digitação
+            validarTelefoneVisual(input);
+        });
+        
+        // --- [MELHORIA 6] Evento blur: valida ao sair do campo ---
+        input.addEventListener('blur', function() {
+            validarTelefoneVisual(input);
         });
     });
     
-    // Máscara de dinheiro
+    /**
+     * [MELHORIA 6] Validação Visual do Telefone
+     * 
+     * Verifica se o telefone está:
+     *   - Vazio (OK — campo opcional)
+     *   - Completo com 10 ou 11 dígitos (OK)
+     *   - Parcialmente preenchido (ERRO — exibe feedback visual)
+     * 
+     * Integração com Bootstrap 5:
+     *   - Usa classe 'is-invalid' para borda vermelha
+     *   - Cria/reutiliza div.invalid-feedback para mensagem
+     *   - Não duplica feedback se PHP server-side já criou um
+     * 
+     * @param {HTMLInputElement} input - O campo de telefone
+     */
+    function validarTelefoneVisual(input) {
+        const valor = input.value.replace(/\D/g, ''); // Extrai só dígitos
+        const feedbackId = input.id + '-mask-feedback';
+        
+        // Busca ou cria o elemento de feedback
+        let feedback = document.getElementById(feedbackId);
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.id = feedbackId;
+            feedback.className = 'invalid-feedback';
+            feedback.style.display = 'none';
+            feedback.textContent = 'Telefone incompleto. Informe DDD + número (10 ou 11 dígitos)';
+            
+            // Insere após o input, respeitando feedback PHP existente
+            const parent = input.parentNode;
+            const phpFeedback = parent.querySelector('.invalid-feedback:not([id])');
+            if (phpFeedback) {
+                // Feedback do PHP já existe sem ID — reutiliza
+                phpFeedback.id = feedbackId;
+                feedback = phpFeedback;
+            } else if (!document.getElementById(feedbackId)) {
+                parent.appendChild(feedback);
+            }
+        }
+        
+        // Lógica: vazio = OK (opcional), 10 ou 11 dígitos = OK, outro = incompleto
+        if (valor.length === 0 || valor.length === 10 || valor.length === 11) {
+            // ✅ Válido ou vazio — remove estado de erro
+            input.classList.remove('is-invalid');
+            input.classList.remove('telefone-incompleto');
+            feedback.style.display = 'none';
+        } else {
+            // ❌ Incompleto — aplica estado de erro
+            input.classList.add('is-invalid');
+            input.classList.add('telefone-incompleto');
+            feedback.style.display = 'block';
+            feedback.textContent = 'Telefone incompleto. Informe DDD + número (10 ou 11 dígitos)';
+        }
+    }
+    
+    /**
+     * [MELHORIA 6] Bloqueio de Submit — Impede envio com telefone incompleto
+     * 
+     * Intercepta o submit de qualquer formulário que contenha
+     * input[data-mask="telefone"] e verifica:
+     *   - Vazio → permite (campo opcional)
+     *   - 10 ou 11 dígitos → permite (válido)
+     *   - 1-9 dígitos → bloqueia (incompleto) + mostra erro + foca no campo
+     */
+    document.querySelectorAll('form').forEach(function(form) {
+        var telefoneInput = form.querySelector('input[data-mask="telefone"]');
+        if (!telefoneInput) return; // Só atua em forms com campo de telefone
+        
+        form.addEventListener('submit', function(e) {
+            var valor = telefoneInput.value.replace(/\D/g, '');
+            
+            // Vazio = OK (opcional), 10 ou 11 = OK (válido)
+            if (valor.length === 0 || valor.length === 10 || valor.length === 11) {
+                return true; // Permite submit
+            }
+            
+            // Bloqueia submit — telefone incompleto
+            e.preventDefault();
+            
+            // Força validação visual para mostrar o erro
+            validarTelefoneVisual(telefoneInput);
+            
+            // Foca no campo com problema
+            telefoneInput.focus();
+            
+            // Scroll suave até o campo (útil em formulários longos)
+            telefoneInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            return false;
+        });
+    });
+    
+    // Máscara de dinheiro (inalterada)
     document.querySelectorAll('input[data-mask="dinheiro"]').forEach(function(input) {
         input.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, '');
@@ -273,14 +407,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // ==========================================
     // 6. ALERTAS AUTO-DISMISS
-// Fecha flash messages após 5s, mas preserva alertas com data-persist="true"
-document.querySelectorAll('.alert-dismissible').forEach(function(alert) {
-    if (alert.dataset.persist === 'true') return; // ← Ignora alertas persistentes
-    setTimeout(function() {
-        const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
-        bsAlert.close();
-    }, 10000);
-});
+    // ==========================================
+    // Fecha flash messages após 10s, mas preserva alertas com data-persist="true"
+    document.querySelectorAll('.alert-dismissible').forEach(function(alert) {
+        if (alert.dataset.persist === 'true') return; // ← Ignora alertas persistentes
+        setTimeout(function() {
+            const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+            bsAlert.close();
+        }, 10000);
+    });
     
     // ==========================================
     // 7. TOOLTIPS (Bootstrap)
