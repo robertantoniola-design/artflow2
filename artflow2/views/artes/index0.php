@@ -7,11 +7,6 @@
  * - $filtros: Filtros aplicados
  * - $estatisticas: Stats das artes
  * - $tags: Tags para filtro
- * 
- * CORREÇÕES Fase 1 (15/02/2026):
- * - Adicionado status "reservada" no dropdown de filtro
- * - Adicionado status "reservada" nos labels/cores da tabela
- * - Card de estatísticas inclui contagem de reservadas
  */
 $currentPage = 'artes';
 ?>
@@ -40,7 +35,7 @@ $currentPage = 'artes';
                        value="<?= e($filtros['termo'] ?? '') ?>">
             </div>
             
-            <!-- CORREÇÃO: Filtro por status — agora inclui "reservada" -->
+            <!-- Filtro por status -->
             <div class="col-md-3">
                 <label class="form-label">Status</label>
                 <select name="status" class="form-select">
@@ -53,10 +48,6 @@ $currentPage = 'artes';
                     </option>
                     <option value="vendida" <?= ($filtros['status'] ?? '') === 'vendida' ? 'selected' : '' ?>>
                         Vendida
-                    </option>
-                    <!-- CORREÇÃO Fase 1: Status "reservada" adicionado -->
-                    <option value="reservada" <?= ($filtros['status'] ?? '') === 'reservada' ? 'selected' : '' ?>>
-                        Reservada
                     </option>
                 </select>
             </div>
@@ -110,7 +101,6 @@ $currentPage = 'artes';
             </div>
         </div>
     </div>
-    <!-- CORREÇÃO: Último card agora mostra vendidas + reservadas -->
     <div class="col-sm-6 col-lg-3">
         <div class="card border-0" style="background: rgba(99, 102, 241, 0.1);">
             <div class="card-body text-center">
@@ -121,23 +111,15 @@ $currentPage = 'artes';
     </div>
 </div>
 
-<!-- Listagem -->
+<!-- Tabela de Artes -->
 <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">
-            <i class="bi bi-palette me-2"></i>
-            Artes
-            <span class="badge bg-secondary ms-2"><?= count($artes ?? []) ?></span>
-        </h5>
-    </div>
-    
     <div class="card-body p-0">
         <?php if (!empty($artes)): ?>
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
                         <tr>
-                            <th>Nome</th>
+                            <th>Arte</th>
                             <th>Complexidade</th>
                             <th>Horas</th>
                             <th>Custo</th>
@@ -149,19 +131,26 @@ $currentPage = 'artes';
                         <?php foreach ($artes as $arte): ?>
                             <tr>
                                 <td>
-                                    <a href="<?= url('/artes/' . $arte->getId()) ?>" class="text-decoration-none fw-medium">
-                                        <?= e($arte->getNome()) ?>
-                                    </a>
+                                    <div>
+                                        <a href="<?= url('/artes/' . $arte->getId()) ?>" class="fw-medium text-decoration-none">
+                                            <?= e($arte->getNome()) ?>
+                                        </a>
+                                        <?php if ($arte->getDescricao()): ?>
+                                            <br>
+                                            <small class="text-muted">
+                                                <?= e(str_limit($arte->getDescricao(), 50)) ?>
+                                            </small>
+                                        <?php endif; ?>
+                                    </div>
                                 </td>
                                 <td>
                                     <?php
-                                    // Cor do badge de complexidade
-                                    $cor = match($arte->getComplexidade()) {
+                                    $complexColors = [
                                         'baixa' => 'success',
-                                        'media' => 'warning',
-                                        'alta'  => 'danger',
-                                        default => 'secondary'
-                                    };
+                                        'media' => 'warning', 
+                                        'alta' => 'danger'
+                                    ];
+                                    $cor = $complexColors[$arte->getComplexidade()] ?? 'secondary';
                                     ?>
                                     <span class="badge bg-<?= $cor ?>-subtle text-<?= $cor ?>">
                                         <?= ucfirst($arte->getComplexidade()) ?>
@@ -176,22 +165,19 @@ $currentPage = 'artes';
                                 </td>
                                 <td>
                                     <?php
-                                    // CORREÇÃO Fase 1: Incluído "reservada" nos mapas de status
                                     $statusColors = [
-                                        'disponivel'  => 'success',
+                                        'disponivel' => 'success',
                                         'em_producao' => 'warning',
-                                        'vendida'     => 'primary',
-                                        'reservada'   => 'info'        // NOVO
+                                        'vendida' => 'primary'
                                     ];
                                     $statusLabels = [
-                                        'disponivel'  => 'Disponível',
+                                        'disponivel' => 'Disponível',
                                         'em_producao' => 'Em Produção',
-                                        'vendida'     => 'Vendida',
-                                        'reservada'   => 'Reservada'   // NOVO
+                                        'vendida' => 'Vendida'
                                     ];
                                     $statusCor = $statusColors[$arte->getStatus()] ?? 'secondary';
                                     ?>
-                                    <span class="badge bg-<?= $statusCor ?>">
+                                    <span class="badge badge-<?= $arte->getStatus() ?>">
                                         <?= $statusLabels[$arte->getStatus()] ?? $arte->getStatus() ?>
                                     </span>
                                 </td>

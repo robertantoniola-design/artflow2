@@ -8,7 +8,10 @@
  * - $complexidades: Lista de níveis de complexidade
  * - $statusList: Lista de status disponíveis
  * 
- * CORREÇÃO (29/01/2026): Campo CSRF padronizado para _token
+ * CORREÇÕES Fase 1 (15/02/2026):
+ * - Status dropdown agora inclui todos os 4 status: disponivel, em_producao, vendida, reservada
+ * - Usa variável $statusList do controller (dinâmico) com fallback hardcoded
+ * - Token CSRF padronizado para _token
  */
 $currentPage = 'artes';
 ?>
@@ -32,7 +35,7 @@ $currentPage = 'artes';
             </div>
             <div class="card-body">
                 <form action="<?= url('/artes') ?>" method="POST" id="formArte">
-                    <!-- CORREÇÃO: Token CSRF padronizado para _token -->
+                    <!-- Token CSRF -->
                     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     
                     <!-- Nome -->
@@ -46,13 +49,13 @@ $currentPage = 'artes';
                                name="nome" 
                                value="<?= old('nome') ?>"
                                placeholder="Ex: Retrato em Aquarela"
-                               maxlength="100"
+                               maxlength="150"
                                required
                                autofocus>
                         <?php if (has_error('nome')): ?>
                             <div class="invalid-feedback"><?= errors('nome') ?></div>
                         <?php endif; ?>
-                        <small class="text-muted">3 a 100 caracteres</small>
+                        <small class="text-muted">3 a 150 caracteres</small>
                     </div>
                     
                     <!-- Descrição -->
@@ -62,30 +65,24 @@ $currentPage = 'artes';
                                   id="descricao" 
                                   name="descricao" 
                                   rows="3"
-                                  maxlength="1000"
-                                  placeholder="Descreva a arte, técnicas usadas, inspiração..."><?= old('descricao') ?></textarea>
+                                  placeholder="Detalhes sobre a arte..."><?= old('descricao') ?></textarea>
                         <?php if (has_error('descricao')): ?>
                             <div class="invalid-feedback"><?= errors('descricao') ?></div>
                         <?php endif; ?>
-                        <small class="text-muted">Até 1000 caracteres</small>
                     </div>
                     
                     <div class="row">
-                        <!-- Tempo Médio (horas) -->
+                        <!-- Tempo Médio Estimado -->
                         <div class="col-md-4 mb-3">
-                            <label for="tempo_medio_horas" class="form-label">
-                                Tempo Médio (horas) <span class="text-danger">*</span>
-                            </label>
+                            <label for="tempo_medio_horas" class="form-label">Tempo Estimado (h)</label>
                             <input type="number" 
                                    class="form-control <?= has_error('tempo_medio_horas') ? 'is-invalid' : '' ?>"
                                    id="tempo_medio_horas" 
                                    name="tempo_medio_horas" 
                                    value="<?= old('tempo_medio_horas') ?>"
-                                   min="0.5"
-                                   max="1000"
+                                   min="0"
                                    step="0.5"
-                                   placeholder="Ex: 10"
-                                   required>
+                                   placeholder="Ex: 10">
                             <?php if (has_error('tempo_medio_horas')): ?>
                                 <div class="invalid-feedback"><?= errors('tempo_medio_horas') ?></div>
                             <?php endif; ?>
@@ -148,18 +145,27 @@ $currentPage = 'artes';
                             <?php endif; ?>
                         </div>
                         
-                        <!-- Status -->
+                        <!-- CORREÇÃO Fase 1: Status dropdown com TODOS os 4 status -->
                         <div class="col-md-6 mb-3">
                             <label for="status" class="form-label">Status Inicial</label>
                             <select class="form-select <?= has_error('status') ? 'is-invalid' : '' ?>"
                                     id="status" 
                                     name="status">
-                                <option value="disponivel" <?= old('status', 'disponivel') === 'disponivel' ? 'selected' : '' ?>>
-                                    Disponível
-                                </option>
-                                <option value="em_producao" <?= old('status') === 'em_producao' ? 'selected' : '' ?>>
-                                    Em Produção
-                                </option>
+                                <?php
+                                // Usa $statusList do controller se disponível, senão fallback
+                                $listaStatus = $statusList ?? [
+                                    'disponivel'  => 'Disponível',
+                                    'em_producao' => 'Em Produção',
+                                    'vendida'     => 'Vendida',
+                                    'reservada'   => 'Reservada'
+                                ];
+                                foreach ($listaStatus as $valor => $label):
+                                ?>
+                                    <option value="<?= $valor ?>" 
+                                            <?= old('status', 'disponivel') === $valor ? 'selected' : '' ?>>
+                                        <?= $label ?>
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                             <?php if (has_error('status')): ?>
                                 <div class="invalid-feedback"><?= errors('status') ?></div>
@@ -167,7 +173,7 @@ $currentPage = 'artes';
                         </div>
                     </div>
                     
-                    <!-- Tags -->
+                    <!-- Tags (checkboxes estilizados) -->
                     <div class="mb-4">
                         <label class="form-label">Tags</label>
                         <div class="d-flex flex-wrap gap-2">
@@ -183,6 +189,9 @@ $currentPage = 'artes';
                                         <label class="btn btn-outline-secondary btn-sm" 
                                                for="tag_<?= $tag->getId() ?>"
                                                style="border-color: <?= e($tag->getCor()) ?>; color: <?= e($tag->getCor()) ?>;">
+                                            <?php if (method_exists($tag, 'getIcone') && $tag->getIcone()): ?>
+                                                <i class="<?= e($tag->getIcone()) ?> me-1"></i>
+                                            <?php endif; ?>
                                             <?= e($tag->getNome()) ?>
                                         </label>
                                     </div>
@@ -190,20 +199,22 @@ $currentPage = 'artes';
                             <?php else: ?>
                                 <p class="text-muted mb-0">
                                     Nenhuma tag cadastrada. 
-                                    <a href="<?= url('/tags/criar') ?>" target="_blank">Criar tag</a>
+                                    <a href="<?= url('/tags/criar') ?>">Crie uma tag</a> primeiro.
                                 </p>
                             <?php endif; ?>
                         </div>
                     </div>
                     
+                    <hr>
+                    
                     <!-- Botões -->
-                    <div class="d-flex gap-2">
+                    <div class="d-flex justify-content-between">
+                        <a href="<?= url('/artes') ?>" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Cancelar
+                        </a>
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-check-lg me-1"></i> Salvar Arte
                         </button>
-                        <a href="<?= url('/artes') ?>" class="btn btn-outline-secondary">
-                            Cancelar
-                        </a>
                     </div>
                 </form>
             </div>
