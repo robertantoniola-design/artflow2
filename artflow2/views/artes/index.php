@@ -1,11 +1,12 @@
 <?php
 /**
  * ============================================
- * VIEW: Listagem de Artes (Melhoria 1 — Paginação)
+ * VIEW: Listagem de Artes (Melhoria 2 — Ordenação Dinâmica)
  * ============================================
  * 
  * GET /artes
  * GET /artes?pagina=2&status=disponivel&tag_id=3&termo=retrato
+ * GET /artes?ordenar=nome&direcao=ASC&pagina=1
  * 
  * VARIÁVEIS DISPONÍVEIS (via extract no View::renderFile):
  * - $artes (array<Arte>)     — Artes da página atual
@@ -19,6 +20,9 @@
  * - [Melhoria 1] Paginação com controles Bootstrap 5 (12 artes/página)
  * - [Melhoria 1] Preservação de filtros (status, tag_id, termo) ao paginar
  * - [Melhoria 1] Indicador "Mostrando X-Y de Z artes"
+ * - [Melhoria 2] Ordenação clicável (6 colunas) com setas visuais ▲/▼
+ * - [Melhoria 2] Toggle automático ASC↔DESC ao clicar na coluna ativa
+ * - [Melhoria 2] Headers da tabela clicáveis com ícones de direção
  * 
  * PADRÃO: Segue o mesmo modelo do módulo Clientes (clienteUrl → arteUrl)
  * 
@@ -27,7 +31,7 @@
 $currentPage = 'artes';
 
 // ══════════════════════════════════════════════════════════════
-// FUNÇÕES HELPER PARA URLs DE PAGINAÇÃO
+// FUNÇÕES HELPER PARA URLs DE PAGINAÇÃO E ORDENAÇÃO
 // ══════════════════════════════════════════════════════════════
 // Recebem $filtros como parâmetro (não usam 'global')
 // porque View::renderFile() faz extract($data) em escopo local.
@@ -47,6 +51,7 @@ $currentPage = 'artes';
  */
 function arteUrl(array $filtros, array $params = []): string {
     // Merge: parâmetros passados sobrescrevem os atuais
+    // SEMPRE inclui ordenar/direcao para garantir consistência na navegação
     $merged = array_merge([
         'termo'   => $filtros['termo'] ?? '',
         'status'  => $filtros['status'] ?? '',
@@ -75,6 +80,7 @@ function arteUrl(array $filtros, array $params = []): string {
     }
     
     // Ordenação: SEMPRE inclui para preservar estado entre páginas
+    // (Lição do módulo Clientes: sem isso, paginação perde a ordenação)
     $query['ordenar'] = $merged['ordenar'];
     $query['direcao'] = $merged['direcao'];
     
@@ -85,6 +91,78 @@ function arteUrl(array $filtros, array $params = []): string {
     
     $qs = !empty($query) ? '?' . http_build_query($query) : '';
     return url('/artes') . $qs;
+}
+
+/**
+ * [MELHORIA 2] Gera URL de ordenação com toggle automático de direção.
+ * - Clicar na MESMA coluna: inverte ASC↔DESC
+ * - Clicar em OUTRA coluna: usa direção padrão da coluna
+ * - Sempre volta para página 1 ao mudar ordenação
+ * 
+ * Direções padrão por coluna:
+ *   nome, complexidade, status → ASC (A→Z, baixa→alta)
+ *   preco_custo, horas_trabalhadas, created_at → DESC (maior primeiro)
+ * 
+ * @param array  $filtros Filtros atuais
+ * @param string $coluna  Coluna clicada (deve estar na whitelist do Repository)
+ * @return string URL com nova ordenação
+ */
+function arteSortUrl(array $filtros, string $coluna): string {
+    $ordenarAtual = $filtros['ordenar'] ?? 'created_at';
+    $direcaoAtual = $filtros['direcao'] ?? 'DESC';
+    
+    if ($ordenarAtual === $coluna) {
+        // Mesma coluna: inverte a direção (toggle ASC↔DESC)
+        $novaDirecao = ($direcaoAtual === 'ASC') ? 'DESC' : 'ASC';
+    } else {
+        // Coluna diferente: usa direção padrão da coluna
+        // Colunas numéricas/data começam DESC (maior primeiro)
+        // Colunas de texto/enum começam ASC (A→Z)
+        $colunasDesc = ['preco_custo', 'horas_trabalhadas', 'created_at'];
+        $novaDirecao = in_array($coluna, $colunasDesc) ? 'DESC' : 'ASC';
+    }
+    
+    return arteUrl($filtros, [
+        'ordenar' => $coluna,
+        'direcao' => $novaDirecao,
+        'pagina'  => 1  // Volta para página 1 ao trocar ordenação
+    ]);
+}
+
+/**
+ * [MELHORIA 2] Retorna ícone HTML de seta para indicar direção de ordenação.
+ * - Coluna ativa: seta colorida (azul) na direção atual
+ * - Coluna inativa: seta cinza neutra (↕)
+ * - Ícones específicos por tipo: alfa para texto, numérico para valores, calendário para data
+ * 
+ * @param array  $filtros Filtros atuais
+ * @param string $coluna  Coluna a verificar
+ * @return string HTML do ícone Bootstrap
+ */
+function arteSortIcon(array $filtros, string $coluna): string {
+    $ordenarAtual = $filtros['ordenar'] ?? 'created_at';
+    $direcaoAtual = $filtros['direcao'] ?? 'DESC';
+    
+    // Coluna inativa: seta cinza neutra (indica que é clicável)
+    if ($ordenarAtual !== $coluna) {
+        return '<i class="bi bi-arrow-down-up text-muted opacity-50"></i>';
+    }
+    
+    // Coluna ativa: ícone específico por tipo de coluna
+    // Colunas de texto: ícone alfabético (A↓Z / Z↓A)
+    $colunasTexto = ['nome', 'complexidade', 'status'];
+    
+    if (in_array($coluna, $colunasTexto)) {
+        $icone = ($direcaoAtual === 'ASC') ? 'bi-sort-alpha-down' : 'bi-sort-alpha-up';
+    } elseif ($coluna === 'created_at') {
+        // Data: ícone genérico de ordenação
+        $icone = ($direcaoAtual === 'ASC') ? 'bi-sort-down' : 'bi-sort-up';
+    } else {
+        // Colunas numéricas (preco_custo, horas_trabalhadas): ícone numérico
+        $icone = ($direcaoAtual === 'ASC') ? 'bi-sort-numeric-down' : 'bi-sort-numeric-up';
+    }
+    
+    return '<i class="bi ' . $icone . ' text-primary"></i>';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -100,13 +178,14 @@ $temAnterior  = $paginacao['temAnterior'] ?? false;
 $temProxima   = $paginacao['temProxima'] ?? false;
 
 // Cálculo de "Mostrando X-Y de Z"
-$inicio = $total > 0 ? (($paginaAtual - 1) * $porPagina) + 1 : 0;
+$inicio = $total > 0 ? ($paginaAtual - 1) * $porPagina + 1 : 0;
 $fim    = min($paginaAtual * $porPagina, $total);
 
-// ══════════════════════════════════════════════════════════════
-// MAPA DE LABELS E CORES POR STATUS
-// ══════════════════════════════════════════════════════════════
-// Centralizado aqui para evitar repetição no HTML
+// [MELHORIA 2] Extrai filtros de ordenação para uso nos botões/headers
+$ordenarAtual = $filtros['ordenar'] ?? 'created_at';
+$direcaoAtual = $filtros['direcao'] ?? 'DESC';
+
+// Mapas de labels e cores para status (reusados na tabela)
 $statusLabels = [
     'disponivel'  => 'Disponível',
     'em_producao' => 'Em Produção',
@@ -119,24 +198,38 @@ $statusCores = [
     'vendida'     => 'info',
     'reservada'   => 'secondary',
 ];
+
+// Mapas de labels e cores para complexidade
+$complexLabels = ['baixa' => 'Baixa', 'media' => 'Média', 'alta' => 'Alta'];
+$complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'];
 ?>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- HEADER DA PÁGINA                                          -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- HEADER: Título + Botão Nova Arte               -->
+<!-- ═══════════════════════════════════════════════ -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <p class="text-muted mb-0">Gerencie suas obras de arte</p>
+        <h2 class="mb-1">
+            <i class="bi bi-palette text-primary"></i> Artes
+        </h2>
+        <p class="text-muted mb-0">
+            <?php if ($total > 0): ?>
+                <?= $total ?> arte<?= $total > 1 ? 's' : '' ?> cadastrada<?= $total > 1 ? 's' : '' ?>
+            <?php else: ?>
+                Gerencie suas obras de arte
+            <?php endif; ?>
+        </p>
     </div>
     <a href="<?= url('/artes/criar') ?>" class="btn btn-primary">
         <i class="bi bi-plus-lg me-1"></i> Nova Arte
     </a>
 </div>
 
-<!-- ══════════════════════════════════════════════════════════ -->
-<!-- CARDS DE ESTATÍSTICAS POR STATUS                          -->
-<!-- ══════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════ -->
+<!-- CARDS DE ESTATÍSTICAS POR STATUS               -->
+<!-- ═══════════════════════════════════════════════ -->
 <div class="row g-3 mb-4">
+    <!-- Card: Disponíveis -->
     <div class="col-6 col-md-3">
         <div class="card border-success">
             <div class="card-body text-center py-2">
@@ -145,6 +238,7 @@ $statusCores = [
             </div>
         </div>
     </div>
+    <!-- Card: Em Produção -->
     <div class="col-6 col-md-3">
         <div class="card border-warning">
             <div class="card-body text-center py-2">
@@ -153,6 +247,7 @@ $statusCores = [
             </div>
         </div>
     </div>
+    <!-- Card: Vendidas -->
     <div class="col-6 col-md-3">
         <div class="card border-info">
             <div class="card-body text-center py-2">
@@ -161,7 +256,7 @@ $statusCores = [
             </div>
         </div>
     </div>
-    <!-- Fase 1: Card de reservadas -->
+    <!-- Card: Reservadas (Fase 1) -->
     <div class="col-6 col-md-3">
         <div class="card border-secondary">
             <div class="card-body text-center py-2">
@@ -173,7 +268,7 @@ $statusCores = [
 </div>
 
 <!-- ══════════════════════════════════════════════════════════ -->
-<!-- BARRA DE FILTROS                                          -->
+<!-- BARRA DE FILTROS + ORDENAÇÃO                              -->
 <!-- ══════════════════════════════════════════════════════════ -->
 <div class="card mb-4">
     <div class="card-body">
@@ -181,6 +276,7 @@ $statusCores = [
             NOTA: O form usa GET para que os filtros fiquem na URL.
             Ao submeter, pagina é resetada para 1 automaticamente
             (não há input hidden para pagina no form).
+            [MELHORIA 2] Campos hidden preservam ordenação durante busca.
         -->
         <form action="<?= url('/artes') ?>" method="GET" class="row g-3 align-items-end">
             <!-- Busca por nome/descrição -->
@@ -233,9 +329,9 @@ $statusCores = [
                 </button>
             </div>
             
-            <!-- Preserva ordenação ao filtrar -->
-            <input type="hidden" name="ordenar" value="<?= e($filtros['ordenar'] ?? 'created_at') ?>">
-            <input type="hidden" name="direcao" value="<?= e($filtros['direcao'] ?? 'DESC') ?>">
+            <!-- [MELHORIA 2] Preserva ordenação atual durante busca (campos hidden) -->
+            <input type="hidden" name="ordenar" value="<?= e($ordenarAtual) ?>">
+            <input type="hidden" name="direcao" value="<?= e($direcaoAtual) ?>">
         </form>
         
         <!-- Link "Limpar filtros" — só aparece se há filtros ativos -->
@@ -246,6 +342,59 @@ $statusCores = [
                 </a>
             </div>
         <?php endif; ?>
+        
+        <!-- ══════════════════════════════════════════ -->
+        <!-- [MELHORIA 2] Botões de ordenação          -->
+        <!-- Toggle: clicar no ativo inverte ASC↔DESC   -->
+        <!-- 6 colunas ordenáveis (whitelist backend)   -->
+        <!-- ══════════════════════════════════════════ -->
+        <div class="d-flex align-items-center gap-2 mt-3 pt-3 border-top">
+            <span class="text-muted small me-1">
+                <i class="bi bi-sort-down"></i> Ordenar:
+            </span>
+            
+            <!-- Botão Nome (A-Z / Z-A) -->
+            <a href="<?= arteSortUrl($filtros, 'nome') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'nome' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+               title="Ordenar por nome">
+                Nome <?= arteSortIcon($filtros, 'nome') ?>
+            </a>
+            
+            <!-- Botão Complexidade (baixa→alta / alta→baixa) -->
+            <a href="<?= arteSortUrl($filtros, 'complexidade') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'complexidade' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+               title="Ordenar por complexidade">
+                Complexidade <?= arteSortIcon($filtros, 'complexidade') ?>
+            </a>
+            
+            <!-- Botão Custo (R$ maior/menor) -->
+            <a href="<?= arteSortUrl($filtros, 'preco_custo') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'preco_custo' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+               title="Ordenar por custo">
+                Custo <?= arteSortIcon($filtros, 'preco_custo') ?>
+            </a>
+            
+            <!-- Botão Horas (mais/menos horas) -->
+            <a href="<?= arteSortUrl($filtros, 'horas_trabalhadas') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'horas_trabalhadas' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+               title="Ordenar por horas trabalhadas">
+                Horas <?= arteSortIcon($filtros, 'horas_trabalhadas') ?>
+            </a>
+            
+            <!-- Botão Status -->
+            <a href="<?= arteSortUrl($filtros, 'status') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'status' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+               title="Ordenar por status">
+                Status <?= arteSortIcon($filtros, 'status') ?>
+            </a>
+            
+            <!-- Botão Data (recentes/antigos) — DEFAULT -->
+            <a href="<?= arteSortUrl($filtros, 'created_at') ?>" 
+               class="btn btn-sm <?= $ordenarAtual === 'created_at' ? 'btn-primary' : 'btn-outline-secondary' ?>"
+               title="Ordenar por data de criação">
+                Data <?= arteSortIcon($filtros, 'created_at') ?>
+            </a>
+        </div>
     </div>
 </div>
 
@@ -280,13 +429,42 @@ $statusCores = [
     <div class="card">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
+                <!-- ══════════════════════════════════════════════ -->
+                <!-- [MELHORIA 2] Headers clicáveis com setas ▲/▼  -->
+                <!-- Cada header é um link que ordena por coluna    -->
+                <!-- ══════════════════════════════════════════════ -->
                 <thead class="table-light">
                     <tr>
-                        <th>Nome</th>
-                        <th>Complexidade</th>
-                        <th>Custo</th>
-                        <th>Horas</th>
-                        <th>Status</th>
+                        <th>
+                            <a href="<?= arteSortUrl($filtros, 'nome') ?>" 
+                               class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+                                Nome <?= arteSortIcon($filtros, 'nome') ?>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="<?= arteSortUrl($filtros, 'complexidade') ?>" 
+                               class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+                                Complexidade <?= arteSortIcon($filtros, 'complexidade') ?>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="<?= arteSortUrl($filtros, 'preco_custo') ?>" 
+                               class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+                                Custo <?= arteSortIcon($filtros, 'preco_custo') ?>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="<?= arteSortUrl($filtros, 'horas_trabalhadas') ?>" 
+                               class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+                                Horas <?= arteSortIcon($filtros, 'horas_trabalhadas') ?>
+                            </a>
+                        </th>
+                        <th>
+                            <a href="<?= arteSortUrl($filtros, 'status') ?>" 
+                               class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
+                                Status <?= arteSortIcon($filtros, 'status') ?>
+                            </a>
+                        </th>
                         <th class="text-end">Ações</th>
                     </tr>
                 </thead>
@@ -305,11 +483,7 @@ $statusCores = [
                             
                             <!-- Complexidade -->
                             <td>
-                                <?php
-                                    $complexLabels = ['baixa' => 'Baixa', 'media' => 'Média', 'alta' => 'Alta'];
-                                    $complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'];
-                                    $comp = $arte->getComplexidade();
-                                ?>
+                                <?php $comp = $arte->getComplexidade(); ?>
                                 <span class="badge bg-<?= $complexCores[$comp] ?? 'secondary' ?>">
                                     <?= $complexLabels[$comp] ?? ucfirst($comp) ?>
                                 </span>
@@ -372,48 +546,49 @@ $statusCores = [
                     </li>
                     
                     <?php
-                    // ── Lógica de janela de páginas (mostra até 5 números) ──
-                    // Ex: Para página 7 de 20: [5] [6] [7*] [8] [9]
-                    $inicio_pag = max(1, $paginaAtual - 2);
-                    $fim_pag    = min($totalPaginas, $paginaAtual + 2);
+                    // ══════════════════════════════════════════
+                    // JANELA DE PÁGINAS (máx 5 números visíveis)
+                    // ══════════════════════════════════════════
+                    // Mostra até 5 páginas centradas na atual,
+                    // com reticências (...) quando há páginas ocultas.
+                    $janelaSize = 5;
+                    $metade = floor($janelaSize / 2);
+                    $janelaInicio = max(1, $paginaAtual - $metade);
+                    $janelaFim = min($totalPaginas, $janelaInicio + $janelaSize - 1);
                     
-                    // Ajusta janela se perto do início ou fim
-                    if ($paginaAtual <= 2) {
-                        $fim_pag = min($totalPaginas, 5);
+                    // Ajusta início se o fim ficou limitado
+                    if ($janelaFim - $janelaInicio < $janelaSize - 1) {
+                        $janelaInicio = max(1, $janelaFim - $janelaSize + 1);
                     }
-                    if ($paginaAtual >= $totalPaginas - 1) {
-                        $inicio_pag = max(1, $totalPaginas - 4);
-                    }
-                    ?>
                     
-                    <!-- Primeira página + reticências (se janela não começa em 1) -->
-                    <?php if ($inicio_pag > 1): ?>
+                    // Reticências no início (se a janela não começa na página 1)
+                    if ($janelaInicio > 1): ?>
                         <li class="page-item">
                             <a class="page-link" href="<?= arteUrl($filtros, ['pagina' => 1]) ?>">1</a>
                         </li>
-                        <?php if ($inicio_pag > 2): ?>
+                        <?php if ($janelaInicio > 2): ?>
                             <li class="page-item disabled">
-                                <span class="page-link">...</span>
+                                <span class="page-link">…</span>
                             </li>
                         <?php endif; ?>
                     <?php endif; ?>
                     
-                    <!-- Números de página (janela de até 5) -->
-                    <?php for ($i = $inicio_pag; $i <= $fim_pag; $i++): ?>
-                        <li class="page-item <?= $i === $paginaAtual ? 'active' : '' ?>">
-                            <?php if ($i === $paginaAtual): ?>
-                                <span class="page-link"><?= $i ?></span>
+                    <!-- Números de página na janela -->
+                    <?php for ($p = $janelaInicio; $p <= $janelaFim; $p++): ?>
+                        <li class="page-item <?= $p === $paginaAtual ? 'active' : '' ?>">
+                            <?php if ($p === $paginaAtual): ?>
+                                <span class="page-link"><?= $p ?></span>
                             <?php else: ?>
-                                <a class="page-link" href="<?= arteUrl($filtros, ['pagina' => $i]) ?>"><?= $i ?></a>
+                                <a class="page-link" href="<?= arteUrl($filtros, ['pagina' => $p]) ?>"><?= $p ?></a>
                             <?php endif; ?>
                         </li>
                     <?php endfor; ?>
                     
-                    <!-- Reticências + última página (se janela não termina no final) -->
-                    <?php if ($fim_pag < $totalPaginas): ?>
-                        <?php if ($fim_pag < $totalPaginas - 1): ?>
+                    <!-- Reticências no final (se a janela não termina na última página) -->
+                    <?php if ($janelaFim < $totalPaginas): ?>
+                        <?php if ($janelaFim < $totalPaginas - 1): ?>
                             <li class="page-item disabled">
-                                <span class="page-link">...</span>
+                                <span class="page-link">…</span>
                             </li>
                         <?php endif; ?>
                         <li class="page-item">
@@ -429,10 +604,9 @@ $statusCores = [
                             <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
-                    
                 </ul>
             </nav>
         </div>
     <?php endif; ?>
-
+    
 <?php endif; ?>

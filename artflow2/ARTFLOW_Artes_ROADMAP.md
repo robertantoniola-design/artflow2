@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Artes: Documentação Completa
 
 **Data:** 16/02/2026  
-**Status Geral:** ✅ FASE 1 + MELHORIA 1 COMPLETAS — Paginação 12/página implementada  
-**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados  
+**Status Geral:** ✅ FASE 1 + MELHORIAS 1, 2 e 3 COMPLETAS — Ordenação dinâmica 6 colunas implementada  
+**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados + Ordenação dinâmica  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)  
 **Banco de dados:** `artflow2_db`
 
@@ -12,7 +12,7 @@
 
 O módulo de Artes do ArtFlow 2.0 é o módulo central do sistema — gerencia o portfólio de obras artísticas, incluindo dados de produção (tempo, complexidade, custo), status de disponibilidade e categorização via Tags (relacionamento N:N). O módulo depende de Tags (seletor no formulário) e é pré-requisito para o módulo de Vendas (select de arte_id no formulário de venda) e para o Dashboard (estatísticas e gráficos).
 
-O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3.
+O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3. A **Melhoria 2 (Ordenação Dinâmica)** foi implementada em 16/02/2026 com 10/10 testes OK, adicionando 6 colunas ordenáveis com headers clicáveis e botões de ordenação.
 
 ### Status das Fases
 
@@ -20,8 +20,8 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 |------|-----------|--------|
 | Fase 1 | Estabilização CRUD — 11 bugs corrigidos, 12/12 testes | ✅ COMPLETA (15/02/2026) |
 | Melhoria 1 | Paginação na listagem (12/página) | ✅ COMPLETA (16/02/2026) |
-| Melhoria 2 | Ordenação dinâmica (nome, status, custo, horas, data) | 📋 PLANEJADA |
-| Melhoria 3 | Filtros combinados (status + tag + busca simultâneos) | ✅ BACKEND PRONTO (via M1) — UI já funcional |
+| Melhoria 2 | Ordenação dinâmica (6 colunas clicáveis) | ✅ COMPLETA (16/02/2026) |
+| Melhoria 3 | Filtros combinados (status + tag + busca simultâneos) | ✅ COMPLETA (via M1) — UI já funcional |
 | Melhoria 4 | Upload de imagem + galeria visual | 📋 PLANEJADA |
 | Melhoria 5 | Estatísticas por arte (cards financeiros no show.php) | 📋 PLANEJADA |
 | Melhoria 6 | Gráfico de distribuição (Chart.js — status + complexidade) | 📋 PLANEJADA |
@@ -31,8 +31,8 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 | # | Melhoria | Complexidade | Dependência | Status |
 |---|----------|--------------|-------------|--------|
 | 1 | Paginação na listagem (12/página) | Baixa | — | ✅ COMPLETA |
-| 2 | Ordenação dinâmica (6 colunas) | Baixa | Melhoria 1 ✅ | 📋 PLANEJADA |
-| 3 | Filtros combinados (status + tag + busca) | Média | Melhoria 1 ✅ | ✅ BACKEND PRONTO (via M1) |
+| 2 | Ordenação dinâmica (6 colunas) | Baixa | Melhoria 1 ✅ | ✅ COMPLETA |
+| 3 | Filtros combinados (status + tag + busca) | Média | Melhoria 1 ✅ | ✅ COMPLETA (via M1) |
 | 4 | Upload de imagem + galeria visual | Média | — | 📋 PLANEJADA |
 | 5 | Estatísticas por arte (cards no show.php) | Média | — | 📋 PLANEJADA |
 | 6 | Gráfico de distribuição (Doughnut + Barras) | Baixa | — | 📋 PLANEJADA |
@@ -48,17 +48,17 @@ src/
 ├── Models/
 │   └── Arte.php                       ✅ Original
 ├── Repositories/
-│   └── ArteRepository.php             🔧 Melhoria 1 (+ allPaginated, countAll — filtros combinados)
+│   └── ArteRepository.php             🔧 Melhoria 1 (+ allPaginated, countAll — filtros combinados + whitelist 6 colunas)
 ├── Services/
 │   └── ArteService.php                🔧 Melhoria 1 (+ listarPaginado, POR_PAGINA=12)
 ├── Controllers/
-│   └── ArteController.php             🔧 Melhoria 1 (index usa listarPaginado + passa $paginacao)
+│   └── ArteController.php             🔧 Melhoria 1 (index usa listarPaginado + passa $paginacao + ordenar/direcao)
 └── Validators/
     └── ArteValidator.php              🔧 CORRIGIDO Fase 1 (A1: status reservada no ENUM)
 
 views/
 └── artes/
-    ├── index.php                      🔧 Melhoria 1 (arteUrl helper, paginação Bootstrap 5, limpar filtros)
+    ├── index.php                      🔧 Melhoria 2 (+ arteSortUrl, arteSortIcon, headers clicáveis, botões ordenação)
     ├── create.php                     🔧 CORRIGIDO Fase 1 (dropdown dinâmico via $statusList)
     ├── show.php                       🔧 CORRIGIDO Fase 1 (url() helper, botão excluir, cards status/horas)
     └── edit.php                       🔧 CORRIGIDO Fase 1 (dropdown dinâmico, maxlength 150, campo hidden vendida)
@@ -153,7 +153,7 @@ CREATE TABLE arte_tags (
 
 ```
 ARTES (7 RESTful + 2 extras)
-  GET    /artes              → ArteController@index         (listar com filtros)
+  GET    /artes              → ArteController@index         (listar com filtros + ordenação)
   GET    /artes/criar        → ArteController@create        (formulário criação)
   POST   /artes              → ArteController@store         (salvar nova)
   GET    /artes/{id}         → ArteController@show          (detalhes + tags + cálculos)
@@ -297,6 +297,7 @@ Análise estática do código antes de testes no navegador, baseada nos padrões
 | 3 | 15/02 tarde | Correção views | 4 views corrigidas (index, show, create, edit) |
 | 4 | 15/02 noite | Re-teste + fixes finais | T1 (busca) + T11 (transição status) → 12/12 OK |
 | 5 | 16/02 manhã | Melhoria 1 — Paginação | 4 arquivos (Repository, Service, Controller, view) → 12/12 testes OK |
+| 6 | 16/02 tarde | Melhoria 2 — Ordenação | 1 arquivo (view index.php) → 10/10 testes OK |
 
 ---
 
@@ -393,26 +394,52 @@ function arteUrl(array $filtros, array $params = []): string
 
 ---
 
-## 📋 MELHORIA 2 — ORDENAÇÃO DINÂMICA (PLANEJADA)
+## ✅ MELHORIA 2 — ORDENAÇÃO DINÂMICA (COMPLETA)
 
+**Implementada em:** 16/02/2026  
 **Complexidade:** Baixa  
 **Padrão:** Idêntico a Tags e Clientes (headers clicáveis com indicador visual)  
-**Arquivos a alterar:** views/artes/index.php (principal) — backend já pronto via M1  
+**Arquivos alterados:** views/artes/index.php (apenas view — backend já pronto via M1)  
 **Pré-requisito:** Melhoria 1 ✅ COMPLETA  
-**Nota:** A whitelist de 6 colunas e os params `ordenar`/`direcao` já estão implementados no Repository e Controller (M1). Falta apenas a UI com headers clicáveis.
+**Testes:** 10/10 OK (T1–T10)
 
-### Colunas Ordenáveis (Whitelist)
+### O Que Foi Implementado
 
-| Coluna | Label na View | Default | Notas |
-|--------|---------------|---------|-------|
-| `nome` | Nome | ASC | Alfabética |
-| `complexidade` | Complexidade | ASC | baixa → media → alta |
-| `preco_custo` | Custo | DESC | Maior custo primeiro |
-| `horas_trabalhadas` | Horas | DESC | Mais horas primeiro |
-| `status` | Status | ASC | Ordenação ENUM |
-| `created_at` | Data | DESC | **Padrão** — mais recentes primeiro |
+| Recurso | Descrição |
+|---------|-----------|
+| **6 botões de ordenação** | Nome, Complexidade, Custo, Horas, Status, Data |
+| **Headers da tabela clicáveis** | Cada `<th>` é um link que ordena pela coluna correspondente |
+| **Toggle automático** | Clicar na coluna ativa inverte ASC↔DESC |
+| **Indicador visual** | Botão ativo fica azul (`btn-primary`) + ícone de seta contextual |
+| **Preserva filtros** | Busca + status + tag + paginação mantidos ao mudar ordenação |
+| **Setas contextuais** | `bi-sort-alpha-down/up` para texto, `bi-sort-numeric-down/up` para valores, `bi-sort-down/up` para data |
+| **Direções padrão inteligentes** | Texto começa ASC (A→Z), numérico/data começa DESC (maior primeiro) |
 
-### Whitelist no Repository
+### Funções Helper Adicionadas na View
+
+```php
+// Monta URL preservando TODOS os parâmetros (busca + filtros + ordenação + paginação)
+arteUrl(array $filtros, array $params = []): string  // [já existia M1, ajustada M2]
+
+// Gera URL de ordenação com toggle ASC↔DESC automático
+arteSortUrl(array $filtros, string $coluna): string   // [NOVA M2]
+
+// Retorna ícone HTML de seta para a coluna (ativa = colorida, inativa = cinza)
+arteSortIcon(array $filtros, string $coluna): string   // [NOVA M2]
+```
+
+### Colunas Ordenáveis (Whitelist no Repository)
+
+| Botão | Coluna no BD | Direção padrão ao ativar | Tipo de ícone |
+|-------|-------------|--------------------------|---------------|
+| Nome | `nome` | ASC (A→Z) | `bi-sort-alpha-down/up` |
+| Complexidade | `complexidade` | ASC (baixa→alta) | `bi-sort-alpha-down/up` |
+| Custo | `preco_custo` | DESC (maior primeiro) | `bi-sort-numeric-down/up` |
+| Horas | `horas_trabalhadas` | DESC (mais horas primeiro) | `bi-sort-numeric-down/up` |
+| Status | `status` | ASC (ordenação ENUM) | `bi-sort-alpha-down/up` |
+| Data | `created_at` | DESC (recentes primeiro) — **PADRÃO** | `bi-sort-down/up` |
+
+### Whitelist no Repository (já implementada M1)
 
 ```php
 // Colunas permitidas para ordenação (proteção contra SQL injection)
@@ -422,9 +449,56 @@ private array $ordenacaoPermitida = [
 ];
 ```
 
-### UI na View (index.php)
+### Integração com Filtros de Busca
 
-Headers clicáveis com indicador ▲/▼, alternando ASC↔DESC a cada clique. Parâmetros `ordenar` e `direcao` preservados na URL junto com filtros e paginação.
+O formulário de busca agora inclui campos `<input type="hidden">` para `ordenar` e `direcao`, garantindo que ao buscar um termo a ordenação ativa é mantida.
+
+```html
+<!-- Preserva ordenação durante busca -->
+<input type="hidden" name="ordenar" value="<?= e($ordenarAtual) ?>">
+<input type="hidden" name="direcao" value="<?= e($direcaoAtual) ?>">
+```
+
+### Decisões Técnicas
+
+| Decisão | Justificativa |
+|---------|---------------|
+| **Backend inalterado** | Whitelist e params `ordenar`/`direcao` já prontos desde M1 |
+| **Dois pontos de ordenação** | Botões no card de filtros + headers na tabela = dupla usabilidade |
+| **`arteUrl()` sempre inclui ordenar/direcao** | Lição do módulo Clientes: sem isso, paginação perdia ordenação |
+| **Direções padrão por tipo** | Texto ASC, numérico/data DESC — comportamento intuitivo |
+| **Ícones por tipo de dado** | Alfa para texto, numérico para valores, genérico para data |
+| **Mapas no topo do arquivo** | `$statusLabels`, `$complexLabels` extraídos do foreach para reutilização |
+
+### Testes Realizados (10/10 OK)
+
+| # | Teste | O que verificar | Resultado |
+|---|-------|-----------------|-----------|
+| T1 | Acessar `/artes` | Botão "Data" ativo (azul), seta DESC | ✅ |
+| T2 | Clicar "Nome" | Reordena A→Z, botão "Nome" fica azul | ✅ |
+| T3 | Clicar "Nome" de novo | Inverte Z→A, seta muda | ✅ |
+| T4 | Clicar "Custo" | Reordena maior→menor (DESC) | ✅ |
+| T5 | Clicar "Custo" de novo | Inverte menor→maior (ASC) | ✅ |
+| T6 | Filtrar + ordenar | Ordenação preservada após filtro | ✅ |
+| T7 | Paginar + ordenar | Ordenação preservada ao mudar página | ✅ |
+| T8 | Header "Horas" na tabela | Mesma funcionalidade dos botões | ✅ |
+| T9 | Limpar filtros | Default `created_at DESC` restaurado | ✅ |
+| T10 | CRUD intacto | Criar, editar, excluir funcionam | ✅ |
+
+### Correção Aplicada: Preservação de Filtros na Paginação
+
+A função `arteUrl()` foi ajustada para **sempre incluir** `ordenar` e `direcao` na URL, sem lógica de limpeza de defaults. Isso garante que a ordenação é preservada ao navegar entre páginas.
+
+**Antes (M1 — funcionava mas podia perder ordenação):**
+```
+/artes?pagina=2          ← ordenar/direcao poderiam ser omitidos
+```
+
+**Depois (M2 — sempre presente):**
+```
+/artes?ordenar=nome&direcao=ASC&pagina=2     ← sempre preservado
+/artes?status=disponivel&ordenar=preco_custo&direcao=DESC&pagina=3   ← tudo mantido
+```
 
 ---
 
@@ -650,7 +724,7 @@ O status de uma arte segue uma máquina de estados com transições explícitas.
 | Padrão | Origem | Aplicação |
 |--------|--------|-----------|
 | Paginação 12/página | Tags M1, Clientes M1 | ✅ Aplicado Melhoria 1 |
-| Headers clicáveis ▲/▼ | Tags M2, Clientes M2 | Melhoria 2 |
+| Headers clicáveis ▲/▼ | Tags M2, Clientes M2 | ✅ Aplicado Melhoria 2 |
 | Whitelist de colunas para ORDER BY | Tags M2 | ✅ Aplicado Melhoria 1 (6 colunas prontas para M2) |
 | `limparDadosFormulario()` | Clientes B9 | ✅ Aplicado Fase 1 |
 | `$_SESSION['_errors']` direto | Clientes B8 | ✅ Aplicado Fase 1 |
@@ -658,23 +732,24 @@ O status de uma arte segue uma máquina de estados com transições explícitas.
 | Preservação de estado via URL params | Tags M1, Clientes M1 | ✅ Aplicado Melhoria 1 (arteUrl helper) |
 | Conversão string→int no Controller | Tags (Router bug fix) | ✅ Aplicado Fase 1 |
 | Filtros combinados via WHERE dinâmico | Artes M1 (antecipou M3) | ✅ Aplicado Melhoria 1 |
+| Sempre incluir ordenar/direcao na URL | Clientes M2 (fix preservação) | ✅ Aplicado Melhoria 2 |
 
 ---
 
 ## 📌 PRÓXIMAS AÇÕES
 
-1. **Iniciar Melhoria 2 — Ordenação Dinâmica (6 colunas)**
-   - Whitelist já implementada no Repository (M1)
-   - Falta: Headers clicáveis ▲/▼ na view index.php
-   - Padrão idêntico a Tags M2 e Clientes M2
+1. **Iniciar Melhoria 4 — Upload de Imagem + Galeria**
+   - Campo `imagem VARCHAR(255)` já existe na tabela
+   - Storage em `storage/uploads/artes/`
+   - Altera 7 arquivos (Service, Controller, Validator, 4 views)
 
 2. **Sequência recomendada:**
    ```
    ✅ Fase 1 (COMPLETA — 12/12 testes OK)
    ✅ Melhoria 1 (COMPLETA — Paginação 12/página + filtros combinados)
+   ✅ Melhoria 2 (COMPLETA — Ordenação dinâmica 6 colunas + headers clicáveis)
    ✅ Melhoria 3 (COMPLETA VIA M1 — backend + UI já funcionais)
    
-   Melhoria 2 (ordenação dinâmica — headers clicáveis)
    Melhoria 4 (upload de imagem — independente)
    Melhoria 5 (estatísticas — independente)
    Melhoria 6 (gráficos — independente)
@@ -692,12 +767,12 @@ Ordem de estabilização (menor → maior acoplamento):
 1. ✅ Tags         — independente                        → COMPLETO (6/6)
 2. ✅ Clientes     — independente                        → COMPLETO (6/6)
 3. ✅ Metas        — independente (atualizado por Vendas) → COMPLETO (6/6)
-4. 🔧 ARTES        — depende de Tags (✅ pronto)          → FASE 1 + M1 + M3 COMPLETAS, M2/M4/M5/M6 PENDENTES
+4. 🔧 ARTES        — depende de Tags (✅ pronto)          → FASE 1 + M1 + M2 + M3 COMPLETAS, M4/M5/M6 PENDENTES
 5. ⏳ Vendas       — depende de Artes + Clientes + Metas → NÃO TESTADO
 ```
 
 ---
 
 **Última atualização:** 16/02/2026  
-**Status:** ✅ FASE 1 + MELHORIA 1 + MELHORIA 3 COMPLETAS — Próximo: Melhoria 2 (Ordenação)  
-**Próxima ação:** Implementar ordenação dinâmica (headers clicáveis ▲/▼)
+**Status:** ✅ FASE 1 + MELHORIAS 1, 2 e 3 COMPLETAS — Próximo: Melhoria 4 (Upload de Imagem)  
+**Próxima ação:** Implementar upload de imagem + galeria visual
