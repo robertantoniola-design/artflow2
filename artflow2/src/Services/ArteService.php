@@ -11,7 +11,7 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * ARTE SERVICE
+ * ARTE SERVICE — CORRIGIDO Fase 1 (T1 + T11)
  * ============================================
  * 
  * Camada de lógica de negócio para Artes.
@@ -22,6 +22,17 @@ use App\Exceptions\NotFoundException;
  * - Aplicar regras de negócio
  * - Coordenar operações entre repositories
  * - Calcular métricas
+ * 
+ * CORREÇÕES APLICADAS:
+ * ─────────────────────
+ * [Bug T1]  Método listar() — busca retornava 0 resultados quando
+ *           URL tinha ?status= (string vazia). O operador ?? não converte
+ *           "" para null, fazendo o Repository adicionar AND status = ''.
+ *           Correção: normalizar filtros com ?: null antes de usar.
+ * 
+ * [Bug T11] Método validarTransicaoStatus() — array $transicoesPermitidas
+ *           não continha 'reservada' nem como origem nem como destino.
+ *           Correção: adicionada 'reservada' com transições bidirecionais.
  */
 class ArteService
 {
@@ -44,32 +55,51 @@ class ArteService
     // ==========================================
     
     /**
-     * Lista todas as artes
+     * Lista artes com filtros opcionais
      * 
-     * @param array $filtros Filtros opcionais (status, termo, etc)
+     * NOTA: Os filtros são mutuamente exclusivos nesta implementação.
+     * Melhoria 3 (filtros combinados) resolverá isso com query dinâmica.
+     * 
+     * [Bug T1 CORRIGIDO] — Normalização de filtros com ?: null
+     * ─────────────────────────────────────────────────────────
+     * Problema: URL ?status= gera "" (string vazia) no PHP.
+     *   - O operador ?? (null coalesce) só testa null/undefined
+     *   - "" ?? null = "" (retorna "" porque "" NÃO é null!)
+     *   - Repository recebia $status="" → adicionava AND status = '' → 0 resultados
+     * 
+     * Solução: Usar encadeamento ?? null ?: null
+     *   - ?? null  → trata chave ausente (undefined → null)
+     *   - ?: null  → trata string vazia ("" → null, porque "" é falsy)
+     *   - Resultado: "" vira null, "disponivel" permanece "disponivel"
+     * 
+     * @param array $filtros Filtros opcionais (status, termo, tag_id)
      * @return array
      */
     public function listar(array $filtros = []): array
     {
-        // Busca com filtro de status
-        if (!empty($filtros['status'])) {
-            return $this->arteRepository->findByStatus($filtros['status']);
+        // ─── [T1 FIX] Normaliza filtros: converte "" para null ───
+        // Parâmetros de URL vazios (?status=&tag_id=) chegam como "",
+        // mas os métodos do Repository esperam null para "sem filtro".
+        $status = $filtros['status'] ?? null ?: null;  // "" → null, "disponivel" → "disponivel"
+        $termo  = $filtros['termo']  ?? null ?: null;  // "" → null, "artemis"    → "artemis"
+        $tagId  = $filtros['tag_id'] ?? null ?: null;  // "" → null, "5"          → "5"
+        
+        // Busca com filtro de status (sem termo de pesquisa)
+        if ($status && !$termo) {
+            return $this->arteRepository->findByStatus($status);
         }
         
-        // Busca com termo de pesquisa
-        if (!empty($filtros['termo'])) {
-            return $this->arteRepository->search(
-                $filtros['termo'],
-                $filtros['status'] ?? null
-            );
+        // Busca com termo de pesquisa (com ou sem status combinado)
+        if ($termo) {
+            return $this->arteRepository->search($termo, $status);
         }
         
         // Busca por tag
-        if (!empty($filtros['tag_id'])) {
-            return $this->arteRepository->findByTag((int) $filtros['tag_id']);
+        if ($tagId) {
+            return $this->arteRepository->findByTag((int) $tagId);
         }
         
-        // Lista todas
+        // Lista todas (sem filtros)
         return $this->arteRepository->all();
     }
     
@@ -194,17 +224,40 @@ class ArteService
     /**
      * Valida se transição de status é permitida
      * 
-     * @param string $atual
-     * @param string $novo
-     * @throws ValidationException
+     * [Bug T11 CORRIGIDO] — 'reservada' adicionada como origem E destino
+     * ──────────────────────────────────────────────────────────────────────
+     * Problema: O array $transicoesPermitidas não continha a chave 'reservada',
+     *   nem 'reservada' aparecia como destino válido em nenhum status.
+     *   Resultado: qualquer transição FROM ou TO 'reservada' era rejeitada.
+     * 
+     * Regras de transição de status:
+     * ┌──────────────┬────────────────────────────────────────┐
+     * │ Status Atual  │ Pode ir para                           │
+     * ├──────────────┼────────────────────────────────────────┤
+     * │ disponivel    │ em_producao, vendida, reservada         │
+     * │ em_producao   │ disponivel, vendida, reservada          │
+     * │ reservada     │ disponivel, em_producao, vendida        │
+     * │ vendida       │ (nenhum — estado final)                 │
+     * └──────────────┴────────────────────────────────────────┘
+     * 
+     * Lógica de negócio:
+     * - disponivel/em_producao → reservada: cliente reservou a peça
+     * - reservada → disponivel: cliente cancelou a reserva
+     * - reservada → em_producao: retomou trabalho na peça reservada
+     * - reservada → vendida: cliente confirmou a compra
+     * - vendida → qualquer: bloqueado (estado final, arte já foi vendida)
+     * 
+     * @param string $atual Status atual da arte
+     * @param string $novo  Novo status desejado
+     * @throws ValidationException Se a transição não é permitida
      */
     private function validarTransicaoStatus(string $atual, string $novo): void
     {
-        // Regras de transição
         $transicoesPermitidas = [
-            'disponivel' => ['em_producao', 'vendida'],
-            'em_producao' => ['disponivel', 'vendida'],
-            'vendida' => [] // Vendida é estado final
+            'disponivel'  => ['em_producao', 'vendida', 'reservada'],
+            'em_producao' => ['disponivel', 'vendida', 'reservada'],
+            'reservada'   => ['disponivel', 'em_producao', 'vendida'],
+            'vendida'     => [] // Estado final — não pode mudar
         ];
         
         if (!in_array($novo, $transicoesPermitidas[$atual] ?? [])) {
