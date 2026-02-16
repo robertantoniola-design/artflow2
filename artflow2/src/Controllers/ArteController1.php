@@ -11,17 +11,27 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * ARTE CONTROLLER — MELHORIA 1 (Paginação)
+ * ARTE CONTROLLER — FASE 1 CORRIGIDO
  * ============================================
  * 
- * FASE 1 (15/02/2026): B8 workaround, B9 limparDados, conversão int, $statusList
- * MELHORIA 1 (16/02/2026): index() agora usa listarPaginado() com paginação
+ * CORREÇÕES APLICADAS (14/02/2026):
+ * - A1: Status 'reservada' incluído nos selects (corrigido no ArteValidator)
+ * - A2/B8: Erros de validação gravados direto em $_SESSION['_errors']
+ * - A3/B9: limparDadosFormulario() em index(), edit(), show()
+ * - A4: Conversão explícita string→int para parâmetros do Router
+ * - A5: getComplexidades() e getStatusList() centralizados
+ * - A6: update() re-renderiza view em vez de back() após erro de validação
  * 
- * ALTERAÇÕES M1:
- * - index(): $filtros expandido com pagina/ordenar/direcao
- * - index(): Usa ArteService::listarPaginado() ao invés de listar()
- * - index(): Passa $paginacao e $filtros para a view
- * - Demais métodos: INALTERADOS
+ * Rotas:
+ * GET    /artes              -> index()          Lista com filtros
+ * GET    /artes/criar        -> create()         Formulário de criação
+ * POST   /artes              -> store()          Salva nova
+ * GET    /artes/{id}         -> show()           Detalhes + tags + cálculos
+ * GET    /artes/{id}/editar  -> edit()           Formulário de edição
+ * PUT    /artes/{id}         -> update()         Atualiza + sync tags
+ * DELETE /artes/{id}         -> destroy()        Remove (CASCADE em arte_tags)
+ * POST   /artes/{id}/status  -> alterarStatus()  Muda status sem editar tudo
+ * POST   /artes/{id}/horas   -> adicionarHoras() Incrementa horas_trabalhadas
  */
 class ArteController extends BaseController
 {
@@ -35,64 +45,87 @@ class ArteController extends BaseController
     }
     
     // ==========================================
-    // LISTAGEM (MELHORIA 1 — PAGINAÇÃO)
+    // MÉTODOS AUXILIARES
     // ==========================================
     
     /**
-     * Lista artes com paginação e filtros
+     * CORREÇÃO B9: Limpa dados residuais de formulários anteriores
+     * 
+     * Chamado em index(), edit() e show() — NUNCA em create()!
+     * Motivo: Após validação falhar no store(), dados ficam em $_SESSION.
+     * Se o usuário navegar para edit() de outra arte, o form mostraria
+     * dados do create falho em vez dos dados reais da arte.
+     */
+    private function limparDadosFormulario(): void
+    {
+        unset($_SESSION['_old_input'], $_SESSION['_errors']);
+    }
+    
+    /**
+     * Lista de complexidades para selects nos formulários
+     */
+    private function getComplexidades(): array
+    {
+        return [
+            'baixa' => 'Baixa',
+            'media' => 'Média',
+            'alta'  => 'Alta'
+        ];
+    }
+    
+    /**
+     * Lista de status para selects nos formulários
+     * CORREÇÃO A1: Inclui 'reservada' (existia no ENUM do banco mas faltava aqui)
+     */
+    private function getStatusList(): array
+    {
+        return [
+            'disponivel'  => 'Disponível',
+            'em_producao' => 'Em Produção',
+            'vendida'     => 'Vendida',
+            'reservada'   => 'Reservada'
+        ];
+    }
+    
+    // ==========================================
+    // LISTAGEM
+    // ==========================================
+    
+    /**
+     * Lista todas as artes
      * GET /artes
-     * GET /artes?pagina=2&status=disponivel&tag_id=3&termo=retrato
-     * 
-     * MELHORIA 1: Paginação via ?pagina=X (12 artes por página)
-     * Filtros preservados entre páginas via URL params.
-     * 
-     * NOTA: Parâmetro 'ordenar' e 'direcao' já são capturados para
-     * compatibilidade futura com Melhoria 2 (ordenação dinâmica).
      */
     public function index(Request $request): Response
     {
-        // ── [B9 Workaround] Limpa dados residuais de formulários anteriores ──
+        // CORREÇÃO B9: Limpa dados residuais ao navegar para a lista
         $this->limparDadosFormulario();
         
-        // ── Captura TODOS os filtros/params da URL ──
-        // [MELHORIA 1] Adicionados: pagina, ordenar, direcao
-        // [FASE 1 mantidos] termo, status, tag_id
+        // Filtros da URL — nomes conferidos com os inputs do HTML da view
         $filtros = [
-            'termo'   => $request->get('termo'),
-            'status'  => $request->get('status'),
-            'tag_id'  => $request->get('tag_id'),
-            'pagina'  => (int) ($request->get('pagina') ?? 1), // Router passa string
-            'ordenar' => $request->get('ordenar') ?? 'created_at',
-            'direcao' => $request->get('direcao') ?? 'DESC',
+            'status' => $request->get('status'),
+            'termo'  => $request->get('termo'),
+            'tag_id' => $request->get('tag_id')
         ];
         
-        // ── [MELHORIA 1] Busca paginada com filtros combinados ──
-        // Retorna: ['artes' => [...], 'paginacao' => [...]]
-        $resultado = $this->arteService->listarPaginado($filtros);
-        
-        // Tags para o dropdown de filtro (usa TagService existente)
+        $artes = $this->arteService->listar($filtros);
         $tags = $this->tagService->listar();
-        
-        // Estatísticas para os cards (contagem por status)
         $estatisticas = $this->arteService->getEstatisticas();
         
-        // Resposta AJAX (mantida para compatibilidade)
+        // Resposta AJAX
         if ($request->wantsJson()) {
             return $this->json([
                 'success' => true,
-                'data' => array_map(fn($a) => $a->toArray(), $resultado['artes']),
-                'total' => $resultado['paginacao']['total']
+                'data'    => array_map(fn($a) => $a->toArray(), $artes),
+                'total'   => count($artes)
             ]);
         }
         
-        // ── Renderiza view com dados de paginação ──
         return $this->view('artes/index', [
             'titulo'       => 'Minhas Artes',
-            'artes'        => $resultado['artes'],       // Artes da página atual
-            'paginacao'    => $resultado['paginacao'],    // [MELHORIA 1] Metadados de paginação
-            'tags'         => $tags,                       // Para dropdown de filtro
-            'estatisticas' => $estatisticas,               // Para cards de status
-            'filtros'      => $filtros,                    // [MELHORIA 1] Filtros ativos (para preservar na URL)
+            'artes'        => $artes,
+            'tags'         => $tags,
+            'estatisticas' => $estatisticas,
+            'filtros'      => $filtros
         ]);
     }
     
@@ -103,6 +136,9 @@ class ArteController extends BaseController
     /**
      * Exibe formulário de criação
      * GET /artes/criar
+     * 
+     * ⚠️ NÃO chamar limparDadosFormulario() aqui!
+     * Os erros de validação do store() precisam chegar ao form.
      */
     public function create(Request $request): Response
     {
@@ -125,51 +161,81 @@ class ArteController extends BaseController
         $this->validateCsrf($request);
         
         try {
-            $dados = $this->limparDados($request->all());
+            $dados = $request->only([
+                'nome', 'descricao', 'tempo_medio_horas',
+                'complexidade', 'preco_custo', 'horas_trabalhadas',
+                'status', 'tags'
+            ]);
+            
             $arte = $this->arteService->criar($dados);
             
             if ($request->wantsJson()) {
                 return $this->success('Arte criada com sucesso!', [
-                    'id' => $arte->getId()
+                    'id'       => $arte->getId(),
+                    'redirect' => url('/artes')
                 ]);
             }
             
-            $this->flashSuccess('Arte criada com sucesso!');
-            return $this->redirectTo('/artes/' . $arte->getId());
+            // Sucesso: limpa resíduos
+            $this->limparDadosFormulario();
+            
+            $this->flashSuccess('Arte "' . $arte->getNome() . '" criada com sucesso!');
+            return $this->redirectTo('/artes');
             
         } catch (ValidationException $e) {
-            // ── [B8 Workaround] Grava erros diretamente em $_SESSION['_errors'] ──
-            // O framework grava em $_SESSION['_flash'] mas helpers lêem de $_SESSION['_errors']
-            $_SESSION['_errors'] = $e->getErrors();
-            
             if ($request->wantsJson()) {
                 return $this->error('Erro de validação', 422, $e->getErrors());
             }
+            
+            // ============================================
+            // CORREÇÃO B8: Grava direto na sessão
+            // ============================================
+            // Motivo: Response::withErrors() salva em $_SESSION['_flash']['errors']
+            // mas os helpers has_error()/errors() leem de $_SESSION['_errors'].
+            // Resultado sem esta correção: erros de validação são silenciosamente
+            // ignorados e o formulário "aceita" dados inválidos sem feedback.
+            $_SESSION['_errors'] = $e->getErrors();
+            $_SESSION['_old_input'] = $request->all();
             
             return $this->back();
         }
     }
     
     // ==========================================
-    // DETALHES
+    // VISUALIZAÇÃO
     // ==========================================
     
     /**
-     * Exibe detalhes da arte
+     * Exibe detalhes de uma arte
      * GET /artes/{id}
      */
     public function show(Request $request, int $id): Response
     {
-        // ── [B9 Workaround] Limpa dados residuais ──
+        // CORREÇÃO B9: Limpa dados residuais
         $this->limparDadosFormulario();
         
-        $id = (int) $id; // Router pode passar string
+        // CORREÇÃO A4: Garante conversão string→int (Router passa string)
+        $id = (int) $id;
         
         try {
             $arte = $this->arteService->buscar($id);
+            
+            // getTags() existe no ArteService ✅ — delega para TagRepository::getByArte()
             $tags = $this->arteService->getTags($id);
-            $custoPorHora = $this->arteService->calcularCustoPorHora($arte);
+            
+            // Cálculos auxiliares — ambos existem no ArteService ✅
+            $custoPorHora  = $this->arteService->calcularCustoPorHora($arte);
             $precoSugerido = $this->arteService->calcularPrecoSugerido($arte);
+            
+            if ($request->wantsJson()) {
+                return $this->json([
+                    'success'        => true,
+                    'data'           => $arte->toArray(),
+                    'tags'           => array_map(fn($t) => $t->toArray(), $tags),
+                    'custo_por_hora' => $custoPorHora,
+                    'preco_sugerido' => $precoSugerido
+                ]);
+            }
             
             return $this->view('artes/show', [
                 'titulo'        => $arte->getNome(),
@@ -195,14 +261,17 @@ class ArteController extends BaseController
      */
     public function edit(Request $request, int $id): Response
     {
-        // ── [B9 Workaround] Limpa dados residuais ──
+        // CORREÇÃO B9: Limpa dados residuais do create()
         $this->limparDadosFormulario();
         
+        // CORREÇÃO A4: Conversão string→int
         $id = (int) $id;
         
         try {
             $arte = $this->arteService->buscar($id);
             $tags = $this->tagService->listar();
+            
+            // getTagIdsArte() existe no TagService ✅ — delega para TagRepository::getIdsByArte()
             $tagIds = $this->tagService->getTagIdsArte($id);
             
             return $this->view('artes/edit', [
@@ -215,35 +284,52 @@ class ArteController extends BaseController
             ]);
             
         } catch (NotFoundException $e) {
-            return $this->notFound('Arte não encontrada');
+            $this->flashError('Arte não encontrada');
+            return $this->redirectTo('/artes');
         }
     }
     
     /**
-     * Atualiza arte
+     * Atualiza arte existente
      * PUT /artes/{id}
      */
     public function update(Request $request, int $id): Response
     {
         $this->validateCsrf($request);
+        
         $id = (int) $id;
         
         try {
-            $dados = $this->limparDados($request->all());
+            $dados = $request->only([
+                'nome', 'descricao', 'tempo_medio_horas',
+                'complexidade', 'preco_custo', 'horas_trabalhadas',
+                'status', 'tags'
+            ]);
+            
             $arte = $this->arteService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
-                return $this->success('Arte atualizada com sucesso!');
+                return $this->success('Arte atualizada com sucesso!', [
+                    'id' => $arte->getId()
+                ]);
             }
             
+            $this->limparDadosFormulario();
             $this->flashSuccess('Arte atualizada com sucesso!');
             return $this->redirectTo('/artes/' . $id);
             
         } catch (ValidationException $e) {
-            // ── [B8 Workaround] ──
-            $_SESSION['_errors'] = $e->getErrors();
+            if ($request->wantsJson()) {
+                return $this->error('Erro de validação', 422, $e->getErrors());
+            }
             
-            // Recarrega dados para o formulário
+            // CORREÇÃO B8: Grava direto na sessão
+            $_SESSION['_errors'] = $e->getErrors();
+            $_SESSION['_old_input'] = $request->all();
+            
+            // CORREÇÃO A6: Re-renderiza a view diretamente em vez de back()
+            // Motivo: back() depende do HTTP_REFERER que pode ser impreciso.
+            // Padrão do ClienteController corrigido: renderiza a view com dados frescos.
             try {
                 $arte = $this->arteService->buscar($id);
                 $tags = $this->tagService->listar();
@@ -326,7 +412,7 @@ class ArteController extends BaseController
             }
             
             $this->flashSuccess('Status alterado com sucesso!');
-            return $this->redirectTo('/artes/' . $id);
+            return $this->back();
             
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
@@ -342,7 +428,7 @@ class ArteController extends BaseController
     }
     
     /**
-     * Adiciona horas trabalhadas
+     * Adiciona horas trabalhadas (incrementa, não substitui)
      * POST /artes/{id}/horas
      */
     public function adicionarHoras(Request $request, int $id): Response
@@ -351,15 +437,17 @@ class ArteController extends BaseController
         $id = (int) $id;
         
         try {
-            $horas = (float) $request->get('horas', 0);
-            $this->arteService->adicionarHoras($id, $horas);
+            $horas = (float) $request->get('horas');
+            $arte = $this->arteService->adicionarHoras($id, $horas);
             
             if ($request->wantsJson()) {
-                return $this->success('Horas adicionadas com sucesso!');
+                return $this->success('Horas adicionadas!', [
+                    'total_horas' => $arte->getHorasTrabalhadas()
+                ]);
             }
             
-            $this->flashSuccess('Horas adicionadas com sucesso!');
-            return $this->redirectTo('/artes/' . $id);
+            $this->flashSuccess($horas . ' horas adicionadas com sucesso!');
+            return $this->back();
             
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
@@ -372,70 +460,5 @@ class ArteController extends BaseController
         } catch (NotFoundException $e) {
             return $this->notFound('Arte não encontrada');
         }
-    }
-    
-    // ==========================================
-    // HELPERS PRIVADOS
-    // ==========================================
-    
-    /**
-     * Lista de complexidades para dropdowns
-     */
-    private function getComplexidades(): array
-    {
-        return [
-            'baixa' => 'Baixa',
-            'media' => 'Média',
-            'alta'  => 'Alta'
-        ];
-    }
-    
-    /**
-     * Lista de status para dropdowns
-     * Adicionado na Fase 1 para centralizar labels/valores
-     */
-    private function getStatusList(): array
-    {
-        return [
-            'disponivel'  => 'Disponível',
-            'em_producao' => 'Em Produção',
-            'reservada'   => 'Reservada',
-            'vendida'     => 'Vendida'
-        ];
-    }
-    
-    /**
-     * Limpa e normaliza dados do formulário
-     * [B9 FIX] Previne que campos vazios sejam enviados como ""
-     */
-    private function limparDados(array $dados): array
-    {
-        // Campos numéricos: "" → null (evita erro MySQL strict mode)
-        $camposNumericos = ['tempo_medio_horas', 'preco_custo', 'horas_trabalhadas'];
-        
-        foreach ($camposNumericos as $campo) {
-            if (isset($dados[$campo]) && $dados[$campo] === '') {
-                $dados[$campo] = null;
-            }
-        }
-        
-        // Campos de texto: trim
-        $camposTexto = ['nome', 'descricao'];
-        foreach ($camposTexto as $campo) {
-            if (isset($dados[$campo])) {
-                $dados[$campo] = trim($dados[$campo]);
-            }
-        }
-        
-        return $dados;
-    }
-    
-    /**
-     * Limpa dados residuais de formulários anteriores
-     * [B9 Workaround] Evita que dados de create contamine edit
-     */
-    private function limparDadosFormulario(): void
-    {
-        unset($_SESSION['_old_input']);
     }
 }

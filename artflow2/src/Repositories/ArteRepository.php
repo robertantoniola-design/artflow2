@@ -1,16 +1,22 @@
 <?php
+
 namespace App\Repositories;
 
 use App\Models\Arte;
-use App\Core\Database;
+use PDO;
 
 /**
  * ============================================
  * REPOSITORY: ARTES
  * ============================================
  * 
- * Responsável por todas as operações de banco
- * relacionadas à tabela 'artes'.
+ * FASE 1 (15/02/2026): Estabilização CRUD (11 bugs corrigidos)
+ * MELHORIA 1 (16/02/2026): Paginação padronizada (padrão Tags/Clientes)
+ *   - allPaginated(): Lista paginada com filtros combinados
+ *   - countAll(): Conta total de registros (com ou sem filtros)
+ * 
+ * NOTA: O método paginate() antigo permanece para compatibilidade,
+ * mas NÃO deve ser usado no index(). Usar allPaginated() no lugar.
  * 
  * Herda CRUD genérico do BaseRepository e
  * adiciona métodos específicos para artes.
@@ -32,8 +38,180 @@ class ArteRepository extends BaseRepository
         'imagem'
     ];
     
+    // ==========================================
+    // PAGINAÇÃO E FILTROS (MELHORIA 1)
+    // ==========================================
+    
+    /**
+     * ============================================
+     * MELHORIA 1: Lista artes paginadas com filtros combinados
+     * ============================================
+     * 
+     * Diferente do Clientes (que só filtra por termo), Artes precisa
+     * combinar 3 filtros simultaneamente: termo, status e tag_id.
+     * 
+     * O filtro por tag_id usa subquery em arte_tags porque Artes tem
+     * relacionamento N:N com Tags (tabela pivot arte_tags).
+     * 
+     * SEGURANÇA:
+     * - Whitelist de colunas para ORDER BY (previne SQL injection)
+     * - Parâmetros via bindValue (previne SQL injection nos filtros)
+     * - LIMIT/OFFSET como PDO::PARAM_INT (obrigatório MySQL)
+     * 
+     * @param int         $pagina    Página atual (1-based)
+     * @param int         $porPagina Itens por página (default 12)
+     * @param string|null $termo     Busca por nome/descrição (LIKE)
+     * @param string|null $status    Filtro por status ENUM
+     * @param int|null    $tagId     Filtro por tag (via subquery)
+     * @param string      $ordenarPor Coluna de ordenação (whitelist)
+     * @param string      $direcao   ASC ou DESC
+     * @return array Array de objetos Arte
+     */
+    public function allPaginated(
+        int $pagina = 1,
+        int $porPagina = 12,
+        ?string $termo = null,
+        ?string $status = null,
+        ?int $tagId = null,
+        string $ordenarPor = 'created_at',
+        string $direcao = 'DESC'
+    ): array {
+        // ── WHITELIST de colunas (previne SQL Injection no ORDER BY) ──
+        // Preparado para Melhoria 2 (ordenação dinâmica) — já inclui todas
+        // as colunas que serão ordenáveis, mas na M1 o default é created_at
+        $camposPermitidos = [
+            'nome', 'complexidade', 'preco_custo',
+            'horas_trabalhadas', 'status', 'created_at'
+        ];
+        if (!in_array($ordenarPor, $camposPermitidos)) {
+            $ordenarPor = 'created_at'; // fallback seguro
+        }
+        
+        // Sanitiza direção: apenas ASC ou DESC
+        $direcao = strtoupper($direcao) === 'ASC' ? 'ASC' : 'DESC';
+        
+        // Calcula OFFSET (página 1 = offset 0, página 2 = offset 12, etc.)
+        $offset = ($pagina - 1) * $porPagina;
+        
+        // ── CONSTRUÇÃO DINÂMICA DO WHERE ──
+        // Usa WHERE 1=1 para permitir concatenação simples com AND
+        // Todos os filtros são opcionais e combinam entre si
+        $conditions = [];
+        $params = [];
+        
+        // Filtro por termo (busca em nome e descrição)
+        if ($termo !== null && trim($termo) !== '') {
+            $conditions[] = "(nome LIKE :termo1 OR descricao LIKE :termo2)";
+            $params[':termo1'] = '%' . trim($termo) . '%';
+            $params[':termo2'] = '%' . trim($termo) . '%';
+        }
+        
+        // Filtro por status (valor exato do ENUM)
+        if ($status !== null && trim($status) !== '') {
+            $conditions[] = "status = :status";
+            $params[':status'] = $status;
+        }
+        
+        // Filtro por tag_id (subquery na tabela pivot arte_tags)
+        // Usa subquery ao invés de JOIN para evitar duplicatas no resultado
+        // (uma arte com 3 tags apareceria 3 vezes com JOIN)
+        if ($tagId !== null && $tagId > 0) {
+            $conditions[] = "id IN (SELECT arte_id FROM arte_tags WHERE tag_id = :tag_id)";
+            $params[':tag_id'] = $tagId;
+        }
+        
+        // Monta cláusula WHERE completa
+        $whereClause = '';
+        if (!empty($conditions)) {
+            $whereClause = 'WHERE ' . implode(' AND ', $conditions);
+        }
+        
+        // ── QUERY PRINCIPAL ──
+        $sql = "SELECT * FROM {$this->table} 
+                {$whereClause} 
+                ORDER BY {$ordenarPor} {$direcao} 
+                LIMIT :limit OFFSET :offset";
+        
+        $stmt = $this->db->prepare($sql);
+        
+        // Bind dos parâmetros de filtro (string)
+        foreach ($params as $key => $value) {
+            // tag_id precisa ser INT, os demais são STR
+            if ($key === ':tag_id') {
+                $stmt->bindValue($key, $value, PDO::PARAM_INT);
+            } else {
+                $stmt->bindValue($key, $value, PDO::PARAM_STR);
+            }
+        }
+        
+        // Bind de LIMIT e OFFSET como inteiros (obrigatório para MySQL)
+        $stmt->bindValue(':limit', $porPagina, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        // Hidrata resultados em objetos Arte
+        return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+    
+    /**
+     * ============================================
+     * MELHORIA 1: Conta total de artes (com filtros combinados)
+     * ============================================
+     * 
+     * Necessário para calcular o total de páginas na paginação.
+     * Aceita os MESMOS filtros do allPaginated() para que a contagem
+     * reflita exatamente os resultados filtrados.
+     * 
+     * Exemplo: Se existem 50 artes, mas o filtro status=disponivel
+     * retorna 15, a paginação mostra 2 páginas (15/12 = 1.25 → 2).
+     * 
+     * @param string|null $termo  Filtro de busca por nome/descrição
+     * @param string|null $status Filtro por status ENUM
+     * @param int|null    $tagId  Filtro por tag (via subquery)
+     * @return int Total de registros que correspondem aos filtros
+     */
+    public function countAll(
+        ?string $termo = null,
+        ?string $status = null,
+        ?int $tagId = null
+    ): int {
+        // ── MESMA lógica de WHERE do allPaginated ──
+        // IMPORTANTE: Se alterar os filtros aqui, alterar lá também!
+        $conditions = [];
+        $params = [];
+        
+        if ($termo !== null && trim($termo) !== '') {
+            $conditions[] = "(nome LIKE :termo1 OR descricao LIKE :termo2)";
+            $params[':termo1'] = '%' . trim($termo) . '%';
+            $params[':termo2'] = '%' . trim($termo) . '%';
+        }
+        
+        if ($status !== null && trim($status) !== '') {
+            $conditions[] = "status = :status";
+            $params[':status'] = $status;
+        }
+        
+        if ($tagId !== null && $tagId > 0) {
+            $conditions[] = "id IN (SELECT arte_id FROM arte_tags WHERE tag_id = :tag_id)";
+            $params[':tag_id'] = $tagId;
+        }
+        
+        $whereClause = '';
+        if (!empty($conditions)) {
+            $whereClause = 'WHERE ' . implode(' AND ', $conditions);
+        }
+        
+        $sql = "SELECT COUNT(*) FROM {$this->table} {$whereClause}";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        
+        return (int) $stmt->fetchColumn();
+    }
+    
     // ========================================
-    // MÉTODOS DE BUSCA ESPECÍFICOS
+    // MÉTODOS DE BUSCA ESPECÍFICOS (originais)
     // ========================================
     
     /**
@@ -51,7 +229,7 @@ class ArteRepository extends BaseRepository
         $stmt = $this->getConnection()->prepare($sql);
         $stmt->execute(['status' => $status]);
         
-        return $this->hydrateMany($stmt->fetchAll(\PDO::FETCH_ASSOC));
+        return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
     
     /**
@@ -97,6 +275,7 @@ class ArteRepository extends BaseRepository
     
     /**
      * Busca artes por termo (nome ou descrição)
+     * Mantido para compatibilidade. Para listagem paginada, use allPaginated().
      * 
      * @param string $termo Termo de busca
      * @param string|null $status Filtro opcional de status
@@ -122,7 +301,7 @@ class ArteRepository extends BaseRepository
         $stmt = $this->getConnection()->prepare($sql);
         $stmt->execute($params);
         
-        return $this->hydrateMany($stmt->fetchAll(\PDO::FETCH_ASSOC));
+        return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
     
     /**
@@ -141,7 +320,7 @@ class ArteRepository extends BaseRepository
         $stmt = $this->getConnection()->prepare($sql);
         $stmt->execute(['tag_id' => $tagId]);
         
-        return $this->hydrateMany($stmt->fetchAll(\PDO::FETCH_ASSOC));
+        return $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
     
     // ========================================
@@ -149,38 +328,9 @@ class ArteRepository extends BaseRepository
     // ========================================
     
     /**
-     * Retorna estatísticas gerais das artes
-     */
-    public function getEstatisticas(): array
-    {
-        $sql = "SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'disponivel' THEN 1 ELSE 0 END) as disponiveis,
-                    SUM(CASE WHEN status = 'em_producao' THEN 1 ELSE 0 END) as em_producao,
-                    SUM(CASE WHEN status = 'vendida' THEN 1 ELSE 0 END) as vendidas,
-                    SUM(CASE WHEN status = 'reservada' THEN 1 ELSE 0 END) as reservadas,
-                    AVG(horas_trabalhadas) as media_horas,
-                    SUM(preco_custo) as custo_total,
-                    AVG(preco_custo) as custo_medio
-                FROM {$this->table}";
-        
-        $result = $this->getConnection()->query($sql)->fetch(\PDO::FETCH_ASSOC);
-        
-        // Garante valores numéricos
-        return [
-            'total' => (int)($result['total'] ?? 0),
-            'disponiveis' => (int)($result['disponiveis'] ?? 0),
-            'em_producao' => (int)($result['em_producao'] ?? 0),
-            'vendidas' => (int)($result['vendidas'] ?? 0),
-            'reservadas' => (int)($result['reservadas'] ?? 0),
-            'media_horas' => round((float)($result['media_horas'] ?? 0), 2),
-            'custo_total' => (float)($result['custo_total'] ?? 0),
-            'custo_medio' => round((float)($result['custo_medio'] ?? 0), 2),
-        ];
-    }
-    
-    /**
      * Conta artes por status
+     * 
+     * @return array ['disponivel' => N, 'em_producao' => N, ...]
      */
     public function countByStatus(): array
     {
@@ -189,88 +339,37 @@ class ArteRepository extends BaseRepository
                 GROUP BY status";
         
         $stmt = $this->getConnection()->query($sql);
-        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        $counts = [];
-        foreach ($results as $row) {
-            $counts[$row['status']] = (int)$row['total'];
+        $result = [
+            'disponivel' => 0,
+            'em_producao' => 0,
+            'vendida' => 0,
+            'reservada' => 0
+        ];
+        
+        foreach ($rows as $row) {
+            $result[$row['status']] = (int) $row['total'];
         }
         
-        return $counts;
-    }
-    
-    /**
-     * Conta artes por complexidade
-     */
-    public function countByComplexidade(): array
-    {
-        $sql = "SELECT complexidade, COUNT(*) as total 
-                FROM {$this->table} 
-                GROUP BY complexidade";
-        
-        $stmt = $this->getConnection()->query($sql);
-        $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        
-        $counts = [];
-        foreach ($results as $row) {
-            $counts[$row['complexidade']] = (int)$row['total'];
-        }
-        
-        return $counts;
+        return $result;
     }
     
     // ========================================
-    // OPERAÇÕES DE HORAS
+    // RELACIONAMENTO COM TAGS (N:N)
     // ========================================
     
     /**
-     * Adiciona horas trabalhadas a uma arte
-     * 
-     * @param int $id ID da arte
-     * @param float $horas Horas a adicionar
-     * @return bool
-     */
-    public function adicionarHoras(int $id, float $horas): bool
-    {
-        $sql = "UPDATE {$this->table} 
-                SET horas_trabalhadas = horas_trabalhadas + :horas,
-                    updated_at = NOW()
-                WHERE id = :id";
-        
-        $stmt = $this->getConnection()->prepare($sql);
-        return $stmt->execute([
-            'id' => $id,
-            'horas' => $horas
-        ]);
-    }
-    
-    /**
-     * Atualiza status de uma arte
-     * 
-     * @param int $id
-     * @param string $status
-     * @return bool
-     */
-    public function atualizarStatus(int $id, string $status): bool
-    {
-        return $this->update($id, ['status' => $status]);
-    }
-    
-    // ========================================
-    // RELACIONAMENTOS COM TAGS
-    // ========================================
-    
-    /**
-     * Associa tags a uma arte
+     * Sincroniza tags de uma arte (remove antigas + insere novas)
      * 
      * @param int $arteId
      * @param array $tagIds Array de IDs de tags
      */
-    public function syncTags(int $arteId, array $tagIds): void
+    public function sincronizarTags(int $arteId, array $tagIds): void
     {
         $pdo = $this->getConnection();
         
-        // Remove associações antigas
+        // Remove todas as tags atuais
         $stmt = $pdo->prepare("DELETE FROM arte_tags WHERE arte_id = ?");
         $stmt->execute([$arteId]);
         
@@ -295,7 +394,7 @@ class ArteRepository extends BaseRepository
         $stmt = $this->getConnection()->prepare($sql);
         $stmt->execute([$arteId]);
         
-        return $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
     
     /**
@@ -316,7 +415,7 @@ class ArteRepository extends BaseRepository
             
             $stmt = $this->getConnection()->prepare($sql);
             $stmt->execute([$id]);
-            $tags = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             $arte->setTags($tags);
         }
@@ -325,11 +424,14 @@ class ArteRepository extends BaseRepository
     }
     
     // ========================================
-    // PAGINAÇÃO COM FILTROS
+    // PAGINAÇÃO LEGADO (manter compatibilidade)
     // ========================================
     
     /**
-     * Lista artes paginadas com filtros
+     * Lista artes paginadas com filtros (MÉTODO LEGADO)
+     * 
+     * NOTA: Mantido para compatibilidade. Para a listagem index,
+     * use allPaginated() que segue o padrão de Tags/Clientes.
      * 
      * @param int $page Página atual
      * @param int $perPage Itens por página
@@ -341,39 +443,32 @@ class ArteRepository extends BaseRepository
         $where = [];
         $params = [];
         
-        // Filtro por status
         if (!empty($filters['status'])) {
             $where[] = "status = :status";
             $params['status'] = $filters['status'];
         }
         
-        // Filtro por complexidade
         if (!empty($filters['complexidade'])) {
             $where[] = "complexidade = :complexidade";
             $params['complexidade'] = $filters['complexidade'];
         }
         
-        // Filtro por termo de busca
         if (!empty($filters['termo'])) {
             $where[] = "(nome LIKE :termo OR descricao LIKE :termo2)";
             $params['termo'] = "%{$filters['termo']}%";
             $params['termo2'] = "%{$filters['termo']}%";
         }
         
-        // Monta WHERE
         $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
         
-        // Conta total
         $countSql = "SELECT COUNT(*) FROM {$this->table} {$whereClause}";
         $stmt = $this->getConnection()->prepare($countSql);
         $stmt->execute($params);
         $total = (int)$stmt->fetchColumn();
         
-        // Calcula paginação
         $pages = ceil($total / $perPage);
         $offset = ($page - 1) * $perPage;
         
-        // Busca dados
         $orderBy = $filters['order_by'] ?? 'created_at';
         $orderDir = $filters['order_dir'] ?? 'DESC';
         
@@ -385,7 +480,7 @@ class ArteRepository extends BaseRepository
         $stmt->execute($params);
         
         return [
-            'data' => $this->hydrateMany($stmt->fetchAll(\PDO::FETCH_ASSOC)),
+            'data' => $this->hydrateMany($stmt->fetchAll(PDO::FETCH_ASSOC)),
             'total' => $total,
             'pages' => $pages,
             'current_page' => $page,

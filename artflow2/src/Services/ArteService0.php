@@ -11,32 +11,34 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * ARTE SERVICE — CORRIGIDO Fase 1 (T1 + T11) + MELHORIA 1 (Paginação)
+ * ARTE SERVICE — CORRIGIDO Fase 1 (T1 + T11)
  * ============================================
  * 
  * Camada de lógica de negócio para Artes.
  * Orquestra validação, repository e regras de negócio.
  * 
+ * Responsabilidades:
+ * - Validar dados de entrada
+ * - Aplicar regras de negócio
+ * - Coordenar operações entre repositories
+ * - Calcular métricas
+ * 
  * CORREÇÕES APLICADAS:
  * ─────────────────────
- * [Bug T1]  Método listar() — normalização de filtros com ?: null
- * [Bug T11] Método validarTransicaoStatus() — 'reservada' adicionada
+ * [Bug T1]  Método listar() — busca retornava 0 resultados quando
+ *           URL tinha ?status= (string vazia). O operador ?? não converte
+ *           "" para null, fazendo o Repository adicionar AND status = ''.
+ *           Correção: normalizar filtros com ?: null antes de usar.
  * 
- * MELHORIAS:
- * ──────────
- * [M1 16/02/2026] listarPaginado() — paginação 12/página com filtros combinados
- *   Substitui listar() na listagem index. Os filtros (termo, status, tag_id)
- *   são aplicados simultaneamente (não mais mutuamente exclusivos).
+ * [Bug T11] Método validarTransicaoStatus() — array $transicoesPermitidas
+ *           não continha 'reservada' nem como origem nem como destino.
+ *           Correção: adicionada 'reservada' com transições bidirecionais.
  */
 class ArteService
 {
     private ArteRepository $arteRepository;
     private TagRepository $tagRepository;
     private ArteValidator $validator;
-    
-    // ── Constante de paginação (mesmo padrão de Tags e Clientes) ──
-    // 12 itens = 3 linhas × 4 colunas em layout XL, ou 4 linhas × 3 em LG
-    const POR_PAGINA = 12;
     
     public function __construct(
         ArteRepository $arteRepository,
@@ -49,118 +51,38 @@ class ArteService
     }
     
     // ==========================================
-    // PAGINAÇÃO (MELHORIA 1)
+    // OPERAÇÕES CRUD
     // ==========================================
     
     /**
-     * ============================================
-     * MELHORIA 1: Lista artes paginadas com filtros combinados
-     * ============================================
+     * Lista artes com filtros opcionais
      * 
-     * Método principal para a listagem index. Substitui listar() na
-     * view de listagem porque aplica paginação + filtros combinados.
-     * 
-     * DIFERENÇA vs listar():
-     * - listar() usa if/elseif (filtros mutuamente exclusivos)
-     * - listarPaginado() aplica TODOS os filtros simultaneamente
-     *   via ArteRepository::allPaginated() (query dinâmica com AND)
-     * 
-     * Padrão idêntico ao ClienteService::listarPaginado().
-     * 
-     * @param array $filtros Filtros da URL:
-     *   - 'termo'   => string|null  Busca por nome/descrição
-     *   - 'status'  => string|null  Filtro por status ENUM
-     *   - 'tag_id'  => int|null     Filtro por tag (N:N)
-     *   - 'pagina'  => int          Página atual (default 1)
-     *   - 'ordenar' => string       Coluna (default 'created_at')
-     *   - 'direcao' => string       ASC|DESC (default 'DESC')
-     * 
-     * @return array [
-     *     'artes'     => Arte[],     // Artes da página atual
-     *     'paginacao' => [
-     *         'total'        => int,  // Total de registros com filtros
-     *         'porPagina'    => int,  // Itens por página (12)
-     *         'paginaAtual'  => int,  // Página corrente
-     *         'totalPaginas' => int,  // Total de páginas
-     *         'temAnterior'  => bool, // Tem página anterior?
-     *         'temProxima'   => bool, // Tem próxima página?
-     *     ]
-     * ]
-     */
-    public function listarPaginado(array $filtros = []): array
-    {
-        // ── Extrai parâmetros com defaults seguros ──
-        // Normalização com ?: null resolve o problema T1 (string vazia → null)
-        $termo   = $filtros['termo']  ?? null ?: null;
-        $status  = $filtros['status'] ?? null ?: null;
-        $tagId   = $filtros['tag_id'] ?? null ?: null;
-        $pagina  = max(1, (int)($filtros['pagina'] ?? 1));
-        $ordenar = $filtros['ordenar'] ?? 'created_at';
-        $direcao = $filtros['direcao'] ?? 'DESC';
-        
-        // Converte tag_id para int (Router pode passar string)
-        if ($tagId !== null) {
-            $tagId = (int) $tagId;
-        }
-        
-        // ── 1. Busca total de registros (com os mesmos filtros) ──
-        $total = $this->arteRepository->countAll($termo, $status, $tagId);
-        
-        // ── 2. Calcula total de páginas ──
-        $totalPaginas = (int) ceil($total / self::POR_PAGINA);
-        
-        // ── 3. Ajusta página se exceder o total ──
-        // Ex: Usuário está na pag 5 e aplica filtro que retorna só 1 página
-        if ($totalPaginas > 0 && $pagina > $totalPaginas) {
-            $pagina = $totalPaginas;
-        }
-        
-        // ── 4. Busca artes da página atual ──
-        $artes = $this->arteRepository->allPaginated(
-            $pagina,
-            self::POR_PAGINA,
-            $termo,
-            $status,
-            $tagId,
-            $ordenar,
-            $direcao
-        );
-        
-        // ── 5. Retorna dados + metadados de paginação ──
-        return [
-            'artes' => $artes,
-            'paginacao' => [
-                'total'        => $total,
-                'porPagina'    => self::POR_PAGINA,
-                'paginaAtual'  => $pagina,
-                'totalPaginas' => $totalPaginas,
-                'temAnterior'  => $pagina > 1,
-                'temProxima'   => $pagina < $totalPaginas
-            ]
-        ];
-    }
-    
-    // ==========================================
-    // OPERAÇÕES CRUD (mantidas da Fase 1)
-    // ==========================================
-    
-    /**
-     * Lista artes com filtros opcionais (MÉTODO ORIGINAL)
-     * 
-     * NOTA: Mantido para compatibilidade com outros módulos que chamam
-     * ArteService::listar(). Para a listagem index, use listarPaginado().
-     * 
-     * Os filtros são mutuamente exclusivos nesta implementação.
-     * O listarPaginado() já resolve isso com query dinâmica.
+     * NOTA: Os filtros são mutuamente exclusivos nesta implementação.
+     * Melhoria 3 (filtros combinados) resolverá isso com query dinâmica.
      * 
      * [Bug T1 CORRIGIDO] — Normalização de filtros com ?: null
+     * ─────────────────────────────────────────────────────────
+     * Problema: URL ?status= gera "" (string vazia) no PHP.
+     *   - O operador ?? (null coalesce) só testa null/undefined
+     *   - "" ?? null = "" (retorna "" porque "" NÃO é null!)
+     *   - Repository recebia $status="" → adicionava AND status = '' → 0 resultados
+     * 
+     * Solução: Usar encadeamento ?? null ?: null
+     *   - ?? null  → trata chave ausente (undefined → null)
+     *   - ?: null  → trata string vazia ("" → null, porque "" é falsy)
+     *   - Resultado: "" vira null, "disponivel" permanece "disponivel"
+     * 
+     * @param array $filtros Filtros opcionais (status, termo, tag_id)
+     * @return array
      */
     public function listar(array $filtros = []): array
     {
         // ─── [T1 FIX] Normaliza filtros: converte "" para null ───
-        $status = $filtros['status'] ?? null ?: null;
-        $termo  = $filtros['termo']  ?? null ?: null;
-        $tagId  = $filtros['tag_id'] ?? null ?: null;
+        // Parâmetros de URL vazios (?status=&tag_id=) chegam como "",
+        // mas os métodos do Repository esperam null para "sem filtro".
+        $status = $filtros['status'] ?? null ?: null;  // "" → null, "disponivel" → "disponivel"
+        $termo  = $filtros['termo']  ?? null ?: null;  // "" → null, "artemis"    → "artemis"
+        $tagId  = $filtros['tag_id'] ?? null ?: null;  // "" → null, "5"          → "5"
         
         // Busca com filtro de status (sem termo de pesquisa)
         if ($status && !$termo) {
@@ -303,29 +225,41 @@ class ArteService
      * Valida se transição de status é permitida
      * 
      * [Bug T11 CORRIGIDO] — 'reservada' adicionada como origem E destino
+     * ──────────────────────────────────────────────────────────────────────
+     * Problema: O array $transicoesPermitidas não continha a chave 'reservada',
+     *   nem 'reservada' aparecia como destino válido em nenhum status.
+     *   Resultado: qualquer transição FROM ou TO 'reservada' era rejeitada.
      * 
-     * @param string $atual Status atual
-     * @param string $novo  Status desejado
-     * @throws ValidationException Se transição não permitida
+     * Regras de transição de status:
+     * ┌──────────────┬────────────────────────────────────────┐
+     * │ Status Atual  │ Pode ir para                           │
+     * ├──────────────┼────────────────────────────────────────┤
+     * │ disponivel    │ em_producao, vendida, reservada         │
+     * │ em_producao   │ disponivel, vendida, reservada          │
+     * │ reservada     │ disponivel, em_producao, vendida        │
+     * │ vendida       │ (nenhum — estado final)                 │
+     * └──────────────┴────────────────────────────────────────┘
+     * 
+     * Lógica de negócio:
+     * - disponivel/em_producao → reservada: cliente reservou a peça
+     * - reservada → disponivel: cliente cancelou a reserva
+     * - reservada → em_producao: retomou trabalho na peça reservada
+     * - reservada → vendida: cliente confirmou a compra
+     * - vendida → qualquer: bloqueado (estado final, arte já foi vendida)
+     * 
+     * @param string $atual Status atual da arte
+     * @param string $novo  Novo status desejado
+     * @throws ValidationException Se a transição não é permitida
      */
     private function validarTransicaoStatus(string $atual, string $novo): void
     {
-        // Mapa de transições permitidas (máquina de estados)
         $transicoesPermitidas = [
             'disponivel'  => ['em_producao', 'vendida', 'reservada'],
             'em_producao' => ['disponivel', 'vendida', 'reservada'],
-            'vendida'     => [],  // Vendida é estado terminal
             'reservada'   => ['disponivel', 'em_producao', 'vendida'],
+            'vendida'     => [] // Estado final — não pode mudar
         ];
         
-        // Se status atual não está no mapa, rejeita
-        if (!isset($transicoesPermitidas[$atual])) {
-            throw new ValidationException([
-                'status' => "Status atual '{$atual}' não reconhecido"
-            ]);
-        }
-        
-        // Se status novo não está na lista de destinos permitidos
         if (!in_array($novo, $transicoesPermitidas[$atual] ?? [])) {
             throw new ValidationException([
                 'status' => "Não é possível mudar de '{$atual}' para '{$novo}'"
@@ -435,7 +369,7 @@ class ArteService
      */
     public function getEstatisticas(): array
     {
-        return $this->arteRepository->countByStatus();
+        return $this->arteRepository->getEstatisticas();
     }
     
     /**
@@ -445,6 +379,7 @@ class ArteService
      */
     public function getDisponiveisParaVenda(): array
     {
+        // Retorna artes disponíveis ou em produção
         $disponiveis = $this->arteRepository->findByStatus('disponivel');
         $emProducao = $this->arteRepository->findByStatus('em_producao');
         

@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Artes: Documentação Completa
 
-**Data:** 15/02/2026  
-**Status Geral:** ✅ FASE 1 COMPLETA — CRUD estabilizado (12/12 testes OK)  
-**Versão Base:** Estrutura MVC estabilizada, aguardando melhorias  
+**Data:** 16/02/2026  
+**Status Geral:** ✅ FASE 1 + MELHORIA 1 COMPLETAS — Paginação 12/página implementada  
+**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)  
 **Banco de dados:** `artflow2_db`
 
@@ -12,16 +12,16 @@
 
 O módulo de Artes do ArtFlow 2.0 é o módulo central do sistema — gerencia o portfólio de obras artísticas, incluindo dados de produção (tempo, complexidade, custo), status de disponibilidade e categorização via Tags (relacionamento N:N). O módulo depende de Tags (seletor no formulário) e é pré-requisito para o módulo de Vendas (select de arte_id no formulário de venda) e para o Dashboard (estatísticas e gráficos).
 
-O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso.
+O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3.
 
 ### Status das Fases
 
 | Fase | Descrição | Status |
 |------|-----------|--------|
 | Fase 1 | Estabilização CRUD — 11 bugs corrigidos, 12/12 testes | ✅ COMPLETA (15/02/2026) |
-| Melhoria 1 | Paginação na listagem (12/página) | 📋 PLANEJADA |
+| Melhoria 1 | Paginação na listagem (12/página) | ✅ COMPLETA (16/02/2026) |
 | Melhoria 2 | Ordenação dinâmica (nome, status, custo, horas, data) | 📋 PLANEJADA |
-| Melhoria 3 | Filtros combinados (status + tag + busca simultâneos) | 📋 PLANEJADA |
+| Melhoria 3 | Filtros combinados (status + tag + busca simultâneos) | ✅ BACKEND PRONTO (via M1) — UI já funcional |
 | Melhoria 4 | Upload de imagem + galeria visual | 📋 PLANEJADA |
 | Melhoria 5 | Estatísticas por arte (cards financeiros no show.php) | 📋 PLANEJADA |
 | Melhoria 6 | Gráfico de distribuição (Chart.js — status + complexidade) | 📋 PLANEJADA |
@@ -30,9 +30,9 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 
 | # | Melhoria | Complexidade | Dependência | Status |
 |---|----------|--------------|-------------|--------|
-| 1 | Paginação na listagem (12/página) | Baixa | — | 📋 PLANEJADA |
-| 2 | Ordenação dinâmica (6 colunas) | Baixa | Melhoria 1 | 📋 PLANEJADA |
-| 3 | Filtros combinados (status + tag + busca) | Média | Melhoria 1 | 📋 PLANEJADA |
+| 1 | Paginação na listagem (12/página) | Baixa | — | ✅ COMPLETA |
+| 2 | Ordenação dinâmica (6 colunas) | Baixa | Melhoria 1 ✅ | 📋 PLANEJADA |
+| 3 | Filtros combinados (status + tag + busca) | Média | Melhoria 1 ✅ | ✅ BACKEND PRONTO (via M1) |
 | 4 | Upload de imagem + galeria visual | Média | — | 📋 PLANEJADA |
 | 5 | Estatísticas por arte (cards no show.php) | Média | — | 📋 PLANEJADA |
 | 6 | Gráfico de distribuição (Doughnut + Barras) | Baixa | — | 📋 PLANEJADA |
@@ -48,17 +48,17 @@ src/
 ├── Models/
 │   └── Arte.php                       ✅ Original
 ├── Repositories/
-│   └── ArteRepository.php             ✅ Original (findByStatus, findByTag, search, countByStatus, sincronizarTags)
+│   └── ArteRepository.php             🔧 Melhoria 1 (+ allPaginated, countAll — filtros combinados)
 ├── Services/
-│   └── ArteService.php                🔧 CORRIGIDO Fase 1 (T1: normalização filtros, T11: transições reservada)
+│   └── ArteService.php                🔧 Melhoria 1 (+ listarPaginado, POR_PAGINA=12)
 ├── Controllers/
-│   └── ArteController.php             🔧 CORRIGIDO Fase 1 (B8 workaround, B9 limparDados, statusList, conversão int)
+│   └── ArteController.php             🔧 Melhoria 1 (index usa listarPaginado + passa $paginacao)
 └── Validators/
     └── ArteValidator.php              🔧 CORRIGIDO Fase 1 (A1: status reservada no ENUM)
 
 views/
 └── artes/
-    ├── index.php                      🔧 CORRIGIDO Fase 1 (dropdown 4 status, cores/labels reservada)
+    ├── index.php                      🔧 Melhoria 1 (arteUrl helper, paginação Bootstrap 5, limpar filtros)
     ├── create.php                     🔧 CORRIGIDO Fase 1 (dropdown dinâmico via $statusList)
     ├── show.php                       🔧 CORRIGIDO Fase 1 (url() helper, botão excluir, cards status/horas)
     └── edit.php                       🔧 CORRIGIDO Fase 1 (dropdown dinâmico, maxlength 150, campo hidden vendida)
@@ -78,7 +78,7 @@ ArteController → ArteService + TagService
 ArteService    → ArteRepository + TagRepository + ArteValidator
 (Depende de Tags para seletor no formulário)
 
-ArteController::index()     usa TagService::listar() para dropdown de filtro por tag
+ArteController::index()     usa ArteService::listarPaginado() + TagService::listar() [M1]
 ArteController::create()    usa TagService::listar() para checkboxes de tags
 ArteController::store()     usa ArteService::criar() que sincroniza tags via ArteRepository
 ArteController::show()      usa ArteService::getTags() + calcularCustoPorHora() + calcularPrecoSugerido()
@@ -296,47 +296,52 @@ Análise estática do código antes de testes no navegador, baseada nos padrões
 | 2 | 15/02 manhã | Correção backend | ArteController.php + ArteValidator.php (7 bugs fixados) |
 | 3 | 15/02 tarde | Correção views | 4 views corrigidas (index, show, create, edit) |
 | 4 | 15/02 noite | Re-teste + fixes finais | T1 (busca) + T11 (transição status) → 12/12 OK |
+| 5 | 16/02 manhã | Melhoria 1 — Paginação | 4 arquivos (Repository, Service, Controller, view) → 12/12 testes OK |
 
 ---
 
-## 📋 MELHORIA 1 — PAGINAÇÃO NA LISTAGEM (PLANEJADA)
+## ✅ MELHORIA 1 — PAGINAÇÃO NA LISTAGEM (COMPLETA)
 
+**Implementada em:** 16/02/2026  
 **Complexidade:** Baixa  
 **Padrão:** Idêntico a Tags e Clientes (12 itens por página)  
-**Arquivos a alterar:** ArteRepository, ArteService, ArteController, views/artes/index.php  
-**Pré-requisito:** Fase 1 completa ✅
+**Arquivos alterados:** ArteRepository, ArteService, ArteController, views/artes/index.php  
+**Testes:** 12/12 OK (P1–P12)
 
-### O Que Implementar
+### O Que Foi Implementado
 
 | Recurso | Descrição |
 |---------|-----------|
 | **12 itens por página** | Mesmo padrão dos módulos Tags e Clientes |
-| **Controles de navegação** | Primeira, anterior, números (até 5), próxima, última |
+| **Controles de navegação** | Anterior, números (janela de 5), próxima, reticências |
 | **Preserva filtros** | Status, tag_id e busca mantidos ao mudar de página |
-| **Indicador de total** | "Mostrando X-Y de Z artes" |
+| **Indicador de total** | "Mostrando X–Y de Z artes" |
+| **Filtros combinados** | Status + Tag + Busca aplicados simultaneamente (antecipa M3) |
+| **Botão Limpar Filtros** | Remove todos os filtros de uma vez |
 
-### Métodos a Adicionar
+### Métodos Adicionados
 
 **ArteRepository:**
 ```php
-// Busca paginada com filtros
+// Busca paginada com 3 filtros combinados (WHERE dinâmico com AND)
 allPaginated(int $pagina, int $porPagina, ?string $termo, ?string $status, 
              ?int $tagId, string $ordenarPor, string $direcao): array
 
-// Contagem total para cálculo de páginas
+// Contagem total com mesmos filtros (para cálculo de páginas)
 countAll(?string $termo, ?string $status, ?int $tagId): int
 ```
 
 **ArteService:**
 ```php
-// Wrapper que coordena paginação + filtros
+const POR_PAGINA = 12;
+
+// Coordena paginação + filtros
 listarPaginado(array $filtros): array
-// Retorna: ['artes' => [...], 'paginacao' => ['total' => N, 'pagina_atual' => X, ...]]
+// Retorna: ['artes' => [...], 'paginacao' => ['total', 'porPagina', 'paginaAtual', 'totalPaginas', 'temAnterior', 'temProxima']]
 ```
 
 **ArteController::index():**
 ```php
-// Captura parâmetros de paginação da URL
 $filtros = [
     'termo'   => $request->get('termo'),
     'status'  => $request->get('status'),
@@ -345,7 +350,42 @@ $filtros = [
     'ordenar' => $request->get('ordenar') ?? 'created_at',
     'direcao' => $request->get('direcao') ?? 'DESC'
 ];
+$resultado = $this->arteService->listarPaginado($filtros);
 ```
+
+**views/artes/index.php:**
+```php
+// Helper para montar URLs preservando filtros
+function arteUrl(array $filtros, array $params = []): string
+// Paginação Bootstrap 5 com janela de 5 páginas
+// Indicador "Mostrando X–Y de Z artes"
+```
+
+### Decisões Técnicas
+
+| Decisão | Justificativa |
+|---------|---------------|
+| **Subquery para tag_id** | `IN (SELECT arte_id FROM arte_tags WHERE tag_id = :tag_id)` evita duplicatas no JOIN N:N |
+| **Filtros combinados na M1** | O `allPaginated()` já usa `WHERE ... AND ... AND ...` em vez de if/elseif, antecipando M3 |
+| **Whitelist com 6 colunas** | `$camposPermitidos` já inclui nome, complexidade, preco_custo, horas_trabalhadas, status, created_at — preparado para M2 |
+| **`listar()` mantido** | Compatibilidade com Dashboard e Vendas que usam `ArteService::listar()` |
+
+### Testes Realizados (12/12 OK)
+
+| # | Teste | Resultado |
+|---|-------|-----------|
+| P1 | Listagem paginada (>12 artes) | ✅ |
+| P2 | Navegação entre páginas | ✅ |
+| P3 | Filtro por status | ✅ |
+| P4 | Filtro por tag | ✅ |
+| P5 | Busca por termo | ✅ |
+| P6 | Filtros preservados ao paginar | ✅ |
+| P7 | Indicador "Mostrando X–Y de Z" | ✅ |
+| P8 | Limpar filtros | ✅ |
+| P9 | Sem resultados (termo inexistente) | ✅ |
+| P10 | Menos de 12 artes (sem paginação) | ✅ |
+| P11 | CRUD intacto (criar, editar, excluir) | ✅ |
+| P12 | Cards de status corretos | ✅ |
 
 ### Lição Aprendida (Tags/Clientes)
 
@@ -357,8 +397,9 @@ $filtros = [
 
 **Complexidade:** Baixa  
 **Padrão:** Idêntico a Tags e Clientes (headers clicáveis com indicador visual)  
-**Arquivos a alterar:** ArteRepository (whitelist), ArteController, views/artes/index.php  
-**Pré-requisito:** Melhoria 1
+**Arquivos a alterar:** views/artes/index.php (principal) — backend já pronto via M1  
+**Pré-requisito:** Melhoria 1 ✅ COMPLETA  
+**Nota:** A whitelist de 6 colunas e os params `ordenar`/`direcao` já estão implementados no Repository e Controller (M1). Falta apenas a UI com headers clicáveis.
 
 ### Colunas Ordenáveis (Whitelist)
 
@@ -387,54 +428,39 @@ Headers clicáveis com indicador ▲/▼, alternando ASC↔DESC a cada clique. P
 
 ---
 
-## 📋 MELHORIA 3 — FILTROS COMBINADOS (PLANEJADA)
+## ✅ MELHORIA 3 — FILTROS COMBINADOS (BACKEND PRONTO VIA M1)
 
 **Complexidade:** Média  
-**Arquivos a alterar:** ArteRepository, ArteService, ArteController, views/artes/index.php  
-**Pré-requisito:** Melhoria 1
+**Status:** ✅ BACKEND + UI JÁ FUNCIONAIS — Implementados junto com Melhoria 1  
+**Arquivos alterados:** Mesmos da Melhoria 1
 
-### Problema Atual
+### Situação
 
-O `ArteService::listar()` usa `if/elseif`, tornando os filtros mutuamente exclusivos:
+O `ArteService::listar()` original usava `if/elseif`, tornando os filtros mutuamente exclusivos. Isso foi **resolvido na Melhoria 1**: o novo `allPaginated()` constrói `WHERE` dinâmico com `AND`, aplicando todos os filtros simultaneamente.
+
+### Problema Original (Resolvido)
 
 ```php
-// PROBLEMA: Se passar status + termo, só filtra por status (sem termo)
-// NOTA: Bug T1 corrigido (normalização ""), mas lógica if/elseif permanece
-if ($status && !$termo) {
-    return $this->arteRepository->findByStatus($status);
-}
-if ($termo) { ... }
-if ($tagId) { ... }
+// ANTES (ArteService::listar) — filtros mutuamente exclusivos
+if ($status && !$termo) { return findByStatus($status); }
+if ($termo) { return search($termo, $status); }
+if ($tagId) { return findByTag($tagId); }
+
+// DEPOIS (ArteRepository::allPaginated) — filtros combinados
+// WHERE status = :status AND (nome LIKE :t OR descricao LIKE :t) AND id IN (SELECT...)
 ```
 
-### Solução: Query Dinâmica com Filtros Compostos
+### O Que Falta (Opcional)
 
-**ArteRepository — novo método `allPaginatedFiltered()`:**
-```php
-// Constrói WHERE dinâmico com TODOS os filtros aplicados simultaneamente
-// WHERE 1=1
-//   AND status = :status          (se $status não vazio)
-//   AND (nome LIKE :t OR descricao LIKE :t)  (se $termo não vazio)
-//   AND a.id IN (SELECT arte_id FROM arte_tags WHERE tag_id = :tag)  (se $tagId não vazio)
-// ORDER BY $coluna $direcao
-// LIMIT $porPagina OFFSET $offset
-```
+A Melhoria 3 pode ser considerada **COMPLETA** pois:
+- ✅ Backend: `allPaginated()` + `countAll()` já combinam status + tag + busca
+- ✅ UI: Barra de filtros já funciona com os 3 dropdowns + botão Limpar
+- ✅ Paginação: Filtros preservados ao navegar entre páginas
 
-### UI: Barra de Filtros
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│ [🔍 Buscar...      ] [Status ▼] [Tag ▼] [Limpar Filtros]    │
-└──────────────────────────────────────────────────────────────┘
-```
-
-Cada filtro funciona independente e combina com os demais:
-- **Busca:** Campo texto para nome/descrição
-- **Status:** Dropdown com as 4 opções + "Todos"
-- **Tag:** Dropdown com todas as tags disponíveis + "Todas"
-- **Limpar:** Remove todos os filtros de uma vez
-
-Todos os filtros são preservados ao paginar e ordenar.
+Se desejado futuramente, melhorias adicionais poderiam incluir:
+- Filtro por complexidade (adicionar dropdown)
+- Filtro por faixa de preço (min/max)
+- Indicadores visuais de filtros ativos (badges)
 
 ---
 
@@ -580,7 +606,8 @@ $temDadosGrafico = !empty($estatisticas) && array_sum(array_column($estatisticas
 
 | Método chamado no Controller | Existe no Service? | Status |
 |------------------------------|--------------------|--------|
-| `ArteService::listar($filtros)` | ✅ Sim | ✅ Verificado + Corrigido (T1) |
+| `ArteService::listarPaginado($filtros)` | ✅ Sim | ✅ Adicionado Melhoria 1 |
+| `ArteService::listar($filtros)` | ✅ Sim | ✅ Mantido para compatibilidade |
 | `ArteService::buscar($id)` | ✅ Sim | ✅ Verificado |
 | `ArteService::criar($dados)` | ✅ Sim | ✅ Verificado |
 | `ArteService::atualizar($id, $dados)` | ✅ Sim | ✅ Verificado |
@@ -622,30 +649,32 @@ O status de uma arte segue uma máquina de estados com transições explícitas.
 
 | Padrão | Origem | Aplicação |
 |--------|--------|-----------|
-| Paginação 12/página | Tags M1, Clientes M1 | Melhoria 1 |
+| Paginação 12/página | Tags M1, Clientes M1 | ✅ Aplicado Melhoria 1 |
 | Headers clicáveis ▲/▼ | Tags M2, Clientes M2 | Melhoria 2 |
-| Whitelist de colunas para ORDER BY | Tags M2 | Melhoria 2 |
+| Whitelist de colunas para ORDER BY | Tags M2 | ✅ Aplicado Melhoria 1 (6 colunas prontas para M2) |
 | `limparDadosFormulario()` | Clientes B9 | ✅ Aplicado Fase 1 |
 | `$_SESSION['_errors']` direto | Clientes B8 | ✅ Aplicado Fase 1 |
 | Chart.js 4.4.7 CDN + container 300px | Tags M6, Dashboard | Melhoria 6 |
-| Preservação de estado via URL params | Tags M1, Clientes M1 | Melhorias 1-3 |
+| Preservação de estado via URL params | Tags M1, Clientes M1 | ✅ Aplicado Melhoria 1 (arteUrl helper) |
 | Conversão string→int no Controller | Tags (Router bug fix) | ✅ Aplicado Fase 1 |
+| Filtros combinados via WHERE dinâmico | Artes M1 (antecipou M3) | ✅ Aplicado Melhoria 1 |
 
 ---
 
 ## 📌 PRÓXIMAS AÇÕES
 
-1. **Iniciar Melhoria 1 — Paginação (12/página)**
-   - Padrão idêntico a Tags e Clientes
-   - Arquivos: ArteRepository, ArteService, ArteController, views/artes/index.php
-   - Preservar filtros ao paginar
+1. **Iniciar Melhoria 2 — Ordenação Dinâmica (6 colunas)**
+   - Whitelist já implementada no Repository (M1)
+   - Falta: Headers clicáveis ▲/▼ na view index.php
+   - Padrão idêntico a Tags M2 e Clientes M2
 
 2. **Sequência recomendada:**
    ```
    ✅ Fase 1 (COMPLETA — 12/12 testes OK)
+   ✅ Melhoria 1 (COMPLETA — Paginação 12/página + filtros combinados)
+   ✅ Melhoria 3 (COMPLETA VIA M1 — backend + UI já funcionais)
    
-   Melhoria 1 → Melhoria 2 (paginação antes de ordenação)
-   Melhoria 3 (filtros combinados — depende da paginação estar pronta)
+   Melhoria 2 (ordenação dinâmica — headers clicáveis)
    Melhoria 4 (upload de imagem — independente)
    Melhoria 5 (estatísticas — independente)
    Melhoria 6 (gráficos — independente)
@@ -663,12 +692,12 @@ Ordem de estabilização (menor → maior acoplamento):
 1. ✅ Tags         — independente                        → COMPLETO (6/6)
 2. ✅ Clientes     — independente                        → COMPLETO (6/6)
 3. ✅ Metas        — independente (atualizado por Vendas) → COMPLETO (6/6)
-4. 🔧 ARTES        — depende de Tags (✅ pronto)          → FASE 1 COMPLETA, MELHORIAS PENDENTES
+4. 🔧 ARTES        — depende de Tags (✅ pronto)          → FASE 1 + M1 + M3 COMPLETAS, M2/M4/M5/M6 PENDENTES
 5. ⏳ Vendas       — depende de Artes + Clientes + Metas → NÃO TESTADO
 ```
 
 ---
 
-**Última atualização:** 15/02/2026  
-**Status:** ✅ FASE 1 COMPLETA (12/12 testes) — Próximo: Melhoria 1 (Paginação)  
-**Próxima ação:** Implementar paginação (12 itens/página)
+**Última atualização:** 16/02/2026  
+**Status:** ✅ FASE 1 + MELHORIA 1 + MELHORIA 3 COMPLETAS — Próximo: Melhoria 2 (Ordenação)  
+**Próxima ação:** Implementar ordenação dinâmica (headers clicáveis ▲/▼)
