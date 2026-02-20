@@ -118,6 +118,30 @@ $progresso = ($tempoEstimado > 0 && $horasTrabalhadas > 0)
             </div>
         </div>
         
+        <!-- ============================================ -->
+<!-- [MELHORIA 4] Imagem da Arte (Ampliada)      -->
+<!-- ============================================ -->
+<?php if ($arte->getImagem()): ?>
+    <div class="text-center mb-4">
+        <img src="<?= url('/' . e($arte->getImagem())) ?>" 
+             alt="<?= e($arte->getNome()) ?>" 
+             class="img-fluid rounded shadow-sm" 
+             style="max-height: 400px; cursor: pointer;"
+             onclick="this.classList.toggle('img-expanded')"
+             title="Clique para ampliar">
+    </div>
+<?php else: ?>
+    <!-- Placeholder quando não há imagem -->
+    <div class="text-center mb-4 p-4 bg-light rounded border">
+        <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
+        <p class="text-muted mt-2 mb-0">Nenhuma imagem cadastrada</p>
+        <a href="<?= url('/artes/' . $arte->getId() . '/editar') ?>" class="btn btn-sm btn-outline-primary mt-2">
+            <i class="bi bi-upload"></i> Adicionar imagem
+        </a>
+    </div>
+<?php endif; ?>
+
+
         <!-- Informações Técnicas -->
         <div class="card mb-4">
             <div class="card-header">

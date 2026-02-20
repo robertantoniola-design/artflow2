@@ -33,8 +33,65 @@ $currentPage = 'artes';
                     Cadastrar Nova Arte
                 </h5>
             </div>
+           
+            <!-- [MELHORIA 4] JavaScript para preview de imagem -->
+<script>
+/**
+ * Exibe preview da imagem selecionada ANTES do envio do form.
+ * Permite que o usuário veja a imagem que está prestes a enviar.
+ */
+function previewImagem(input) {
+    const container = document.getElementById('preview-container');
+    const preview = document.getElementById('preview-imagem');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Validação client-side (feedback imediato — o backend valida de novo)
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
+        
+        if (!tiposPermitidos.includes(file.type)) {
+            alert('Formato não suportado. Use JPG, PNG ou WEBP.');
+            input.value = '';
+            container.classList.add('d-none');
+            return;
+        }
+        
+        if (file.size > maxSize) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            alert('A imagem tem ' + sizeMB + 'MB. O máximo é 2MB.');
+            input.value = '';
+            container.classList.add('d-none');
+            return;
+        }
+        
+        // Gera preview usando FileReader
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            container.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        container.classList.add('d-none');
+    }
+}
+
+/**
+ * Limpa a seleção de imagem e esconde o preview
+ */
+function limparPreview() {
+    const input = document.getElementById('imagem');
+    const container = document.getElementById('preview-container');
+    
+    input.value = '';
+    container.classList.add('d-none');
+}
+</script>
+           
             <div class="card-body">
-                <form action="<?= url('/artes') ?>" method="POST" id="formArte">
+                <form action="<?= url('/artes') ?>" method="POST" enctype="multipart/form-data" id="formArte">
                     <!-- Token CSRF -->
                     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     
@@ -173,6 +230,46 @@ $currentPage = 'artes';
                         </div>
                     </div>
                     
+                                <!-- ============================================ -->
+<!-- [MELHORIA 4] Upload de Imagem               -->
+<!-- ============================================ -->
+<div class="mb-3">
+    <label for="imagem" class="form-label">
+        <i class="bi bi-image"></i> Imagem da Arte
+    </label>
+    
+    <!-- Input de arquivo -->
+    <input type="file" 
+           class="form-control <?= has_error('imagem') ? 'is-invalid' : '' ?>" 
+           id="imagem" 
+           name="imagem" 
+           accept=".jpg,.jpeg,.png,.webp"
+           onchange="previewImagem(this)">
+    
+    <!-- Mensagem de erro de validação -->
+    <?php if (has_error('imagem')): ?>
+        <div class="invalid-feedback"><?= errors('imagem') ?></div>
+    <?php endif; ?>
+    
+    <!-- Dica de formatos aceitos -->
+    <div class="form-text">
+        <i class="bi bi-info-circle"></i>
+        Formatos: JPG, PNG, WEBP — Tamanho máximo: 2MB
+    </div>
+    
+    <!-- Preview da imagem (aparece via JavaScript ao selecionar arquivo) -->
+    <div id="preview-container" class="mt-2 d-none">
+        <img id="preview-imagem" 
+             src="" 
+             alt="Preview" 
+             class="img-thumbnail" 
+             style="max-height: 200px; max-width: 300px;">
+        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="limparPreview()">
+            <i class="bi bi-x-circle"></i> Remover
+        </button>
+    </div>
+</div>
+
                     <!-- Tags (checkboxes estilizados) -->
                     <div class="mb-4">
                         <label class="form-label">Tags</label>

@@ -11,28 +11,17 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * ARTE CONTROLLER — MELHORIA 4 (Upload de Imagem)
+ * ARTE CONTROLLER — MELHORIA 1 (Paginação)
  * ============================================
  * 
- * HISTÓRICO:
- * ─────────────────────
- * Fase 1:     B8/B9 workarounds, conversão int, $statusList
- * Melhoria 1: index() usa listarPaginado() + passa $paginacao + filtros
- * Melhoria 4: store() e update() agora processam upload de imagem
- *             - store(): passa $request->file('imagem') para Service
- *             - update(): passa arquivo + flag $removerImagem
- *             - Formulários precisam de enctype="multipart/form-data"
+ * FASE 1 (15/02/2026): B8 workaround, B9 limparDados, conversão int, $statusList
+ * MELHORIA 1 (16/02/2026): index() agora usa listarPaginado() com paginação
  * 
- * Rotas:
- * GET    /artes              -> index()          Lista com filtros + ordenação
- * GET    /artes/criar        -> create()         Formulário de criação
- * POST   /artes              -> store()          Salva nova (+ upload imagem)
- * GET    /artes/{id}         -> show()           Detalhes + tags + cálculos + imagem
- * GET    /artes/{id}/editar  -> edit()           Formulário de edição (+ imagem atual)
- * PUT    /artes/{id}         -> update()         Atualiza + sync tags (+ upload/remove imagem)
- * DELETE /artes/{id}         -> destroy()        Remove (CASCADE em arte_tags + limpa imagem)
- * POST   /artes/{id}/status  -> alterarStatus()  Muda status sem editar tudo
- * POST   /artes/{id}/horas   -> adicionarHoras() Incrementa horas_trabalhadas
+ * ALTERAÇÕES M1:
+ * - index(): $filtros expandido com pagina/ordenar/direcao
+ * - index(): Usa ArteService::listarPaginado() ao invés de listar()
+ * - index(): Passa $paginacao e $filtros para a view
+ * - Demais métodos: INALTERADOS
  */
 class ArteController extends BaseController
 {
@@ -46,99 +35,48 @@ class ArteController extends BaseController
     }
     
     // ==========================================
-    // MÉTODOS AUXILIARES
+    // LISTAGEM (MELHORIA 1 — PAGINAÇÃO)
     // ==========================================
     
     /**
-     * CORREÇÃO B9: Limpa dados residuais de formulários anteriores
-     * Chamado em index(), edit() e show() — NUNCA em create()!
-     */
-    private function limparDadosFormulario(): void
-    {
-        unset($_SESSION['_old_input'], $_SESSION['_errors']);
-    }
-    
-    /**
-     * Lista de complexidades para selects nos formulários
-     */
-    private function getComplexidades(): array
-    {
-        return [
-            'baixa' => 'Baixa',
-            'media' => 'Média',
-            'alta'  => 'Alta'
-        ];
-    }
-    
-    /**
-     * Lista de status para selects nos formulários
-     * CORREÇÃO A1: Inclui 'reservada' (existia no ENUM do banco)
-     */
-    private function getStatusList(): array
-    {
-        return [
-            'disponivel'  => 'Disponível',
-            'em_producao' => 'Em Produção',
-            'vendida'     => 'Vendida',
-            'reservada'   => 'Reservada'
-        ];
-    }
-    
-    /**
-     * Limpa dados do formulário removendo campos não pertinentes ao banco
-     * 
-     * Remove campos que NÃO devem ir para o Repository:
-     * - _token (CSRF)
-     * - _method (PUT/DELETE override)
-     * - imagem (tratado separadamente via $_FILES)
-     * - remover_imagem (flag de controle, não é coluna do banco)
-     * 
-     * @param array $dados Dados brutos do request
-     * @return array Dados limpos para o Service/Repository
-     */
-    private function limparDados(array $dados): array
-    {
-        // Remove campos de controle que não são colunas do banco
-        unset(
-            $dados['_token'],
-            $dados['_method'],
-            $dados['imagem'],          // [M4] Tratado via $_FILES, não via POST
-            $dados['remover_imagem']   // [M4] Flag de controle, não é coluna
-        );
-        
-        return $dados;
-    }
-    
-    // ==========================================
-    // LISTAGEM
-    // ==========================================
-    
-    /**
-     * Lista todas as artes
+     * Lista artes com paginação e filtros
      * GET /artes
+     * GET /artes?pagina=2&status=disponivel&tag_id=3&termo=retrato
+     * 
+     * MELHORIA 1: Paginação via ?pagina=X (12 artes por página)
+     * Filtros preservados entre páginas via URL params.
+     * 
+     * NOTA: Parâmetro 'ordenar' e 'direcao' já são capturados para
+     * compatibilidade futura com Melhoria 2 (ordenação dinâmica).
      */
     public function index(Request $request): Response
     {
-        // CORREÇÃO B9: Limpa dados residuais
+        // ── [B9 Workaround] Limpa dados residuais de formulários anteriores ──
         $this->limparDadosFormulario();
         
-        // Filtros da URL (M1: paginação, M2: ordenação)
+        // ── Captura TODOS os filtros/params da URL ──
+        // [MELHORIA 1] Adicionados: pagina, ordenar, direcao
+        // [FASE 1 mantidos] termo, status, tag_id
         $filtros = [
-            'status'  => $request->get('status'),
             'termo'   => $request->get('termo'),
+            'status'  => $request->get('status'),
             'tag_id'  => $request->get('tag_id'),
-            'pagina'  => (int) ($request->get('pagina') ?? 1),
+            'pagina'  => (int) ($request->get('pagina') ?? 1), // Router passa string
             'ordenar' => $request->get('ordenar') ?? 'created_at',
             'direcao' => $request->get('direcao') ?? 'DESC',
         ];
         
-        // [MELHORIA 1] Busca paginada com filtros combinados
+        // ── [MELHORIA 1] Busca paginada com filtros combinados ──
+        // Retorna: ['artes' => [...], 'paginacao' => [...]]
         $resultado = $this->arteService->listarPaginado($filtros);
         
+        // Tags para o dropdown de filtro (usa TagService existente)
         $tags = $this->tagService->listar();
+        
+        // Estatísticas para os cards (contagem por status)
         $estatisticas = $this->arteService->getEstatisticas();
         
-        // Resposta AJAX
+        // Resposta AJAX (mantida para compatibilidade)
         if ($request->wantsJson()) {
             return $this->json([
                 'success' => true,
@@ -147,13 +85,14 @@ class ArteController extends BaseController
             ]);
         }
         
+        // ── Renderiza view com dados de paginação ──
         return $this->view('artes/index', [
             'titulo'       => 'Minhas Artes',
-            'artes'        => $resultado['artes'],
-            'paginacao'    => $resultado['paginacao'],
-            'tags'         => $tags,
-            'estatisticas' => $estatisticas,
-            'filtros'      => $filtros,
+            'artes'        => $resultado['artes'],       // Artes da página atual
+            'paginacao'    => $resultado['paginacao'],    // [MELHORIA 1] Metadados de paginação
+            'tags'         => $tags,                       // Para dropdown de filtro
+            'estatisticas' => $estatisticas,               // Para cards de status
+            'filtros'      => $filtros,                    // [MELHORIA 1] Filtros ativos (para preservar na URL)
         ]);
     }
     
@@ -164,9 +103,6 @@ class ArteController extends BaseController
     /**
      * Exibe formulário de criação
      * GET /artes/criar
-     * 
-     * ⚠️ NÃO chamar limparDadosFormulario() aqui!
-     * Os erros de validação do store() precisam chegar ao form.
      */
     public function create(Request $request): Response
     {
@@ -183,25 +119,14 @@ class ArteController extends BaseController
     /**
      * Salva nova arte
      * POST /artes
-     * 
-     * [MELHORIA 4] — Agora processa upload de imagem via $request->file('imagem')
-     * 
-     * IMPORTANTE: O formulário DEVE ter enctype="multipart/form-data"
-     * para que $_FILES seja populado corretamente.
      */
     public function store(Request $request): Response
     {
         $this->validateCsrf($request);
         
         try {
-            // Limpa dados do formulário (remove _token, _method, imagem, etc.)
             $dados = $this->limparDados($request->all());
-            
-            // [MELHORIA 4] Obtém arquivo de imagem (ou null se nenhum foi enviado)
-            $arquivo = $request->hasFile('imagem') ? $request->file('imagem') : null;
-            
-            // Delega para o Service (que cuida de validar, criar, upload e sync tags)
-            $arte = $this->arteService->criar($dados, $arquivo);
+            $arte = $this->arteService->criar($dados);
             
             if ($request->wantsJson()) {
                 return $this->success('Arte criada com sucesso!', [
@@ -209,25 +134,24 @@ class ArteController extends BaseController
                 ]);
             }
             
-            $this->limparDadosFormulario();
-            $this->flashSuccess('Arte "' . $arte->getNome() . '" criada com sucesso!');
+            $this->flashSuccess('Arte criada com sucesso!');
             return $this->redirectTo('/artes/' . $arte->getId());
             
         } catch (ValidationException $e) {
+            // ── [B8 Workaround] Grava erros diretamente em $_SESSION['_errors'] ──
+            // O framework grava em $_SESSION['_flash'] mas helpers lêem de $_SESSION['_errors']
+            $_SESSION['_errors'] = $e->getErrors();
+            
             if ($request->wantsJson()) {
                 return $this->error('Erro de validação', 422, $e->getErrors());
             }
-            
-            // CORREÇÃO B8: Grava erros direto na sessão
-            $_SESSION['_errors'] = $e->getErrors();
-            $_SESSION['_old_input'] = $request->all();
             
             return $this->back();
         }
     }
     
     // ==========================================
-    // VISUALIZAÇÃO
+    // DETALHES
     // ==========================================
     
     /**
@@ -236,14 +160,14 @@ class ArteController extends BaseController
      */
     public function show(Request $request, int $id): Response
     {
+        // ── [B9 Workaround] Limpa dados residuais ──
         $this->limparDadosFormulario();
-        $id = (int) $id;
+        
+        $id = (int) $id; // Router pode passar string
         
         try {
             $arte = $this->arteService->buscar($id);
             $tags = $this->arteService->getTags($id);
-            
-            // Cálculos de métricas
             $custoPorHora = $this->arteService->calcularCustoPorHora($arte);
             $precoSugerido = $this->arteService->calcularPrecoSugerido($arte);
             
@@ -271,7 +195,9 @@ class ArteController extends BaseController
      */
     public function edit(Request $request, int $id): Response
     {
+        // ── [B9 Workaround] Limpa dados residuais ──
         $this->limparDadosFormulario();
+        
         $id = (int) $id;
         
         try {
@@ -289,21 +215,13 @@ class ArteController extends BaseController
             ]);
             
         } catch (NotFoundException $e) {
-            $this->flashError('Arte não encontrada');
-            return $this->redirectTo('/artes');
+            return $this->notFound('Arte não encontrada');
         }
     }
     
     /**
-     * Atualiza arte existente
+     * Atualiza arte
      * PUT /artes/{id}
-     * 
-     * [MELHORIA 4] — Agora processa upload/remoção de imagem
-     * 
-     * Três cenários de imagem:
-     * 1. checkbox "remover_imagem" marcado → remove imagem sem substituir
-     * 2. novo arquivo enviado              → substitui imagem anterior
-     * 3. nenhum dos dois                   → mantém imagem atual
      */
     public function update(Request $request, int $id): Response
     {
@@ -312,32 +230,20 @@ class ArteController extends BaseController
         
         try {
             $dados = $this->limparDados($request->all());
-            
-            // [MELHORIA 4] Captura arquivo e flag de remoção
-            $arquivo = $request->hasFile('imagem') ? $request->file('imagem') : null;
-            $removerImagem = !empty($request->get('remover_imagem'));
-            
-            // Delega para o Service com os novos parâmetros
-            $arte = $this->arteService->atualizar($id, $dados, $arquivo, $removerImagem);
+            $arte = $this->arteService->atualizar($id, $dados);
             
             if ($request->wantsJson()) {
                 return $this->success('Arte atualizada com sucesso!');
             }
             
-            $this->limparDadosFormulario();
             $this->flashSuccess('Arte atualizada com sucesso!');
             return $this->redirectTo('/artes/' . $id);
             
         } catch (ValidationException $e) {
-            if ($request->wantsJson()) {
-                return $this->error('Erro de validação', 422, $e->getErrors());
-            }
-            
-            // CORREÇÃO B8: Grava direto na sessão
+            // ── [B8 Workaround] ──
             $_SESSION['_errors'] = $e->getErrors();
-            $_SESSION['_old_input'] = $request->all();
             
-            // CORREÇÃO A6: Re-renderiza view diretamente
+            // Recarrega dados para o formulário
             try {
                 $arte = $this->arteService->buscar($id);
                 $tags = $this->tagService->listar();
@@ -367,8 +273,6 @@ class ArteController extends BaseController
     /**
      * Remove arte
      * DELETE /artes/{id}
-     * 
-     * [MELHORIA 4] — Service agora também remove arquivo de imagem do disco
      */
     public function destroy(Request $request, int $id): Response
     {
@@ -428,6 +332,7 @@ class ArteController extends BaseController
             if ($request->wantsJson()) {
                 return $this->error($e->getFirstError());
             }
+            
             $this->flashError($e->getFirstError());
             return $this->back();
             
@@ -447,26 +352,90 @@ class ArteController extends BaseController
         
         try {
             $horas = (float) $request->get('horas', 0);
-            $arte = $this->arteService->adicionarHoras($id, $horas);
+            $this->arteService->adicionarHoras($id, $horas);
             
             if ($request->wantsJson()) {
-                return $this->success('Horas adicionadas!', [
-                    'horas_trabalhadas' => $arte->getHorasTrabalhadas()
-                ]);
+                return $this->success('Horas adicionadas com sucesso!');
             }
             
-            $this->flashSuccess("{$horas}h adicionadas com sucesso!");
+            $this->flashSuccess('Horas adicionadas com sucesso!');
             return $this->redirectTo('/artes/' . $id);
             
         } catch (ValidationException $e) {
             if ($request->wantsJson()) {
                 return $this->error($e->getFirstError());
             }
+            
             $this->flashError($e->getFirstError());
             return $this->back();
             
         } catch (NotFoundException $e) {
             return $this->notFound('Arte não encontrada');
         }
+    }
+    
+    // ==========================================
+    // HELPERS PRIVADOS
+    // ==========================================
+    
+    /**
+     * Lista de complexidades para dropdowns
+     */
+    private function getComplexidades(): array
+    {
+        return [
+            'baixa' => 'Baixa',
+            'media' => 'Média',
+            'alta'  => 'Alta'
+        ];
+    }
+    
+    /**
+     * Lista de status para dropdowns
+     * Adicionado na Fase 1 para centralizar labels/valores
+     */
+    private function getStatusList(): array
+    {
+        return [
+            'disponivel'  => 'Disponível',
+            'em_producao' => 'Em Produção',
+            'reservada'   => 'Reservada',
+            'vendida'     => 'Vendida'
+        ];
+    }
+    
+    /**
+     * Limpa e normaliza dados do formulário
+     * [B9 FIX] Previne que campos vazios sejam enviados como ""
+     */
+    private function limparDados(array $dados): array
+    {
+        // Campos numéricos: "" → null (evita erro MySQL strict mode)
+        $camposNumericos = ['tempo_medio_horas', 'preco_custo', 'horas_trabalhadas'];
+        
+        foreach ($camposNumericos as $campo) {
+            if (isset($dados[$campo]) && $dados[$campo] === '') {
+                $dados[$campo] = null;
+            }
+        }
+        
+        // Campos de texto: trim
+        $camposTexto = ['nome', 'descricao'];
+        foreach ($camposTexto as $campo) {
+            if (isset($dados[$campo])) {
+                $dados[$campo] = trim($dados[$campo]);
+            }
+        }
+        
+        return $dados;
+    }
+    
+    /**
+     * Limpa dados residuais de formulários anteriores
+     * [B9 Workaround] Evita que dados de create contamine edit
+     */
+    private function limparDadosFormulario(): void
+    {
+        unset($_SESSION['_old_input']);
     }
 }

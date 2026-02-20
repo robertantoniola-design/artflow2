@@ -58,8 +58,76 @@ if (!empty($arteTags)) {
                     <?= ucfirst(str_replace('_', ' ', $arte->getStatus())) ?>
                 </span>
             </div>
+            
+            <!-- [MELHORIA 4] JavaScript para preview de imagem + toggle remoção -->
+<script>
+function previewImagem(input) {
+    const container = document.getElementById('preview-container');
+    const preview = document.getElementById('preview-imagem');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const maxSize = 2 * 1024 * 1024;
+        const tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp'];
+        
+        if (!tiposPermitidos.includes(file.type)) {
+            alert('Formato não suportado. Use JPG, PNG ou WEBP.');
+            input.value = '';
+            container.classList.add('d-none');
+            return;
+        }
+        
+        if (file.size > maxSize) {
+            const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+            alert('A imagem tem ' + sizeMB + 'MB. O máximo é 2MB.');
+            input.value = '';
+            container.classList.add('d-none');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            container.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        container.classList.add('d-none');
+    }
+}
+
+function limparPreview() {
+    const input = document.getElementById('imagem');
+    const container = document.getElementById('preview-container');
+    input.value = '';
+    container.classList.add('d-none');
+}
+
+/**
+ * Quando "Remover imagem" é marcado, desabilita o campo de upload
+ * (não faz sentido enviar nova imagem E pedir remoção ao mesmo tempo)
+ */
+function toggleUploadField(checkbox) {
+    const uploadField = document.getElementById('upload-field');
+    const inputFile = document.getElementById('imagem');
+    const previewContainer = document.getElementById('preview-container');
+    
+    if (checkbox.checked) {
+        // Desabilita upload e limpa seleção
+        uploadField.style.opacity = '0.5';
+        inputFile.disabled = true;
+        inputFile.value = '';
+        previewContainer.classList.add('d-none');
+    } else {
+        // Reabilita upload
+        uploadField.style.opacity = '1';
+        inputFile.disabled = false;
+    }
+}
+</script>
+            
             <div class="card-body">
-                <form action="<?= url('/artes/' . $arte->getId()) ?>" method="POST" id="formArte">
+                <form action="<?= url('/artes/' . $arte->getId()) ?>" method="POST" enctype="multipart/form-data" id="formArte">
                     <!-- Token CSRF e método PUT -->
                     <input type="hidden" name="_token" value="<?= csrf_token() ?>">
                     <input type="hidden" name="_method" value="PUT">
@@ -197,6 +265,79 @@ if (!empty($arteTags)) {
                         </div>
                     </div>
                     
+                        <!-- ============================================ -->
+<!-- [MELHORIA 4] Upload de Imagem (Edição)      -->
+<!-- ============================================ -->
+<div class="mb-3">
+    <label for="imagem" class="form-label">
+        <i class="bi bi-image"></i> Imagem da Arte
+    </label>
+    
+    <?php if ($arte->getImagem()): ?>
+        <!-- ── Imagem atual ── -->
+        <div class="mb-2 p-2 border rounded bg-light">
+            <div class="d-flex align-items-center gap-3">
+                <img src="<?= url('/' . e($arte->getImagem())) ?>" 
+                     alt="<?= e($arte->getNome()) ?>" 
+                     class="img-thumbnail" 
+                     style="max-height: 150px; max-width: 200px;">
+                <div>
+                    <p class="mb-1 text-muted small">
+                        <i class="bi bi-check-circle text-success"></i> Imagem atual
+                    </p>
+                    <!-- Checkbox para remover imagem existente -->
+                    <div class="form-check">
+                        <input type="checkbox" 
+                               class="form-check-input" 
+                               id="remover_imagem" 
+                               name="remover_imagem" 
+                               value="1"
+                               onchange="toggleUploadField(this)">
+                        <label class="form-check-label text-danger small" for="remover_imagem">
+                            <i class="bi bi-trash"></i> Remover imagem
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
+    
+    <!-- Input de arquivo (nova imagem ou substituição) -->
+    <div id="upload-field">
+        <input type="file" 
+               class="form-control <?= has_error('imagem') ? 'is-invalid' : '' ?>" 
+               id="imagem" 
+               name="imagem" 
+               accept=".jpg,.jpeg,.png,.webp"
+               onchange="previewImagem(this)">
+        
+        <?php if (has_error('imagem')): ?>
+            <div class="invalid-feedback"><?= errors('imagem') ?></div>
+        <?php endif; ?>
+        
+        <div class="form-text">
+            <i class="bi bi-info-circle"></i>
+            <?php if ($arte->getImagem()): ?>
+                Selecione uma nova imagem para substituir a atual.
+            <?php else: ?>
+                Formatos: JPG, PNG, WEBP — Tamanho máximo: 2MB
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Preview da nova imagem -->
+    <div id="preview-container" class="mt-2 d-none">
+        <img id="preview-imagem" 
+             src="" 
+             alt="Preview" 
+             class="img-thumbnail" 
+             style="max-height: 200px; max-width: 300px;">
+        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="limparPreview()">
+            <i class="bi bi-x-circle"></i> Cancelar
+        </button>
+    </div>
+</div>
+
                     <!-- Tags (checkboxes estilizados) -->
                     <div class="mb-4">
                         <label class="form-label">Tags</label>

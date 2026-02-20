@@ -441,6 +441,7 @@ $complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'
                                 Nome <?= arteSortIcon($filtros, 'nome') ?>
                             </a>
                         </th>
+                        
                         <th>
                             <a href="<?= arteSortUrl($filtros, 'complexidade') ?>" 
                                class="text-decoration-none text-dark d-inline-flex align-items-center gap-1">
@@ -465,6 +466,7 @@ $complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'
                                 Status <?= arteSortIcon($filtros, 'status') ?>
                             </a>
                         </th>
+                        <th class="width: 60px;">Imagem</th> <!-- [M4] Coluna thumbnail -->
                         <th class="text-end">Ações</th>
                     </tr>
                 </thead>
@@ -503,6 +505,21 @@ $complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'
                                 </span>
                             </td>
                             
+                            <!-- [MELHORIA 4] Thumbnail na listagem -->
+<td class="text-center align-middle">
+    <?php if ($arte->getImagem()): ?>
+        <img src="<?= url('/' . e($arte->getImagem())) ?>" 
+             alt="<?= e($arte->getNome()) ?>" 
+             class="rounded" 
+             style="width: 45px; height: 45px; object-fit: cover;"
+             loading="lazy">
+    <?php else: ?>
+        <span class="text-muted" title="Sem imagem">
+            <i class="bi bi-image" style="font-size: 1.2rem;"></i>
+        </span>
+    <?php endif; ?>
+</td>
+
                             <!-- Ações -->
                             <td class="text-end">
                                 <a href="<?= url('/artes/' . $arte->getId()) ?>" 
@@ -514,7 +531,9 @@ $complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'
                                     <i class="bi bi-pencil"></i>
                                 </a>
                             </td>
+                            
                         </tr>
+                        
                     <?php endforeach; ?>
                 </tbody>
             </table>

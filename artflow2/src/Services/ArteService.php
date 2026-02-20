@@ -11,22 +11,28 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * ARTE SERVICE — CORRIGIDO Fase 1 (T1 + T11) + MELHORIA 1 (Paginação)
+ * ARTE SERVICE — MELHORIA 4 (Upload de Imagem)
  * ============================================
  * 
  * Camada de lógica de negócio para Artes.
  * Orquestra validação, repository e regras de negócio.
  * 
- * CORREÇÕES APLICADAS:
+ * HISTÓRICO:
  * ─────────────────────
- * [Bug T1]  Método listar() — normalização de filtros com ?: null
- * [Bug T11] Método validarTransicaoStatus() — 'reservada' adicionada
+ * Fase 1:   [Bug T1] Normalização de filtros com ?: null
+ *           [Bug T11] Transições de status com 'reservada'
+ * Melhoria 1: listarPaginado() + POR_PAGINA=12
+ * Melhoria 4: processarUploadImagem(), removerImagemFisica()
+ *             Fluxo criar() e atualizar() agora suportam upload
+ *             Fluxo remover() agora limpa arquivo físico
  * 
- * MELHORIAS:
- * ──────────
- * [M1 16/02/2026] listarPaginado() — paginação 12/página com filtros combinados
- *   Substitui listar() na listagem index. Os filtros (termo, status, tag_id)
- *   são aplicados simultaneamente (não mais mutuamente exclusivos).
+ * CORREÇÃO M4-BUG1 (20/02/2026):
+ *   getPublicDir() retornava raiz do projeto (artflow2/) em vez de
+ *   artflow2/public/ quando SCRIPT_FILENAME apontava para index.php
+ *   na raiz. Arquivos iam para artflow2/uploads/artes/ (inacessível).
+ *   Solução: Detectar a pasta public/ de forma confiável usando
+ *   dirname(__DIR__, 2) que sobe de src/Services/ até a raiz do projeto,
+ *   e então concatena /public.
  */
 class ArteService
 {
@@ -34,9 +40,24 @@ class ArteService
     private TagRepository $tagRepository;
     private ArteValidator $validator;
     
-    // ── Constante de paginação (mesmo padrão de Tags e Clientes) ──
-    // 12 itens = 3 linhas × 4 colunas em layout XL, ou 4 linhas × 3 em LG
+    // ==========================================
+    // CONSTANTES
+    // ==========================================
+    
+    /** [MELHORIA 1] Itens por página na listagem */
     const POR_PAGINA = 12;
+    
+    /**
+     * [MELHORIA 4] Diretório de upload relativo à pasta public/
+     * 
+     * O caminho COMPLETO no disco será: {PROJECT_ROOT}/public/uploads/artes/
+     * O caminho salvo no BANCO será:    uploads/artes/arte_1_1708123456.jpg
+     * A URL para o NAVEGADOR usará:     url('/uploads/artes/arte_1_1708123456.jpg')
+     * 
+     * Nota: Armazenado dentro de public/ para servir direto via Apache.
+     * O .htaccess no diretório impede execução de scripts PHP.
+     */
+    const UPLOAD_DIR = 'uploads/artes';
     
     public function __construct(
         ArteRepository $arteRepository,
@@ -49,84 +70,64 @@ class ArteService
     }
     
     // ==========================================
-    // PAGINAÇÃO (MELHORIA 1)
+    // OPERAÇÕES CRUD
     // ==========================================
     
     /**
-     * ============================================
-     * MELHORIA 1: Lista artes paginadas com filtros combinados
-     * ============================================
+     * Lista artes com filtros opcionais
      * 
-     * Método principal para a listagem index. Substitui listar() na
-     * view de listagem porque aplica paginação + filtros combinados.
-     * 
-     * DIFERENÇA vs listar():
-     * - listar() usa if/elseif (filtros mutuamente exclusivos)
-     * - listarPaginado() aplica TODOS os filtros simultaneamente
-     *   via ArteRepository::allPaginated() (query dinâmica com AND)
-     * 
-     * Padrão idêntico ao ClienteService::listarPaginado().
-     * 
-     * @param array $filtros Filtros da URL:
-     *   - 'termo'   => string|null  Busca por nome/descrição
-     *   - 'status'  => string|null  Filtro por status ENUM
-     *   - 'tag_id'  => int|null     Filtro por tag (N:N)
-     *   - 'pagina'  => int          Página atual (default 1)
-     *   - 'ordenar' => string       Coluna (default 'created_at')
-     *   - 'direcao' => string       ASC|DESC (default 'DESC')
-     * 
-     * @return array [
-     *     'artes'     => Arte[],     // Artes da página atual
-     *     'paginacao' => [
-     *         'total'        => int,  // Total de registros com filtros
-     *         'porPagina'    => int,  // Itens por página (12)
-     *         'paginaAtual'  => int,  // Página corrente
-     *         'totalPaginas' => int,  // Total de páginas
-     *         'temAnterior'  => bool, // Tem página anterior?
-     *         'temProxima'   => bool, // Tem próxima página?
-     *     ]
-     * ]
+     * [Bug T1 CORRIGIDO] — Normalização de filtros com ?: null
+     * Problema: URL ?status= gera "" (string vazia) → Repository adicionava AND status = '' → 0 resultados
+     * Solução: Encadeamento ?? null ?: null converte "" para null
      */
-    public function listarPaginado(array $filtros = []): array
+    public function listar(array $filtros = []): array
     {
-        // ── Extrai parâmetros com defaults seguros ──
-        // Normalização com ?: null resolve o problema T1 (string vazia → null)
-        $termo   = $filtros['termo']  ?? null ?: null;
-        $status  = $filtros['status'] ?? null ?: null;
-        $tagId   = $filtros['tag_id'] ?? null ?: null;
+        $status = $filtros['status'] ?? null ?: null;
+        $termo  = $filtros['termo']  ?? null ?: null;
+        $tagId  = $filtros['tag_id'] ?? null ?: null;
+        
+        if ($status && !$termo) {
+            return $this->arteRepository->findByStatus($status);
+        }
+        
+        if ($termo) {
+            return $this->arteRepository->pesquisar($termo, $status);
+        }
+        
+        if ($tagId) {
+            return $this->arteRepository->findByTag((int)$tagId);
+        }
+        
+        return $this->arteRepository->all('created_at', 'DESC');
+    }
+    
+    /**
+     * [MELHORIA 1] Lista artes com paginação e filtros combinados
+     * 
+     * @param array $filtros ['status', 'termo', 'tag_id', 'pagina', 'ordenar', 'direcao']
+     * @return array ['artes' => [...], 'paginacao' => [...]]
+     */
+    public function listarPaginado(array $filtros): array
+    {
         $pagina  = max(1, (int)($filtros['pagina'] ?? 1));
+        $status  = $filtros['status'] ?? null ?: null;
+        $termo   = $filtros['termo']  ?? null ?: null;
+        $tagId   = isset($filtros['tag_id']) && $filtros['tag_id'] !== '' 
+                   ? (int)$filtros['tag_id'] : null;
         $ordenar = $filtros['ordenar'] ?? 'created_at';
         $direcao = $filtros['direcao'] ?? 'DESC';
         
-        // Converte tag_id para int (Router pode passar string)
-        if ($tagId !== null) {
-            $tagId = (int) $tagId;
-        }
-        
-        // ── 1. Busca total de registros (com os mesmos filtros) ──
-        $total = $this->arteRepository->countAll($termo, $status, $tagId);
-        
-        // ── 2. Calcula total de páginas ──
-        $totalPaginas = (int) ceil($total / self::POR_PAGINA);
-        
-        // ── 3. Ajusta página se exceder o total ──
-        // Ex: Usuário está na pag 5 e aplica filtro que retorna só 1 página
-        if ($totalPaginas > 0 && $pagina > $totalPaginas) {
-            $pagina = $totalPaginas;
-        }
-        
-        // ── 4. Busca artes da página atual ──
+        // Busca paginada com filtros combinados
         $artes = $this->arteRepository->allPaginated(
-            $pagina,
-            self::POR_PAGINA,
-            $termo,
-            $status,
-            $tagId,
-            $ordenar,
-            $direcao
+            $pagina, self::POR_PAGINA,
+            $termo, $status, $tagId,
+            $ordenar, $direcao
         );
         
-        // ── 5. Retorna dados + metadados de paginação ──
+        // Contagem total para cálculo de paginação
+        $total = $this->arteRepository->countAll($termo, $status, $tagId);
+        $totalPaginas = max(1, ceil($total / self::POR_PAGINA));
+        
         return [
             'artes' => $artes,
             'paginacao' => [
@@ -135,58 +136,13 @@ class ArteService
                 'paginaAtual'  => $pagina,
                 'totalPaginas' => $totalPaginas,
                 'temAnterior'  => $pagina > 1,
-                'temProxima'   => $pagina < $totalPaginas
+                'temProxima'   => $pagina < $totalPaginas,
             ]
         ];
     }
     
-    // ==========================================
-    // OPERAÇÕES CRUD (mantidas da Fase 1)
-    // ==========================================
-    
-    /**
-     * Lista artes com filtros opcionais (MÉTODO ORIGINAL)
-     * 
-     * NOTA: Mantido para compatibilidade com outros módulos que chamam
-     * ArteService::listar(). Para a listagem index, use listarPaginado().
-     * 
-     * Os filtros são mutuamente exclusivos nesta implementação.
-     * O listarPaginado() já resolve isso com query dinâmica.
-     * 
-     * [Bug T1 CORRIGIDO] — Normalização de filtros com ?: null
-     */
-    public function listar(array $filtros = []): array
-    {
-        // ─── [T1 FIX] Normaliza filtros: converte "" para null ───
-        $status = $filtros['status'] ?? null ?: null;
-        $termo  = $filtros['termo']  ?? null ?: null;
-        $tagId  = $filtros['tag_id'] ?? null ?: null;
-        
-        // Busca com filtro de status (sem termo de pesquisa)
-        if ($status && !$termo) {
-            return $this->arteRepository->findByStatus($status);
-        }
-        
-        // Busca com termo de pesquisa (com ou sem status combinado)
-        if ($termo) {
-            return $this->arteRepository->search($termo, $status);
-        }
-        
-        // Busca por tag
-        if ($tagId) {
-            return $this->arteRepository->findByTag((int) $tagId);
-        }
-        
-        // Lista todas (sem filtros)
-        return $this->arteRepository->all();
-    }
-    
     /**
      * Busca arte por ID
-     * 
-     * @param int $id
-     * @return Arte
-     * @throws NotFoundException
      */
     public function buscar(int $id): Arte
     {
@@ -196,24 +152,54 @@ class ArteService
     /**
      * Cria nova arte
      * 
-     * @param array $dados
+     * [MELHORIA 4] — Agora aceita $arquivo para upload de imagem
+     * 
+     * Fluxo:
+     * 1. Validar dados do formulário
+     * 2. Aplicar defaults
+     * 3. INSERT no banco (sem imagem — ID ainda não existe)
+     * 4. Se tem arquivo, processar upload usando o ID recém-criado
+     * 5. UPDATE com o caminho da imagem
+     * 6. Sincronizar tags
+     * 7. Retornar arte completa
+     * 
+     * @param array $dados Dados do formulário
+     * @param array|null $arquivo Dados de $_FILES['imagem'] (ou null se sem upload)
      * @return Arte
      * @throws ValidationException
      */
-    public function criar(array $dados): Arte
+    public function criar(array $dados, ?array $arquivo = null): Arte
     {
-        // Validação
-        $this->validator->validate($dados);
+        // 1. Validação dos dados do formulário
+        if (!$this->validator->validateCreate($dados)) {
+            throw new ValidationException($this->validator->getErrors());
+        }
         
-        // Dados padrão
+        // [MELHORIA 4] 1b. Validação da imagem (se enviada)
+        if ($arquivo && $arquivo['error'] !== UPLOAD_ERR_NO_FILE) {
+            if (!$this->validator->validateImagem($arquivo)) {
+                throw new ValidationException($this->validator->getErrors());
+            }
+        }
+        
+        // 2. Defaults
         $dados['status'] = $dados['status'] ?? 'disponivel';
         $dados['horas_trabalhadas'] = $dados['horas_trabalhadas'] ?? 0;
         $dados['preco_custo'] = $dados['preco_custo'] ?? 0;
         
-        // Cria a arte
+        // 3. Cria a arte (sem imagem — precisamos do ID primeiro)
         $arte = $this->arteRepository->create($dados);
         
-        // Associa tags se fornecidas
+        // [MELHORIA 4] 4. Processa upload se há arquivo válido
+        if ($arquivo && $arquivo['error'] === UPLOAD_ERR_OK) {
+            $caminhoImagem = $this->processarUploadImagem($arquivo, $arte->getId());
+            
+            // 5. Atualiza registro com o caminho da imagem
+            $this->arteRepository->update($arte->getId(), ['imagem' => $caminhoImagem]);
+            $arte = $this->arteRepository->find($arte->getId()); // Recarrega com imagem
+        }
+        
+        // 6. Associa tags se fornecidas
         if (!empty($dados['tags'])) {
             $this->tagRepository->syncArte($arte->getId(), (array) $dados['tags']);
         }
@@ -224,22 +210,52 @@ class ArteService
     /**
      * Atualiza arte existente
      * 
+     * [MELHORIA 4] — Agora aceita $arquivo e $removerImagem
+     * 
+     * Fluxo de imagem na edição:
+     * - Se $removerImagem = true  → Remove arquivo físico + limpa campo no banco
+     * - Se $arquivo enviado       → Remove imagem anterior + salva nova
+     * - Se nenhum dos dois        → Mantém imagem atual (não altera)
+     * 
      * @param int $id
-     * @param array $dados
+     * @param array $dados Dados do formulário
+     * @param array|null $arquivo Dados de $_FILES['imagem']
+     * @param bool $removerImagem Se true, remove imagem sem substituir
      * @return Arte
      * @throws ValidationException|NotFoundException
      */
-    public function atualizar(int $id, array $dados): Arte
+    public function atualizar(int $id, array $dados, ?array $arquivo = null, bool $removerImagem = false): Arte
     {
         // Verifica se existe
         $arte = $this->arteRepository->findOrFail($id);
         
-        // Validação
+        // Validação dos dados
         if (!$this->validator->validateUpdate($dados)) {
             throw new ValidationException($this->validator->getErrors());
         }
         
-        // Atualiza
+        // [MELHORIA 4] Validação da imagem (se enviada)
+        if ($arquivo && $arquivo['error'] !== UPLOAD_ERR_NO_FILE) {
+            if (!$this->validator->validateImagem($arquivo)) {
+                throw new ValidationException($this->validator->getErrors());
+            }
+        }
+        
+        // [MELHORIA 4] Processa lógica de imagem ANTES do update
+        if ($removerImagem) {
+            // ── Remoção explícita: checkbox "Remover imagem" marcado ──
+            $this->removerImagemFisica($arte);
+            $dados['imagem'] = null; // Limpa campo no banco
+            
+        } elseif ($arquivo && $arquivo['error'] === UPLOAD_ERR_OK) {
+            // ── Nova imagem enviada: substitui a anterior ──
+            $this->removerImagemFisica($arte); // Remove arquivo anterior (se existir)
+            $caminhoImagem = $this->processarUploadImagem($arquivo, $id);
+            $dados['imagem'] = $caminhoImagem;
+        }
+        // Se nenhum dos dois: $dados não inclui 'imagem' → campo NÃO é alterado no UPDATE
+        
+        // Atualiza registro
         $this->arteRepository->update($id, $dados);
         
         // Atualiza tags se fornecidas
@@ -253,13 +269,10 @@ class ArteService
     /**
      * Remove arte
      * 
-     * @param int $id
-     * @return bool
-     * @throws NotFoundException
+     * [MELHORIA 4] — Agora remove arquivo de imagem antes de deletar
      */
     public function remover(int $id): bool
     {
-        // Verifica se existe
         $arte = $this->arteRepository->findOrFail($id);
         
         // Verifica se pode ser removida (não vendida)
@@ -269,10 +282,13 @@ class ArteService
             ]);
         }
         
+        // [MELHORIA 4] Remove arquivo de imagem do disco
+        $this->removerImagemFisica($arte);
+        
         // Remove associações com tags
         $this->tagRepository->syncArte($id, []);
         
-        // Remove a arte
+        // Remove a arte do banco
         return $this->arteRepository->delete($id);
     }
     
@@ -282,20 +298,12 @@ class ArteService
     
     /**
      * Altera status da arte
-     * 
-     * @param int $id
-     * @param string $novoStatus
-     * @return Arte
      */
     public function alterarStatus(int $id, string $novoStatus): Arte
     {
         $arte = $this->arteRepository->findOrFail($id);
-        
-        // Valida transição de status
         $this->validarTransicaoStatus($arte->getStatus(), $novoStatus);
-        
         $this->arteRepository->update($id, ['status' => $novoStatus]);
-        
         return $this->arteRepository->find($id);
     }
     
@@ -303,46 +311,31 @@ class ArteService
      * Valida se transição de status é permitida
      * 
      * [Bug T11 CORRIGIDO] — 'reservada' adicionada como origem E destino
-     * 
-     * @param string $atual Status atual
-     * @param string $novo  Status desejado
-     * @throws ValidationException Se transição não permitida
      */
-    private function validarTransicaoStatus(string $atual, string $novo): void
+    private function validarTransicaoStatus(string $statusAtual, string $novoStatus): void
     {
-        // Mapa de transições permitidas (máquina de estados)
         $transicoesPermitidas = [
             'disponivel'  => ['em_producao', 'vendida', 'reservada'],
             'em_producao' => ['disponivel', 'vendida', 'reservada'],
-            'vendida'     => [],  // Vendida é estado terminal
             'reservada'   => ['disponivel', 'em_producao', 'vendida'],
+            'vendida'     => [] // Estado final — não pode sair
         ];
         
-        // Se status atual não está no mapa, rejeita
-        if (!isset($transicoesPermitidas[$atual])) {
+        if (!isset($transicoesPermitidas[$statusAtual])) {
             throw new ValidationException([
-                'status' => "Status atual '{$atual}' não reconhecido"
+                'status' => "Status atual '{$statusAtual}' é inválido"
             ]);
         }
         
-        // Se status novo não está na lista de destinos permitidos
-        if (!in_array($novo, $transicoesPermitidas[$atual] ?? [])) {
+        if (!in_array($novoStatus, $transicoesPermitidas[$statusAtual])) {
             throw new ValidationException([
-                'status' => "Não é possível mudar de '{$atual}' para '{$novo}'"
+                'status' => "Não é permitido mudar de '{$statusAtual}' para '{$novoStatus}'"
             ]);
         }
     }
     
-    // ==========================================
-    // OPERAÇÕES DE TEMPO/HORAS
-    // ==========================================
-    
     /**
-     * Adiciona horas trabalhadas à arte
-     * 
-     * @param int $id
-     * @param float $horas
-     * @return Arte
+     * Adiciona horas trabalhadas
      */
     public function adicionarHoras(int $id, float $horas): Arte
     {
@@ -350,7 +343,7 @@ class ArteService
         
         if ($horas <= 0) {
             throw new ValidationException([
-                'horas' => 'As horas devem ser maiores que zero'
+                'horas' => 'O valor de horas deve ser maior que zero'
             ]);
         }
         
@@ -360,78 +353,12 @@ class ArteService
         return $this->arteRepository->find($id);
     }
     
-    /**
-     * Define horas trabalhadas da arte
-     * 
-     * @param int $id
-     * @param float $horas
-     * @return Arte
-     */
-    public function definirHoras(int $id, float $horas): Arte
-    {
-        $this->arteRepository->findOrFail($id);
-        
-        if ($horas < 0) {
-            throw new ValidationException([
-                'horas' => 'As horas não podem ser negativas'
-            ]);
-        }
-        
-        $this->arteRepository->update($id, ['horas_trabalhadas' => $horas]);
-        
-        return $this->arteRepository->find($id);
-    }
-    
     // ==========================================
-    // CÁLCULOS E MÉTRICAS
+    // ESTATÍSTICAS E CONSULTAS
     // ==========================================
     
     /**
-     * Calcula custo por hora da arte
-     * 
-     * @param Arte $arte
-     * @return float
-     */
-    public function calcularCustoPorHora(Arte $arte): float
-    {
-        $horas = $arte->getHorasTrabalhadas();
-        
-        if ($horas <= 0) {
-            return 0;
-        }
-        
-        return $arte->getPrecoCusto() / $horas;
-    }
-    
-    /**
-     * Calcula preço sugerido de venda (baseado em margem desejada)
-     * 
-     * @param Arte $arte
-     * @param float $margemDesejada Percentual (ex: 50 para 50%)
-     * @param float $valorHoraMinimo Valor mínimo da hora de trabalho
-     * @return float
-     */
-    public function calcularPrecoSugerido(Arte $arte, float $margemDesejada = 50, float $valorHoraMinimo = 50): float
-    {
-        $custo = $arte->getPrecoCusto();
-        $horas = $arte->getHorasTrabalhadas();
-        
-        // Custo de mão de obra
-        $custoMaoObra = $horas * $valorHoraMinimo;
-        
-        // Custo total
-        $custoTotal = $custo + $custoMaoObra;
-        
-        // Aplica margem
-        $precoSugerido = $custoTotal * (1 + ($margemDesejada / 100));
-        
-        return round($precoSugerido, 2);
-    }
-    
-    /**
-     * Retorna estatísticas gerais das artes
-     * 
-     * @return array
+     * Estatísticas de artes (contagem por status)
      */
     public function getEstatisticas(): array
     {
@@ -439,56 +366,209 @@ class ArteService
     }
     
     /**
-     * Retorna artes disponíveis para venda
-     * 
-     * @return array
+     * Artes disponíveis para venda (usado pelo módulo Vendas)
      */
     public function getDisponiveisParaVenda(): array
     {
-        $disponiveis = $this->arteRepository->findByStatus('disponivel');
-        $emProducao = $this->arteRepository->findByStatus('em_producao');
-        
-        return array_merge($disponiveis, $emProducao);
+        return $this->arteRepository->findByStatus('disponivel');
     }
     
-    // ==========================================
-    // TAGS
-    // ==========================================
-    
     /**
-     * Retorna tags de uma arte
-     * 
-     * @param int $arteId
-     * @return array
+     * Tags associadas a uma arte
      */
     public function getTags(int $arteId): array
     {
         return $this->tagRepository->getByArte($arteId);
     }
     
+    // ==========================================
+    // CÁLCULOS DE MÉTRICAS
+    // ==========================================
+    
     /**
-     * Atualiza tags de uma arte
-     * 
-     * @param int $arteId
-     * @param array $tagIds
-     * @return void
+     * Calcula custo por hora trabalhada
      */
-    public function atualizarTags(int $arteId, array $tagIds): void
+    public function calcularCustoPorHora(Arte $arte): ?float
     {
-        $this->arteRepository->findOrFail($arteId);
-        $this->tagRepository->syncArte($arteId, $tagIds);
+        if ($arte->getHorasTrabalhadas() <= 0) {
+            return null;
+        }
+        return round($arte->getPrecoCusto() / $arte->getHorasTrabalhadas(), 2);
     }
     
     /**
-     * Pesquisa artes por termo (alias para listar com filtros)
-     * 
-     * @param array $filtros
-     * @param int $limit
-     * @return array
+     * Calcula preço sugerido (multiplicador de 2.5x sobre o custo)
      */
-    public function pesquisar(array $filtros = [], int $limit = 10): array
+    public function calcularPrecoSugerido(Arte $arte): float
     {
-        $artes = $this->listar($filtros);
-        return array_slice($artes, 0, $limit);
+        return round($arte->getPrecoCusto() * 2.5, 2);
+    }
+    
+    // ==========================================
+    // [MELHORIA 4] UPLOAD DE IMAGEM
+    // ==========================================
+    
+    /**
+     * Processa upload de imagem e move para diretório final
+     * 
+     * Fluxo:
+     * 1. Garantir que o diretório de uploads existe
+     * 2. Gerar nome seguro: arte_{id}_{timestamp}.{ext}
+     * 3. Mover arquivo do tmp para destino final
+     * 4. Retornar caminho relativo (para salvar no banco)
+     * 
+     * @param array $arquivo Dados de $_FILES['imagem']
+     * @param int $arteId ID da arte (para compor nome do arquivo)
+     * @return string Caminho relativo salvo no banco (ex: "uploads/artes/arte_1_1708123456.jpg")
+     * @throws ValidationException Se falhar ao mover o arquivo
+     */
+    private function processarUploadImagem(array $arquivo, int $arteId): string
+    {
+        // 1. Garante que o diretório existe
+        $diretorioAbsoluto = $this->getUploadDirAbsoluto();
+        if (!is_dir($diretorioAbsoluto)) {
+            // Cria recursivamente com permissões 0755 (seguro para XAMPP)
+            if (!mkdir($diretorioAbsoluto, 0755, true)) {
+                throw new ValidationException([
+                    'imagem' => 'Erro ao criar diretório de uploads. Verifique permissões do servidor.'
+                ]);
+            }
+        }
+        
+        // 2. Gera nome seguro e único
+        // Formato: arte_{id}_{timestamp}.{extensão}
+        // O timestamp evita colisões ao re-enviar imagem para a mesma arte
+        $extensao = strtolower(pathinfo($arquivo['name'], PATHINFO_EXTENSION));
+        $nomeArquivo = sprintf('arte_%d_%d.%s', $arteId, time(), $extensao);
+        
+        // 3. Caminho completo no disco
+        //    CORREÇÃO M4-BUG1: Usa separadores consistentes (/)
+        //    PHP no Windows aceita ambos, mas misturar causa confusão
+        $caminhoAbsoluto = $diretorioAbsoluto . '/' . $nomeArquivo;
+        
+        // 4. Move arquivo do tmp para destino final
+        // move_uploaded_file() verifica se o arquivo veio via HTTP POST (segurança)
+        if (!move_uploaded_file($arquivo['tmp_name'], $caminhoAbsoluto)) {
+            throw new ValidationException([
+                'imagem' => 'Falha ao salvar imagem. Verifique permissões do diretório.'
+            ]);
+        }
+        
+        // 5. Retorna caminho RELATIVO (armazenado no banco)
+        // Formato: "uploads/artes/arte_1_1708123456.jpg"
+        return self::UPLOAD_DIR . '/' . $nomeArquivo;
+    }
+    
+    /**
+     * Remove arquivo de imagem do disco (se existir)
+     * 
+     * Chamado em:
+     * - atualizar() quando checkbox "Remover imagem" está marcado
+     * - atualizar() quando nova imagem substitui a anterior
+     * - remover() quando arte é deletada
+     * 
+     * CORREÇÃO M4-BUG1: Também tenta remover do local antigo (raiz/uploads)
+     * caso existam arquivos salvos antes do fix.
+     * 
+     * @param Arte $arte Objeto arte com o caminho da imagem
+     * @return void
+     */
+    private function removerImagemFisica(Arte $arte): void
+    {
+        $caminhoRelativo = $arte->getImagem();
+        
+        // Se não tem imagem, nada a fazer
+        if (empty($caminhoRelativo)) {
+            return;
+        }
+        
+        // Monta caminho absoluto CORRETO: {PROJECT_ROOT}/public/{caminho_relativo}
+        $caminhoCorreto = $this->getPublicDir() . '/' . $caminhoRelativo;
+        
+        // Remove o arquivo se existir no local correto (public/uploads/artes/)
+        if (file_exists($caminhoCorreto)) {
+            unlink($caminhoCorreto);
+            return;
+        }
+        
+        // CORREÇÃO M4-BUG1: Também tenta o local antigo (raiz/uploads/artes/)
+        // Arquivos salvos antes do fix podem estar em artflow2/uploads/artes/
+        $projectRoot = dirname($this->getPublicDir());
+        $caminhoAntigo = $projectRoot . '/' . $caminhoRelativo;
+        
+        if (file_exists($caminhoAntigo)) {
+            unlink($caminhoAntigo);
+        }
+    }
+    
+    /**
+     * Retorna caminho absoluto do diretório de uploads
+     * 
+     * Exemplo em XAMPP: C:/xampp/htdocs/artflow2/public/uploads/artes
+     * 
+     * @return string
+     */
+    private function getUploadDirAbsoluto(): string
+    {
+        return $this->getPublicDir() . '/' . self::UPLOAD_DIR;
+    }
+    
+    /**
+     * Retorna caminho absoluto da pasta public/
+     * 
+     * CORREÇÃO M4-BUG1 (20/02/2026):
+     * ────────────────────────────────
+     * PROBLEMA:
+     *   Método usava dirname(SCRIPT_FILENAME) como primeira opção.
+     *   No XAMPP com artflow2/, o entry point pode ser:
+     *     - artflow2/index.php (raiz) → dirname() = artflow2/ (SEM /public!) ❌
+     *     - artflow2/public/index.php → dirname() = artflow2/public/ ✅
+     *   Quando o entry point era na raiz, os uploads iam para
+     *   artflow2/uploads/artes/ em vez de artflow2/public/uploads/artes/.
+     * 
+     * SOLUÇÃO:
+     *   Usa dirname(__DIR__, 2) como método primário.
+     *   __DIR__ neste arquivo é sempre src/Services/, então:
+     *     dirname('src/Services', 2) = artflow2/  (raiz do projeto)
+     *     + '/public' = artflow2/public/  ✅ SEMPRE CORRETO
+     *   Isso funciona independente de qual index.php é o entry point.
+     * 
+     * JUSTIFICATIVA:
+     *   dirname(__DIR__, 2) é determinístico: baseado na posição FIXA
+     *   deste arquivo no filesystem, não depende de variáveis de ambiente.
+     *   SCRIPT_FILENAME depende de como o Apache foi configurado.
+     * 
+     * @return string Caminho absoluto da pasta public/
+     */
+    private function getPublicDir(): string
+    {
+        // ── Método primário: baseado na posição deste arquivo ──
+        // Este arquivo está em: {PROJECT_ROOT}/src/Services/ArteService.php
+        // dirname(__DIR__, 2) sobe 2 níveis: Services → src → {PROJECT_ROOT}
+        // Resultado: {PROJECT_ROOT}/public (SEMPRE correto)
+        $projectRoot = dirname(__DIR__, 2);
+        $publicDir = $projectRoot . '/public';
+        
+        if (is_dir($publicDir)) {
+            return $publicDir;
+        }
+        
+        // ── Fallback 1: SCRIPT_FILENAME (se public/ não for encontrado acima) ──
+        // Funciona quando o entry point É o public/index.php
+        if (isset($_SERVER['SCRIPT_FILENAME'])) {
+            $scriptDir = dirname($_SERVER['SCRIPT_FILENAME']);
+            // Verifica se estamos dentro de public/ (contém index.php + assets)
+            if (basename($scriptDir) === 'public' || file_exists($scriptDir . '/index.php')) {
+                return $scriptDir;
+            }
+        }
+        
+        // ── Fallback 2: BASE_PATH (se definida no bootstrap) ──
+        if (defined('BASE_PATH')) {
+            return rtrim(BASE_PATH, '/\\') . '/public';
+        }
+        
+        // ── Último recurso: retorna o que temos ──
+        return $projectRoot . '/public';
     }
 }

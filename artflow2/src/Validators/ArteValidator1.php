@@ -4,62 +4,49 @@ namespace App\Validators;
 
 /**
  * ============================================
- * ARTE VALIDATOR — MELHORIA 4 (Upload de Imagem)
+ * ARTE VALIDATOR — CORRIGIDO Fase 1
  * ============================================
  * 
  * Valida dados de entrada para criação/edição de artes.
  * Usa $this->data que é preenchido pelo BaseValidator.
  * 
- * HISTÓRICO:
+ * CORREÇÕES APLICADAS:
  * ─────────────────────
- * Fase 1:  Status 'reservada' adicionado ao ENUM (Bug A1)
- * Melhoria 4: Método validateImagem() para upload de arquivo
- *             - Verifica MIME type real via finfo (segurança)
- *             - Verifica extensão do arquivo
- *             - Verifica tamanho máximo (2MB)
- *             - Valida códigos de erro do PHP ($_FILES)
+ * [Bug A1] 'reservada' adicionada ao $statusValidos
+ *          → A migration 001 define ENUM('disponivel','em_producao','vendida','reservada')
+ *          → O Validator original só aceitava 3 dos 4 valores
+ *          → Resultado: criar/editar arte com status 'reservada' era rejeitado silenciosamente
+ *          → Correção: $statusValidos agora inclui os 4 valores do ENUM
  * 
- * CORREÇÃO Fase 1 (Bug A1):
- *   $statusValidos incluía apenas 3 dos 4 valores do ENUM.
- *   Adicionado 'reservada' para consistência com a migration.
+ * [Melhoria] Mensagens de erro atualizadas para listar 'reservada' como opção válida
+ * [Melhoria] Limite de nome aumentado para 150 (consistente com VARCHAR(150) da migration)
  */
 class ArteValidator extends BaseValidator
 {
     /**
      * Status válidos para arte
-     * CORREÇÃO A1: Inclui 'reservada' (existia no ENUM do banco)
+     * 
+     * ⚠️ [Bug A1 CORRIGIDO] — Adicionado 'reservada'
+     * DEVE corresponder EXATAMENTE ao ENUM da migration 001:
+     * ENUM('disponivel', 'em_producao', 'vendida', 'reservada')
+     * 
+     * ANTES (BUG):  ['disponivel', 'em_producao', 'vendida']
+     * DEPOIS (FIX):  ['disponivel', 'em_producao', 'vendida', 'reservada']
      */
     private array $statusValidos = ['disponivel', 'em_producao', 'vendida', 'reservada'];
     
     /**
      * Níveis de complexidade válidos
+     * Corresponde ao ENUM da migration 001: ENUM('baixa','media','alta')
      */
     private array $complexidadeValidas = ['baixa', 'media', 'alta'];
     
-    // ==========================================
-    // [MELHORIA 4] Constantes de upload
-    // ==========================================
-    
-    /** Tamanho máximo do arquivo: 2MB */
-    private const MAX_TAMANHO_IMAGEM = 2 * 1024 * 1024; // 2MB em bytes
-    
-    /** MIME types permitidos (verificação real via finfo) */
-    private const MIME_TYPES_PERMITIDOS = [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-    ];
-    
-    /** Extensões de arquivo permitidas */
-    private const EXTENSOES_PERMITIDAS = ['jpg', 'jpeg', 'png', 'webp'];
-    
-    // ==========================================
-    // VALIDAÇÃO DE CRIAÇÃO
-    // ==========================================
-    
     /**
-     * Implementa validação específica de Arte (criação)
+     * Implementa validação específica de Arte
      * Usa $this->data (preenchido pelo BaseValidator)
+     * 
+     * Chamado por: BaseValidator::validate() → lança ValidationException se há erros
+     *              BaseValidator::isValid()   → retorna bool
      */
     protected function doValidation(): void
     {
@@ -68,7 +55,7 @@ class ArteValidator extends BaseValidator
         
         if (!empty($this->data['nome'])) {
             $this->minLength('nome', 3, 'O nome deve ter pelo menos 3 caracteres');
-            // Limite 150 = VARCHAR(150) da migration
+            // [Melhoria] Limite 150 = VARCHAR(150) da migration (antes era 100)
             $this->maxLength('nome', 150, 'O nome deve ter no máximo 150 caracteres');
         }
         
@@ -93,19 +80,20 @@ class ArteValidator extends BaseValidator
                 'Complexidade inválida. Use: baixa, media ou alta');
         }
         
-        // ─── Preço de custo (opcional, não negativo) ───
+        // ─── Preço de custo (opcional, mas não negativo) ───
         if (isset($this->data['preco_custo']) && $this->data['preco_custo'] !== '') {
             $this->numeric('preco_custo', 'O preço de custo deve ser um número');
             $this->notNegative('preco_custo', 'O preço de custo não pode ser negativo');
         }
         
-        // ─── Horas trabalhadas (opcional, não negativo) ───
+        // ─── Horas trabalhadas (opcional, mas não negativo) ───
         if (isset($this->data['horas_trabalhadas']) && $this->data['horas_trabalhadas'] !== '') {
             $this->numeric('horas_trabalhadas', 'As horas trabalhadas devem ser um número');
             $this->notNegative('horas_trabalhadas', 'As horas trabalhadas não podem ser negativas');
         }
         
         // ─── Status (obrigatório se fornecido) ───
+        // [Bug A1 CORRIGIDO] — Mensagem agora lista 'reservada' como opção válida
         if (!empty($this->data['status'])) {
             $this->in('status', $this->statusValidos, 
                 'Status inválido. Use: disponivel, em_producao, vendida ou reservada');
@@ -115,20 +103,21 @@ class ArteValidator extends BaseValidator
     /**
      * Valida dados para criação
      * Delega para isValid() que chama doValidation()
+     * 
+     * @param array $data
+     * @return bool
      */
     public function validateCreate(array $data): bool
     {
         return $this->isValid($data);
     }
     
-    // ==========================================
-    // VALIDAÇÃO DE ATUALIZAÇÃO
-    // ==========================================
-    
     /**
      * Valida dados para atualização (mais flexível)
+     * 
      * Na edição, campos são opcionais (só valida se fornecidos).
-     *
+     * Diferente do doValidation() que exige nome e tempo_medio_horas.
+     * 
      * @param array $data
      * @return bool true = válido, false = há erros em $this->errors
      */
@@ -143,6 +132,7 @@ class ArteValidator extends BaseValidator
                 $this->addError('nome', 'O nome não pode ficar vazio');
             } else {
                 $this->minLength('nome', 3, 'O nome deve ter pelo menos 3 caracteres');
+                // [Melhoria] Limite 150 = VARCHAR(150) da migration
                 $this->maxLength('nome', 150, 'O nome deve ter no máximo 150 caracteres');
             }
         }
@@ -170,112 +160,19 @@ class ArteValidator extends BaseValidator
             $this->notNegative('preco_custo', 'O preço de custo não pode ser negativo');
         }
         
-        // ─── Horas trabalhadas (se fornecidas) ───
+        // ─── Horas trabalhadas (se fornecido) ───
         if (isset($this->data['horas_trabalhadas']) && $this->data['horas_trabalhadas'] !== '') {
             $this->numeric('horas_trabalhadas', 'As horas trabalhadas devem ser um número');
             $this->notNegative('horas_trabalhadas', 'As horas trabalhadas não podem ser negativas');
         }
         
         // ─── Status (se fornecido) ───
-        if (!empty($this->data['status'])) {
+        // [Bug A1 CORRIGIDO] — Agora aceita 'reservada' e mensagem atualizada
+        if (isset($this->data['status']) && !empty($this->data['status'])) {
             $this->in('status', $this->statusValidos, 
                 'Status inválido. Use: disponivel, em_producao, vendida ou reservada');
         }
         
         return empty($this->errors);
-    }
-    
-    // ==========================================
-    // [MELHORIA 4] VALIDAÇÃO DE IMAGEM
-    // ==========================================
-    
-    /**
-     * Valida arquivo de imagem enviado via $_FILES
-     * 
-     * Verificações de segurança:
-     * 1. Código de erro do PHP (UPLOAD_ERR_*)
-     * 2. Tamanho máximo (2MB)
-     * 3. MIME type REAL via finfo (não confia na extensão)
-     * 4. Extensão do arquivo (dupla verificação)
-     * 
-     * @param array $arquivo Dados do arquivo ($_FILES['imagem'])
-     * @return bool true = válido, false = há erros
-     */
-    public function validateImagem(array $arquivo): bool
-    {
-        $this->errors = [];
-        
-        // ── 1. Verifica erro de upload do PHP ──
-        if ($arquivo['error'] !== UPLOAD_ERR_OK) {
-            $mensagem = match ($arquivo['error']) {
-                UPLOAD_ERR_INI_SIZE,
-                UPLOAD_ERR_FORM_SIZE  => 'O arquivo excede o tamanho máximo permitido (2MB)',
-                UPLOAD_ERR_PARTIAL    => 'O upload foi interrompido. Tente novamente',
-                UPLOAD_ERR_NO_FILE    => 'Nenhum arquivo foi enviado',
-                UPLOAD_ERR_NO_TMP_DIR => 'Erro no servidor: diretório temporário não encontrado',
-                UPLOAD_ERR_CANT_WRITE => 'Erro no servidor: falha ao gravar arquivo',
-                default               => 'Erro desconhecido no upload (código: ' . $arquivo['error'] . ')',
-            };
-            $this->addError('imagem', $mensagem);
-            return false;
-        }
-        
-        // ── 2. Verifica tamanho máximo (2MB) ──
-        if ($arquivo['size'] > self::MAX_TAMANHO_IMAGEM) {
-            $tamanhoMB = round($arquivo['size'] / (1024 * 1024), 1);
-            $this->addError('imagem', "A imagem tem {$tamanhoMB}MB. O máximo permitido é 2MB");
-            return false;
-        }
-        
-        // ── 3. Verifica MIME type REAL via finfo ──
-        // SEGURANÇA: Não confiar em $arquivo['type'] (enviado pelo navegador, manipulável)
-        // Usar finfo_file() que analisa o conteúdo real do arquivo (magic bytes)
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mimeReal = $finfo->file($arquivo['tmp_name']);
-        
-        if (!in_array($mimeReal, self::MIME_TYPES_PERMITIDOS, true)) {
-            $this->addError('imagem', 
-                'Formato de imagem não suportado. Use: JPG, PNG ou WEBP. ' .
-                '(Tipo detectado: ' . $mimeReal . ')'
-            );
-            return false;
-        }
-        
-        // ── 4. Verifica extensão do arquivo (dupla verificação) ──
-        $extensao = strtolower(pathinfo($arquivo['name'], PATHINFO_EXTENSION));
-        
-        if (!in_array($extensao, self::EXTENSOES_PERMITIDAS, true)) {
-            $this->addError('imagem', 
-                'Extensão de arquivo não permitida (' . $extensao . '). ' .
-                'Use: .jpg, .jpeg, .png ou .webp'
-            );
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Retorna extensões permitidas (para exibir no frontend)
-     */
-    public static function getExtensoesPermitidas(): array
-    {
-        return self::EXTENSOES_PERMITIDAS;
-    }
-    
-    /**
-     * Retorna tamanho máximo em bytes
-     */
-    public static function getMaxTamanho(): int
-    {
-        return self::MAX_TAMANHO_IMAGEM;
-    }
-    
-    /**
-     * Retorna tamanho máximo formatado (ex: "2MB")
-     */
-    public static function getMaxTamanhoFormatado(): string
-    {
-        return (self::MAX_TAMANHO_IMAGEM / (1024 * 1024)) . 'MB';
     }
 }
