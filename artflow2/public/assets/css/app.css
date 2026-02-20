@@ -625,3 +625,10 @@ a:hover {
 .sidebar-overlay.active {
     display: block;
 }
+
+/* [MELHORIA 4] Expande imagem ao clicar (toggle) */
+.img-expanded {
+    max-height: none !important;
+    max-width: 100% !important;
+    cursor: zoom-out !important;
+}

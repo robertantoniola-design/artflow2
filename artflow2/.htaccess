@@ -1,0 +1,29 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /artflow2/
+    
+    # Se o arquivo existe em public/assets, serve diretamente
+    RewriteCond %{REQUEST_URI} ^/artflow2/public/assets/
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+    
+    # [MELHORIA 4] Serve arquivos de upload diretamente de public/uploads/
+    # Quando a URL é /artflow2/uploads/artes/arte_1.jpg, o Apache
+    # redireciona internamente para public/uploads/artes/arte_1.jpg
+    # onde o arquivo realmente está.
+    RewriteRule ^uploads/(.*)$ public/uploads/$1 [L]
+    
+    # Se não for arquivo nem diretório real, vai para index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Ocultar listagem de diretórios
+Options -Indexes
+
+# Proteção de arquivos sensíveis
+<FilesMatch "^\.env|composer\.(json|lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
