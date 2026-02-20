@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Artes: Documentação Completa
 
-**Data:** 16/02/2026  
-**Status Geral:** ✅ FASE 1 + MELHORIAS 1, 2 e 3 COMPLETAS — Ordenação dinâmica 6 colunas implementada  
-**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados + Ordenação dinâmica  
+**Data:** 20/02/2026  
+**Status Geral:** ✅ FASE 1 + MELHORIAS 1, 2, 3 e 4 COMPLETAS — Upload de imagem funcional com segurança  
+**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados + Ordenação dinâmica + Upload de Imagem  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)  
 **Banco de dados:** `artflow2_db`
 
@@ -10,9 +10,9 @@
 
 ## 📋 RESUMO EXECUTIVO
 
-O módulo de Artes do ArtFlow 2.0 é o módulo central do sistema — gerencia o portfólio de obras artísticas, incluindo dados de produção (tempo, complexidade, custo), status de disponibilidade e categorização via Tags (relacionamento N:N). O módulo depende de Tags (seletor no formulário) e é pré-requisito para o módulo de Vendas (select de arte_id no formulário de venda) e para o Dashboard (estatísticas e gráficos).
+O módulo de Artes do ArtFlow 2.0 é o módulo central do sistema — gerencia o portfólio de obras artísticas, incluindo dados de produção (tempo, complexidade, custo), status de disponibilidade, imagens das obras e categorização via Tags (relacionamento N:N). O módulo depende de Tags (seletor no formulário) e é pré-requisito para o módulo de Vendas (select de arte_id no formulário de venda) e para o Dashboard (estatísticas e gráficos).
 
-O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3. A **Melhoria 2 (Ordenação Dinâmica)** foi implementada em 16/02/2026 com 10/10 testes OK, adicionando 6 colunas ordenáveis com headers clicáveis e botões de ordenação.
+O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3. A **Melhoria 2 (Ordenação Dinâmica)** foi implementada em 16/02/2026 com 10/10 testes OK, adicionando 6 colunas ordenáveis com headers clicáveis e botões de ordenação. A **Melhoria 4 (Upload de Imagem)** foi implementada em 20/02/2026 com 12/12 testes OK, adicionando upload seguro de imagens JPG/PNG/WEBP com validação por MIME type real, preview JavaScript, thumbnails na listagem e imagem ampliada no show.
 
 ### Status das Fases
 
@@ -22,7 +22,7 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 | Melhoria 1 | Paginação na listagem (12/página) | ✅ COMPLETA (16/02/2026) |
 | Melhoria 2 | Ordenação dinâmica (6 colunas clicáveis) | ✅ COMPLETA (16/02/2026) |
 | Melhoria 3 | Filtros combinados (status + tag + busca simultâneos) | ✅ COMPLETA (via M1) — UI já funcional |
-| Melhoria 4 | Upload de imagem + galeria visual | 📋 PLANEJADA |
+| Melhoria 4 | Upload de imagem (JPG/PNG/WEBP, 2MB, segurança) | ✅ COMPLETA (20/02/2026) |
 | Melhoria 5 | Estatísticas por arte (cards financeiros no show.php) | 📋 PLANEJADA |
 | Melhoria 6 | Gráfico de distribuição (Chart.js — status + complexidade) | 📋 PLANEJADA |
 
@@ -33,7 +33,7 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 | 1 | Paginação na listagem (12/página) | Baixa | — | ✅ COMPLETA |
 | 2 | Ordenação dinâmica (6 colunas) | Baixa | Melhoria 1 ✅ | ✅ COMPLETA |
 | 3 | Filtros combinados (status + tag + busca) | Média | Melhoria 1 ✅ | ✅ COMPLETA (via M1) |
-| 4 | Upload de imagem + galeria visual | Média | — | 📋 PLANEJADA |
+| 4 | Upload de imagem (JPG/PNG/WEBP, 2MB) | Média | — | ✅ COMPLETA |
 | 5 | Estatísticas por arte (cards no show.php) | Média | — | 📋 PLANEJADA |
 | 6 | Gráfico de distribuição (Doughnut + Barras) | Baixa | — | 📋 PLANEJADA |
 
@@ -46,26 +46,34 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 ```
 src/
 ├── Models/
-│   └── Arte.php                       ✅ Original
+│   └── Arte.php                       🔧 Melhoria 4 (+ getImagem, setImagem)
 ├── Repositories/
 │   └── ArteRepository.php             🔧 Melhoria 1 (+ allPaginated, countAll — filtros combinados + whitelist 6 colunas)
 ├── Services/
-│   └── ArteService.php                🔧 Melhoria 1 (+ listarPaginado, POR_PAGINA=12)
+│   └── ArteService.php                🔧 Melhoria 4 (+ processarUploadImagem, removerImagemFisica, getPublicDir, getUploadDirAbsoluto)
 ├── Controllers/
-│   └── ArteController.php             🔧 Melhoria 1 (index usa listarPaginado + passa $paginacao + ordenar/direcao)
+│   └── ArteController.php             🔧 Melhoria 4 (store/update passam $arquivo, destroy limpa imagem)
 └── Validators/
-    └── ArteValidator.php              🔧 CORRIGIDO Fase 1 (A1: status reservada no ENUM)
+    └── ArteValidator.php              🔧 Melhoria 4 (+ validateImagem com 4 camadas de segurança)
 
 views/
 └── artes/
-    ├── index.php                      🔧 Melhoria 2 (+ arteSortUrl, arteSortIcon, headers clicáveis, botões ordenação)
-    ├── create.php                     🔧 CORRIGIDO Fase 1 (dropdown dinâmico via $statusList)
-    ├── show.php                       🔧 CORRIGIDO Fase 1 (url() helper, botão excluir, cards status/horas)
-    └── edit.php                       🔧 CORRIGIDO Fase 1 (dropdown dinâmico, maxlength 150, campo hidden vendida)
+    ├── index.php                      🔧 Melhoria 4 (+ thumbnail 45x45 com object-fit:cover + placeholder)
+    ├── create.php                     🔧 Melhoria 4 (+ enctype multipart, input file, preview JS)
+    ├── show.php                       🔧 Melhoria 4 (+ imagem ampliada 400px com zoom)
+    └── edit.php                       🔧 Melhoria 4 (+ imagem atual, checkbox remover, preview nova)
+
+public/
+└── uploads/
+    └── artes/
+        └── .htaccess                  🆕 Melhoria 4 (bloqueia execução PHP, permite apenas imagens)
+
+artflow2/
+└── .htaccess                          🔧 Melhoria 4 (+ RewriteRule ^uploads/ → public/uploads/)
 
 database/
 ├── migrations/
-│   ├── 001_create_artes_table.php     ✅ Executada
+│   ├── 001_create_artes_table.php     ✅ Executada (coluna imagem VARCHAR(255) já existe)
 │   └── 006_create_arte_tags_table.php ✅ Executada (pivot N:N)
 └── seeds/
     └── ArteSeeder.php                 ✅ Executado
@@ -80,10 +88,11 @@ ArteService    → ArteRepository + TagRepository + ArteValidator
 
 ArteController::index()     usa ArteService::listarPaginado() + TagService::listar() [M1]
 ArteController::create()    usa TagService::listar() para checkboxes de tags
-ArteController::store()     usa ArteService::criar() que sincroniza tags via ArteRepository
+ArteController::store()     usa ArteService::criar($dados, $arquivo) [M4: + $arquivo]
 ArteController::show()      usa ArteService::getTags() + calcularCustoPorHora() + calcularPrecoSugerido()
 ArteController::edit()      usa TagService::listar() + TagService::getTagIdsArte()
-ArteController::update()    usa ArteService::atualizar() que faz sync de tags
+ArteController::update()    usa ArteService::atualizar($id, $dados, $arquivo, $removerImagem) [M4: + $arquivo, $removerImagem]
+ArteController::destroy()   usa ArteService::remover() [M4: remove imagem física antes de deletar]
 ArteController::alterarStatus()  usa ArteService::alterarStatus()
 ArteController::adicionarHoras() usa ArteService::adicionarHoras()
 ```
@@ -107,7 +116,7 @@ CREATE TABLE artes (
     preco_custo DECIMAL(10,2) DEFAULT 0,                        -- Custo de produção em R$
     horas_trabalhadas DECIMAL(8,2) DEFAULT 0,                   -- Horas já investidas
     status ENUM('disponivel','em_producao','vendida','reservada') DEFAULT 'disponivel',
-    imagem VARCHAR(255) NULL,                                   -- Caminho do arquivo (upload NÃO implementado)
+    imagem VARCHAR(255) NULL,                                   -- [M4] Caminho relativo (ex: uploads/artes/arte_1_1708123456.jpg)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -148,6 +157,8 @@ CREATE TABLE arte_tags (
 | horas_trabalhadas | number (step 0.5) | min:0 | ❌ | Acumulativo |
 | status | select | in:disponivel,em_producao,vendida,reservada | ✅ | Default: disponivel |
 | tags[] | checkbox multiple | IDs existentes | ❌ | Relacionamento N:N |
+| imagem | file (accept .jpg,.png,.webp) | MIME + extensão + tamanho ≤2MB | ❌ | [M4] Preview JS antes de enviar |
+| remover_imagem | checkbox | — | ❌ | [M4] Só no edit.php — remove imagem sem substituir |
 
 ### Rotas (9 total)
 
@@ -155,11 +166,11 @@ CREATE TABLE arte_tags (
 ARTES (7 RESTful + 2 extras)
   GET    /artes              → ArteController@index         (listar com filtros + ordenação)
   GET    /artes/criar        → ArteController@create        (formulário criação)
-  POST   /artes              → ArteController@store         (salvar nova)
-  GET    /artes/{id}         → ArteController@show          (detalhes + tags + cálculos)
-  GET    /artes/{id}/editar  → ArteController@edit          (formulário edição)
-  PUT    /artes/{id}         → ArteController@update        (atualizar + sync tags)
-  DELETE /artes/{id}         → ArteController@destroy       (excluir — CASCADE remove arte_tags)
+  POST   /artes              → ArteController@store         (salvar nova + upload imagem)
+  GET    /artes/{id}         → ArteController@show          (detalhes + tags + cálculos + imagem)
+  GET    /artes/{id}/editar  → ArteController@edit          (formulário edição + imagem atual)
+  PUT    /artes/{id}         → ArteController@update        (atualizar + sync tags + upload/remover imagem)
+  DELETE /artes/{id}         → ArteController@destroy       (excluir — CASCADE remove arte_tags + remove imagem física)
   POST   /artes/{id}/status  → ArteController@alterarStatus (muda status sem editar tudo)
   POST   /artes/{id}/horas   → ArteController@adicionarHoras(incrementa horas_trabalhadas)
 ```
@@ -298,6 +309,7 @@ Análise estática do código antes de testes no navegador, baseada nos padrões
 | 4 | 15/02 noite | Re-teste + fixes finais | T1 (busca) + T11 (transição status) → 12/12 OK |
 | 5 | 16/02 manhã | Melhoria 1 — Paginação | 4 arquivos (Repository, Service, Controller, view) → 12/12 testes OK |
 | 6 | 16/02 tarde | Melhoria 2 — Ordenação | 1 arquivo (view index.php) → 10/10 testes OK |
+| 7 | 20/02 manhã-tarde | Melhoria 4 — Upload de Imagem | 8 arquivos + 4 diagnósticos + 1 bug corrigido → 12/12 testes OK |
 
 ---
 
@@ -538,54 +550,236 @@ Se desejado futuramente, melhorias adicionais poderiam incluir:
 
 ---
 
-## 📋 MELHORIA 4 — UPLOAD DE IMAGEM + GALERIA (PLANEJADA)
+## ✅ MELHORIA 4 — UPLOAD DE IMAGEM (COMPLETA)
 
+**Implementada em:** 20/02/2026  
 **Complexidade:** Média  
-**Arquivos a alterar:** ArteService, ArteController, ArteValidator, views/artes/create.php, edit.php, show.php, index.php  
-**Pré-requisito:** Fase 1 ✅
+**Arquivos alterados:** ArteService, ArteController, ArteValidator, Arte (Model), 4 views, .htaccess (raiz e uploads)  
+**Pré-requisito:** Fase 1 ✅  
+**Testes:** 12/12 OK (T1–T12)  
+**Bugs encontrados e corrigidos:** 1 (M4-BUG1: getPublicDir)
 
-### Justificativa
+### O Que Foi Implementado
 
-O campo `imagem VARCHAR(255)` já existe na tabela `artes` desde a migration 001, mas o upload **nunca foi implementado**. Para um sistema de gestão de arte, a imagem da obra é essencial para identificação, catálogo e apresentação a clientes.
+| Recurso | Descrição |
+|---------|-----------|
+| **Upload seguro** | Validação por MIME type real (finfo_file), extensão e tamanho |
+| **Formatos aceitos** | JPG, JPEG, PNG, WEBP |
+| **Limite de tamanho** | 2MB por arquivo |
+| **Nomenclatura segura** | `arte_{id}_{timestamp}.{ext}` — evita colisões e caracteres especiais |
+| **Preview JavaScript** | Visualização da imagem antes de enviar o formulário |
+| **Thumbnail na listagem** | 45x45px com `object-fit: cover` + placeholder quando sem imagem |
+| **Imagem ampliada** | 400px no show.php com zoom ao clicar |
+| **Substituição** | Enviar nova imagem no edit remove a anterior automaticamente |
+| **Remoção** | Checkbox "Remover imagem" no edit limpa campo e arquivo |
+| **Limpeza ao excluir** | Deletar arte remove o arquivo físico do disco |
+| **Segurança .htaccess** | Diretório de uploads bloqueia execução PHP |
 
 ### Especificação Técnica
 
 | Aspecto | Detalhe |
 |---------|---------|
-| **Storage** | `storage/uploads/artes/` (diretório no servidor) |
+| **Storage** | `public/uploads/artes/` (servido diretamente pelo Apache) |
 | **Formatos aceitos** | JPG, JPEG, PNG, WEBP |
-| **Tamanho máximo** | 2MB por arquivo |
-| **Nomenclatura** | `arte_{id}_{timestamp}.{ext}` (evita colisões) |
-| **Thumbnail** | Opcional — redimensionar para 300x300 na listagem |
-| **Campo no banco** | `imagem` já existe — armazena caminho relativo |
+| **Tamanho máximo** | 2MB (2 * 1024 * 1024 bytes) |
+| **Nomenclatura** | `arte_{id}_{timestamp}.{ext}` |
+| **Campo no banco** | `imagem VARCHAR(255)` — armazena caminho relativo (ex: `uploads/artes/arte_1_1708123456.jpg`) |
+| **URL no browser** | `url('/uploads/artes/arte_1_1708123456.jpg')` |
+| **Validação MIME** | Via `finfo_file()` (magic bytes) — não confia em `$_FILES['type']` |
+| **Segurança** | `.htaccess` bloqueia PHP, `move_uploaded_file()` verifica origem POST |
 
-### Funcionalidades
+### Fluxo de Upload
 
-| Feature | View | Descrição |
-|---------|------|-----------|
-| **Upload com preview** | create.php / edit.php | Input file com preview JavaScript antes de enviar |
-| **Thumbnail na listagem** | index.php | Imagem pequena (50x50) ao lado do nome na tabela |
-| **Imagem ampliada** | show.php | Imagem em destaque no card de detalhes |
-| **Remoção** | edit.php | Checkbox "Remover imagem" que limpa o campo |
-| **Placeholder** | Todas | Ícone genérico quando não há imagem |
-
-### Validação (ArteValidator)
-
-```php
-// Novas regras para upload
-'imagem' => [
-    'tipo' => ['image/jpeg', 'image/png', 'image/webp'],
-    'max_tamanho' => 2 * 1024 * 1024,  // 2MB
-    'extensoes' => ['jpg', 'jpeg', 'png', 'webp']
-]
+#### Criação com imagem:
+```
+1. Controller: $arquivo = $request->hasFile('imagem') ? $request->file('imagem') : null
+2. Controller: $this->arteService->criar($dados, $arquivo)
+3. Service: $this->validator->validateImagem($arquivo)        ← valida MIME, tamanho, extensão
+4. Service: $arte = $this->arteRepository->create($dados)     ← INSERT sem imagem (ID não existe ainda)
+5. Service: $caminho = $this->processarUploadImagem($arquivo, $arte->getId())
+6. Service: $this->arteRepository->update($arte->getId(), ['imagem' => $caminho])
+7. Service: $arte = $this->arteRepository->find($arte->getId())  ← recarrega com imagem
 ```
 
-### Cuidado com Segurança
+#### Edição:
+```
+Se $removerImagem = true  → removerImagemFisica() + UPDATE imagem = NULL
+Se $arquivo enviado       → removerImagemFisica() + processarUploadImagem() + UPDATE
+Se nenhum dos dois        → não altera campo imagem (mantém atual)
+```
 
-- Verificar MIME type real do arquivo (não confiar só na extensão)
-- Sanitizar nome do arquivo
-- Armazenar FORA da pasta `public/` por segurança, ou usar `.htaccess` para proteger o diretório de uploads
-- Alternativa: servir via controller com verificação de permissão
+#### Exclusão:
+```
+1. Service: $this->removerImagemFisica($arte)  ← deleta arquivo do disco
+2. Repository: DELETE FROM artes WHERE id = ?   ← CASCADE remove arte_tags
+```
+
+### Validação — 4 Camadas de Segurança (ArteValidator::validateImagem)
+
+| # | Camada | O que verifica | Exemplo de rejeição |
+|---|--------|----------------|---------------------|
+| 1 | Erro de upload | `$arquivo['error'] === UPLOAD_ERR_OK` | Arquivo corrompido, timeout |
+| 2 | Tamanho | `$arquivo['size'] <= 2MB` | Foto de câmera profissional não comprimida |
+| 3 | MIME type real | `finfo_file()` retorna `image/jpeg`, `image/png` ou `image/webp` | Script PHP renomeado para .jpg |
+| 4 | Extensão | Extensão do nome original é `jpg`, `jpeg`, `png` ou `webp` | arquivo.gif, arquivo.bmp |
+
+### Métodos Adicionados
+
+**ArteService:**
+```php
+// Processa upload e move para public/uploads/artes/
+private processarUploadImagem(array $arquivo, int $arteId): string
+
+// Remove arquivo de imagem do disco (criação, edição, exclusão)
+private removerImagemFisica(Arte $arte): void
+
+// Retorna caminho absoluto de public/uploads/artes/
+private getUploadDirAbsoluto(): string
+
+// Retorna caminho absoluto da pasta public/ (CORRIGIDO M4-BUG1)
+private getPublicDir(): string
+```
+
+**ArteValidator:**
+```php
+// Validação de arquivo de imagem (4 camadas de segurança)
+public validateImagem(array $arquivo): bool
+```
+
+**Arte (Model):**
+```php
+public getImagem(): ?string
+public setImagem(?string $imagem): void
+```
+
+**ArteController (assinaturas atualizadas):**
+```php
+// store() agora passa $arquivo
+$this->arteService->criar($dados, $arquivo);
+
+// update() agora passa $arquivo e $removerImagem  
+$this->arteService->atualizar($id, $dados, $arquivo, $removerImagem);
+```
+
+### Arquivos de Segurança
+
+**public/uploads/artes/.htaccess:**
+```apache
+# Bloqueia execução de scripts PHP no diretório de uploads
+php_flag engine off
+
+# Permite apenas imagens
+<FilesMatch "\.(?i:jpe?g|png|webp)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>
+
+# Bloqueia todo o resto
+<FilesMatch "\.(?i:php|phtml|php3|php4|php5|phps|phar|sh|cgi|pl)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+```
+
+**artflow2/.htaccess (regra adicionada):**
+```apache
+# [MELHORIA 4] Serve arquivos de upload diretamente de public/uploads/
+# Quando a URL é /artflow2/uploads/artes/arte_1.jpg, o Apache
+# redireciona internamente para public/uploads/artes/arte_1.jpg
+RewriteRule ^uploads/(.*)$ public/uploads/$1 [L]
+```
+
+### Bug M4-BUG1: getPublicDir() Retornava Local Errado
+
+**Descoberto em:** 20/02/2026  
+**Gravidade:** Crítica — uploads iam para local inacessível  
+**Diagnóstico:** 4 scripts de diagnóstico progressivos
+
+**Problema:**
+```
+getPublicDir() usava: dirname($_SERVER['SCRIPT_FILENAME'])
+
+Quando SCRIPT_FILENAME = artflow2/index.php (entry point na raiz):
+  dirname() → artflow2/          ← SEM /public! ❌
+
+Quando SCRIPT_FILENAME = artflow2/public/index.php:
+  dirname() → artflow2/public/   ← correto ✅
+```
+
+**Consequência:** Arquivos eram salvos em `artflow2/uploads/artes/` (fora de public/), inacessíveis ao Apache. O caminho no banco estava correto (`uploads/artes/arte_26_...jpg`), mas a URL resultante apontava para um local inexistente em public/.
+
+**Solução:**
+```php
+// ANTES (dependia de SCRIPT_FILENAME — inconsistente):
+private function getPublicDir(): string {
+    return dirname($_SERVER['SCRIPT_FILENAME']);
+}
+
+// DEPOIS (baseado na posição fixa do arquivo no filesystem):
+private function getPublicDir(): string {
+    // Este arquivo está em: {PROJECT_ROOT}/src/Services/ArteService.php
+    // dirname(__DIR__, 2) sobe 2 níveis: Services → src → {PROJECT_ROOT}
+    $projectRoot = dirname(__DIR__, 2);
+    return $projectRoot . '/public';
+}
+```
+
+**Justificativa:** `dirname(__DIR__, 2)` é determinístico — baseado na posição fixa do arquivo no filesystem, não depende de variáveis de ambiente como SCRIPT_FILENAME que mudam conforme o entry point.
+
+**Migração:** Script `migrar_uploads.php` moveu 3 arquivos do local errado (`artflow2/uploads/artes/`) para o correto (`artflow2/public/uploads/artes/`). O `removerImagemFisica()` também tenta o local antigo como fallback.
+
+### Processo de Diagnóstico (4 etapas)
+
+| # | Script | O que verificou | Resultado |
+|---|--------|-----------------|-----------|
+| 1 | `diagnostico_upload.php` | Filesystem, PHP config, .htaccess | ✅ Upload funciona no PHP, problema na aplicação |
+| 2 | `diagnostico_request.php` | Request::hasFile(), Request::file() | ✅ Framework recebe arquivo corretamente |
+| 3 | `diagnostico_service.php` | Banco, Repository whitelist, Model | ✅ Banco OK, 'imagem' no fillable, getImagem() existe. Arquivos no banco mas NÃO no disco |
+| 4 | `diagnostico_trace.php` | Simulação completa do processarUploadImagem() | 🎯 Arquivos em artflow2/uploads/ (errado) em vez de artflow2/public/uploads/ |
+
+### Decisões Técnicas
+
+| Decisão | Justificativa |
+|---------|---------------|
+| **Storage em `public/uploads/`** | Servido diretamente pelo Apache — sem overhead de controller |
+| **`.htaccess` duplo** | Um em `uploads/artes/` (bloqueia PHP), outro na raiz (redireciona URLs) |
+| **MIME via `finfo_file()`** | Magic bytes — não confia em `$_FILES['type']` que pode ser falsificado |
+| **Nome `arte_{id}_{timestamp}`** | ID garante unicidade por arte, timestamp evita cache stale ao substituir |
+| **INSERT primeiro, upload depois** | Precisa do ID da arte para compor o nome do arquivo |
+| **`getPublicDir()` via `__DIR__`** | Determinístico — não depende de SCRIPT_FILENAME variável |
+| **Fallback no `removerImagemFisica()`** | Tenta local antigo (raiz/uploads/) para arquivos pré-fix |
+
+### Testes Realizados (12/12 OK)
+
+| # | Teste | O que verificar | Resultado |
+|---|-------|-----------------|-----------|
+| T1 | Listar sem imagens | Placeholder exibido | ✅ |
+| T2 | Criar com JPG | Upload + redirect + thumbnail | ✅ |
+| T3 | Criar com PNG | Upload + redirect + thumbnail | ✅ |
+| T4 | Criar com WEBP | Upload + redirect + thumbnail | ✅ |
+| T5 | Criar sem imagem | Salva normalmente, placeholder | ✅ |
+| T6 | Arquivo > 2MB | Erro de validação exibido | ✅ |
+| T7 | Tipo inválido (.pdf) | Rejeita com mensagem de erro | ✅ |
+| T8 | Editar — substituir imagem | Imagem antiga removida, nova aparece | ✅ |
+| T9 | Editar — remover imagem (checkbox) | Arquivo deletado, placeholder aparece | ✅ |
+| T10 | Editar — manter imagem | Altera nome mas imagem permanece | ✅ |
+| T11 | Excluir arte com imagem | Arquivo físico removido do disco | ✅ |
+| T12 | Preview JavaScript | Imagem aparece antes de enviar | ✅ |
+
+### Resumo de Arquivos Modificados na Melhoria 4
+
+| Arquivo | Caminho | Alterações |
+|---------|---------|------------|
+| **ArteService.php** | `src/Services/ArteService.php` | +processarUploadImagem, +removerImagemFisica, +getPublicDir, +getUploadDirAbsoluto, criar() e atualizar() com $arquivo, remover() limpa imagem |
+| **ArteController.php** | `src/Controllers/ArteController.php` | store() e update() passam $arquivo e $removerImagem |
+| **ArteValidator.php** | `src/Validators/ArteValidator.php` | +validateImagem() com 4 camadas de segurança |
+| **Arte.php** | `src/Models/Arte.php` | +getImagem(), +setImagem() |
+| **index.php** | `views/artes/index.php` | +coluna Imagem com thumbnail 45x45 + placeholder |
+| **create.php** | `views/artes/create.php` | +enctype multipart, +input file, +preview JavaScript |
+| **edit.php** | `views/artes/edit.php` | +imagem atual, +checkbox remover, +preview nova |
+| **show.php** | `views/artes/show.php` | +imagem ampliada 400px com zoom |
+| **.htaccess** | `public/uploads/artes/.htaccess` | 🆕 Bloqueia execução PHP, permite imagens |
+| **.htaccess** | `artflow2/.htaccess` | +RewriteRule uploads/ → public/uploads/ |
 
 ---
 
@@ -683,9 +877,9 @@ $temDadosGrafico = !empty($estatisticas) && array_sum(array_column($estatisticas
 | `ArteService::listarPaginado($filtros)` | ✅ Sim | ✅ Adicionado Melhoria 1 |
 | `ArteService::listar($filtros)` | ✅ Sim | ✅ Mantido para compatibilidade |
 | `ArteService::buscar($id)` | ✅ Sim | ✅ Verificado |
-| `ArteService::criar($dados)` | ✅ Sim | ✅ Verificado |
-| `ArteService::atualizar($id, $dados)` | ✅ Sim | ✅ Verificado |
-| `ArteService::remover($id)` | ✅ Sim | ✅ Verificado |
+| `ArteService::criar($dados, $arquivo)` | ✅ Sim | ✅ Atualizado Melhoria 4 (+$arquivo) |
+| `ArteService::atualizar($id, $dados, $arquivo, $removerImagem)` | ✅ Sim | ✅ Atualizado Melhoria 4 (+$arquivo, +$removerImagem) |
+| `ArteService::remover($id)` | ✅ Sim | ✅ Atualizado Melhoria 4 (remove imagem física) |
 | `ArteService::alterarStatus($id, $status)` | ✅ Sim | ✅ Verificado + Corrigido (T11) |
 | `ArteService::adicionarHoras($id, $horas)` | ✅ Sim | ✅ Verificado |
 | `ArteService::getEstatisticas()` | ✅ Sim | ✅ Verificado |
@@ -694,6 +888,16 @@ $temDadosGrafico = !empty($estatisticas) && array_sum(array_column($estatisticas
 | `ArteService::calcularPrecoSugerido($arte)` | ✅ Sim | ✅ Verificado |
 | `TagService::listar()` | ✅ Sim (módulo Tags completo) | ✅ Verificado |
 | `TagService::getTagIdsArte($id)` | ✅ Sim | ✅ Verificado |
+
+### Métodos privados do ArteService (uso interno)
+
+| Método | Adicionado em | Descrição |
+|--------|---------------|-----------|
+| `processarUploadImagem($arquivo, $arteId)` | Melhoria 4 | Move arquivo para public/uploads/artes/, retorna caminho relativo |
+| `removerImagemFisica($arte)` | Melhoria 4 | Remove arquivo de imagem do disco |
+| `getUploadDirAbsoluto()` | Melhoria 4 | Retorna caminho absoluto do diretório de uploads |
+| `getPublicDir()` | Melhoria 4 | Retorna caminho absoluto da pasta public/ (via dirname) |
+| `validarTransicaoStatus($atual, $novo)` | Fase 1 | Valida máquina de estados de status |
 
 ---
 
@@ -733,15 +937,26 @@ O status de uma arte segue uma máquina de estados com transições explícitas.
 | Conversão string→int no Controller | Tags (Router bug fix) | ✅ Aplicado Fase 1 |
 | Filtros combinados via WHERE dinâmico | Artes M1 (antecipou M3) | ✅ Aplicado Melhoria 1 |
 | Sempre incluir ordenar/direcao na URL | Clientes M2 (fix preservação) | ✅ Aplicado Melhoria 2 |
+| Upload seguro com MIME real | Artes M4 | ✅ Aplicado Melhoria 4 |
+| `getPublicDir()` via `__DIR__` | Artes M4-BUG1 | ✅ Padrão para qualquer módulo que use filesystem |
+
+### Lições da Melhoria 4
+
+| Lição | Contexto |
+|-------|----------|
+| **Nunca usar SCRIPT_FILENAME para caminhos absolutos** | O entry point varia conforme config do Apache (.htaccess, VirtualHost). Usar `__DIR__` relativo ao arquivo PHP é determinístico. |
+| **Diagnóstico progressivo camada por camada** | Isolou o problema em 4 etapas: PHP/OS → Request → Banco/Repository → Filesystem. Cada diagnóstico descartou uma camada. |
+| **Arquivos em public/ precisam de regra no .htaccess raiz** | Se o entry point está na raiz do projeto (não em public/), URLs de assets precisam de RewriteRule para redirecionar para public/. |
+| **Validação de imagem por MIME real (finfo_file)** | `$_FILES['type']` é enviado pelo browser e pode ser falsificado. `finfo_file()` lê os magic bytes do arquivo. |
 
 ---
 
 ## 📌 PRÓXIMAS AÇÕES
 
-1. **Iniciar Melhoria 4 — Upload de Imagem + Galeria**
-   - Campo `imagem VARCHAR(255)` já existe na tabela
-   - Storage em `storage/uploads/artes/`
-   - Altera 7 arquivos (Service, Controller, Validator, 4 views)
+1. **Iniciar Melhoria 5 — Estatísticas por Arte**
+   - Cards financeiros no show.php
+   - Métodos `calcularCustoPorHora()` e `calcularPrecoSugerido()` já existem
+   - Adicionar: Progresso, Lucro (se vendida), Rentabilidade
 
 2. **Sequência recomendada:**
    ```
@@ -749,8 +964,8 @@ O status de uma arte segue uma máquina de estados com transições explícitas.
    ✅ Melhoria 1 (COMPLETA — Paginação 12/página + filtros combinados)
    ✅ Melhoria 2 (COMPLETA — Ordenação dinâmica 6 colunas + headers clicáveis)
    ✅ Melhoria 3 (COMPLETA VIA M1 — backend + UI já funcionais)
+   ✅ Melhoria 4 (COMPLETA — Upload seguro JPG/PNG/WEBP + 1 bug corrigido)
    
-   Melhoria 4 (upload de imagem — independente)
    Melhoria 5 (estatísticas — independente)
    Melhoria 6 (gráficos — independente)
    ```
@@ -767,12 +982,12 @@ Ordem de estabilização (menor → maior acoplamento):
 1. ✅ Tags         — independente                        → COMPLETO (6/6)
 2. ✅ Clientes     — independente                        → COMPLETO (6/6)
 3. ✅ Metas        — independente (atualizado por Vendas) → COMPLETO (6/6)
-4. 🔧 ARTES        — depende de Tags (✅ pronto)          → FASE 1 + M1 + M2 + M3 COMPLETAS, M4/M5/M6 PENDENTES
+4. 🔧 ARTES        — depende de Tags (✅ pronto)          → FASE 1 + M1 + M2 + M3 + M4 COMPLETAS, M5/M6 PENDENTES
 5. ⏳ Vendas       — depende de Artes + Clientes + Metas → NÃO TESTADO
 ```
 
 ---
 
-**Última atualização:** 16/02/2026  
-**Status:** ✅ FASE 1 + MELHORIAS 1, 2 e 3 COMPLETAS — Próximo: Melhoria 4 (Upload de Imagem)  
-**Próxima ação:** Implementar upload de imagem + galeria visual
+**Última atualização:** 20/02/2026  
+**Status:** ✅ FASE 1 + MELHORIAS 1, 2, 3 e 4 COMPLETAS — Próximo: Melhoria 5 (Estatísticas)  
+**Próxima ação:** Implementar estatísticas por arte (cards financeiros no show.php)
