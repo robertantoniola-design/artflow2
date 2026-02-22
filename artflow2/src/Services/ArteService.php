@@ -405,6 +405,110 @@ class ArteService
     }
     
     // ==========================================
+    // [MELHORIA 5] MÉTRICAS INDIVIDUAIS (show.php)
+    // ==========================================
+
+    /**
+     * [M5] Calcula o progresso da arte em relação ao tempo estimado
+     * 
+     * Fórmula: (horas_trabalhadas / tempo_medio_horas) × 100
+     * Limitado a 100% para não ultrapassar a barra de progresso,
+     * mas o valor real é preservado em 'valor_real' para exibição.
+     * 
+     * Retorna null se não há tempo estimado (campo não preenchido).
+     * 
+     * @param Arte $arte Objeto Arte com dados de horas
+     * @return array|null [
+     *     'percentual'  => int,   // 0-100 (limitado para barra visual)
+     *     'valor_real'  => float, // Percentual real (pode ser >100%)
+     *     'horas_faltam' => float // Horas restantes (0 se já completou)
+     * ] ou null se sem estimativa
+     */
+    public function calcularProgresso(Arte $arte): ?array
+    {
+        $tempoEstimado = $arte->getTempoMedioHoras();
+        
+        // Sem estimativa de tempo → não é possível calcular progresso
+        if ($tempoEstimado === null || $tempoEstimado <= 0) {
+            return null;
+        }
+        
+        $horasTrabalhadas = $arte->getHorasTrabalhadas();
+        $valorReal = ($horasTrabalhadas / $tempoEstimado) * 100;
+        
+        return [
+            'percentual'   => min(100, (int) round($valorReal)), // Barra visual: máx 100%
+            'valor_real'    => round($valorReal, 1),              // Exibição: pode ser >100%
+            'horas_faltam'  => max(0, round($tempoEstimado - $horasTrabalhadas, 2)),
+        ];
+    }
+
+    /**
+     * [M5] Monta array completo de métricas para a view show.php
+     * 
+     * Centraliza TODOS os cálculos de métricas em um único lugar,
+     * evitando que o Controller precise chamar múltiplos métodos.
+     * 
+     * NOTA: Cards de Lucro e Rentabilidade serão adicionados após
+     * o módulo Vendas estar estabilizado (dependem da tabela vendas).
+     * 
+     * @param Arte $arte Objeto Arte
+     * @return array Métricas calculadas para exibição
+     */
+    public function getMetricasArte(Arte $arte): array
+    {
+        return [
+            'custo_por_hora'   => $this->calcularCustoPorHora($arte),
+            'preco_sugerido'   => $this->calcularPrecoSugerido($arte),
+            'progresso'        => $this->calcularProgresso($arte),
+            
+            // ┌─────────────────────────────────────────────────┐
+            // │ TODO: Adicionar após módulo Vendas estável       │
+            // │                                                   │
+            // │ 'lucro' => $this->calcularLucro($arte),          │
+            // │ 'rentabilidade' => $this->calcularRentab($arte), │
+            // │                                                   │
+            // │ Dependem de: query na tabela vendas               │
+            // │ Condição: só quando status = 'vendida'            │
+            // └─────────────────────────────────────────────────┘
+        ];
+    }
+
+    // ==========================================
+    // [MELHORIA 6] DADOS PARA GRÁFICOS (index.php)
+    // ==========================================
+
+    /**
+     * [M6] Retorna distribuição de artes por complexidade
+     * 
+     * Wrapper para ArteRepository::countByComplexidade().
+     * Padrão: Service delega para Repository (mesma abordagem de Tags M6).
+     * 
+     * @return array ['baixa' => N, 'media' => N, 'alta' => N]
+     */
+    public function getDistribuicaoComplexidade(): array
+    {
+        return $this->arteRepository->countByComplexidade();
+    }
+
+    /**
+     * [M6] Retorna dados para os 4 cards de resumo na index.php
+     * 
+     * Indicadores:
+     * - Total de artes
+     * - Valor em estoque (soma custo das NÃO vendidas)
+     * - Horas totais investidas
+     * - Artes disponíveis para venda
+     * 
+     * @return array Associativo com os indicadores
+     */
+    public function getResumoCards(): array
+    {
+        return $this->arteRepository->getResumoFinanceiro();
+    }
+
+
+    // ==========================================
     // [MELHORIA 4] UPLOAD DE IMAGEM
     // ==========================================
     

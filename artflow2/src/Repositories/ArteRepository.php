@@ -356,6 +356,80 @@ class ArteRepository extends BaseRepository
     }
     
     // ========================================
+    // [MELHORIA 6] ESTATÍSTICAS PARA GRÁFICOS
+    // ========================================
+
+    /**
+     * [M6] Conta artes agrupadas por complexidade
+     * 
+     * Mesmo padrão do countByStatus(), mas agrupa por complexidade.
+     * Usado no gráfico de barras horizontais da index.php.
+     * 
+     * @return array ['baixa' => N, 'media' => N, 'alta' => N]
+     */
+    public function countByComplexidade(): array
+    {
+        $sql = "SELECT complexidade, COUNT(*) as total 
+                FROM {$this->table} 
+                GROUP BY complexidade";
+        
+        $stmt = $this->getConnection()->query($sql);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Inicializa com zeros (garante que todas as chaves existam)
+        $result = [
+            'baixa' => 0,
+            'media' => 0,
+            'alta'  => 0
+        ];
+        
+        foreach ($rows as $row) {
+            if (isset($result[$row['complexidade']])) {
+                $result[$row['complexidade']] = (int) $row['total'];
+            }
+        }
+        
+        return $result;
+    }
+
+    /**
+     * [M6] Retorna resumo financeiro para cards de indicadores
+     * 
+     * Query única que calcula todos os indicadores de uma vez
+     * (mais eficiente que múltiplas queries separadas).
+     * 
+     * Indicadores:
+     * - total: Total de artes no banco
+     * - valor_estoque: SUM(preco_custo) das artes NÃO vendidas
+     * - horas_totais: SUM(horas_trabalhadas) de todas as artes
+     * - disponiveis: COUNT de artes com status 'disponivel'
+     * 
+     * @return array Associativo com os 4 indicadores
+     */
+    public function getResumoFinanceiro(): array
+    {
+        $sql = "SELECT 
+                    COUNT(*) as total,
+                    COALESCE(SUM(
+                        CASE WHEN status IN ('disponivel', 'em_producao', 'reservada') 
+                        THEN preco_custo ELSE 0 END
+                    ), 0) as valor_estoque,
+                    COALESCE(SUM(horas_trabalhadas), 0) as horas_totais,
+                    SUM(CASE WHEN status = 'disponivel' THEN 1 ELSE 0 END) as disponiveis
+                FROM {$this->table}";
+        
+        $result = $this->getConnection()->query($sql)->fetch(PDO::FETCH_ASSOC);
+        
+        return [
+            'total'          => (int)   ($result['total'] ?? 0),
+            'valor_estoque'  => (float) ($result['valor_estoque'] ?? 0),
+            'horas_totais'   => (float) ($result['horas_totais'] ?? 0),
+            'disponiveis'    => (int)   ($result['disponiveis'] ?? 0),
+        ];
+    }
+
+
+    // ========================================
     // RELACIONAMENTO COM TAGS (N:N)
     // ========================================
     

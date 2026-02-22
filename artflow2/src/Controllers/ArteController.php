@@ -116,6 +116,10 @@ class ArteController extends BaseController
     /**
      * Lista todas as artes
      * GET /artes
+     * 
+     * [M1] Paginação via ?pagina=X (12 artes/página)
+     * [M2] Ordenação via ?ordenar=coluna&direcao=ASC|DESC
+     * [M6] Dados para gráficos Chart.js e cards de resumo
      */
     public function index(Request $request): Response
     {
@@ -129,31 +133,38 @@ class ArteController extends BaseController
             'tag_id'  => $request->get('tag_id'),
             'pagina'  => (int) ($request->get('pagina') ?? 1),
             'ordenar' => $request->get('ordenar') ?? 'created_at',
-            'direcao' => $request->get('direcao') ?? 'DESC',
+            'direcao' => $request->get('direcao') ?? 'DESC'
         ];
         
-        // [MELHORIA 1] Busca paginada com filtros combinados
+        // M1: Busca paginada
         $resultado = $this->arteService->listarPaginado($filtros);
         
+        // Tags para dropdown de filtro
         $tags = $this->tagService->listar();
+        
+        // Estatísticas por status (já existia — usado nos cards de status E no gráfico M6)
         $estatisticas = $this->arteService->getEstatisticas();
         
-        // Resposta AJAX
-        if ($request->wantsJson()) {
-            return $this->json([
-                'success' => true,
-                'data' => array_map(fn($a) => $a->toArray(), $resultado['artes']),
-                'total' => $resultado['paginacao']['total']
-            ]);
-        }
+        // ── [MELHORIA 6] Dados para gráficos e cards de resumo ──
+        $distribuicaoComplexidade = $this->arteService->getDistribuicaoComplexidade();
+        $resumoCards = $this->arteService->getResumoCards();
+        
+        // Proteção: só exibe gráficos se houver artes no banco
+        // (evita Canvas vazio / gráfico com 0 em todos os valores)
+        $temDadosGrafico = ($resumoCards['total'] ?? 0) > 0;
         
         return $this->view('artes/index', [
-            'titulo'       => 'Minhas Artes',
-            'artes'        => $resultado['artes'],
-            'paginacao'    => $resultado['paginacao'],
-            'tags'         => $tags,
+            'titulo'      => 'Minhas Artes',
+            'artes'       => $resultado['artes'],
+            'paginacao'   => $resultado['paginacao'],
+            'filtros'     => $filtros,
+            'tags'        => $tags,
             'estatisticas' => $estatisticas,
-            'filtros'      => $filtros,
+            
+            // ── [M6] Novos dados para gráficos e cards ──
+            'distribuicaoComplexidade' => $distribuicaoComplexidade,
+            'resumoCards'              => $resumoCards,
+            'temDadosGrafico'          => $temDadosGrafico,
         ]);
     }
     
@@ -233,6 +244,10 @@ class ArteController extends BaseController
     /**
      * Exibe detalhes da arte
      * GET /artes/{id}
+     * 
+     * [Fase 1] Tags, cálculos, status list
+     * [M4] Imagem ampliada
+     * [M5] Métricas completas (custo/hora, preço sugerido, progresso)
      */
     public function show(Request $request, int $id): Response
     {
@@ -243,17 +258,23 @@ class ArteController extends BaseController
             $arte = $this->arteService->buscar($id);
             $tags = $this->arteService->getTags($id);
             
-            // Cálculos de métricas
-            $custoPorHora = $this->arteService->calcularCustoPorHora($arte);
+            // Cálculos individuais (mantidos para retrocompatibilidade com show.php existente)
+            $custoPorHora  = $this->arteService->calcularCustoPorHora($arte);
             $precoSugerido = $this->arteService->calcularPrecoSugerido($arte);
+            
+            // ── [MELHORIA 5] Métricas completas para cards de estatísticas ──
+            // Retorna: custo_por_hora, preco_sugerido, progresso
+            // Progresso inclui: percentual, valor_real, horas_faltam (ou null)
+            $metricas = $this->arteService->getMetricasArte($arte);
             
             return $this->view('artes/show', [
                 'titulo'        => $arte->getNome(),
                 'arte'          => $arte,
                 'tags'          => $tags,
-                'custoPorHora'  => $custoPorHora,
-                'precoSugerido' => $precoSugerido,
-                'statusList'    => $this->getStatusList()
+                'custoPorHora'  => $custoPorHora,   // Retrocompatibilidade
+                'precoSugerido' => $precoSugerido,  // Retrocompatibilidade
+                'statusList'    => $this->getStatusList(),
+                'metricas'      => $metricas,       // [M5] Array completo de métricas
             ]);
             
         } catch (NotFoundException $e) {
