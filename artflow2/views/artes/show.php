@@ -15,14 +15,16 @@
  *     - custo_por_hora  (float|null)
  *     - preco_sugerido  (float)
  *     - progresso       (array|null: percentual, valor_real, horas_faltam)
+ *     - lucro           (array|null: valor_venda, lucro, margem_percentual) ← NOVO
+ *     - rentabilidade   (float|null: R$/hora)                               ← NOVO
  * 
  * HISTÓRICO:
- * - [Fase 1]    URLs com url(), status "reservada", botão excluir,
- *               cards alterar status e adicionar horas
+ * - [Fase 1]    URLs com url(), status "reservada", botão excluir
  * - [Melhoria 4] Imagem ampliada 400px com zoom
  * - [Melhoria 5] Cards de métricas (Custo/Hora, Preço Sugerido, Progresso)
- *               SUBSTITUEM os cards financeiros antigos (evita duplicidade)
- *               TODO: +Lucro +Rentabilidade após módulo Vendas estável
+ * - [M5 CROSS-MODULE] Cards de Lucro e Rentabilidade (22/02/2026)
+ *     Só visíveis quando status = 'vendida' e dados de venda existem.
+ *     Layout: 3 cards base (row 1) + 2 cards condicionais (row 2).
  */
 $currentPage = 'artes';
 
@@ -105,12 +107,7 @@ $tempoEstimado    = method_exists($arte, 'getTempoMedioHoras') ? $arte->getTempo
 
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!-- [MELHORIA 5] Cards de Métricas da Arte                        -->
-<!-- 3 Cards: Custo/Hora, Preço Sugerido, Progresso                -->
-<!-- SUBSTITUI os "Cards Financeiros" antigos (Custo, Custo/Hora,  -->
-<!-- Preço Sugerido) que existiam dentro do col-lg-8 — evita       -->
-<!-- duplicidade e apresenta dados de forma mais rica.              -->
-<!--                                                                -->
-<!-- TODO: Adicionar +Lucro +Rentabilidade após módulo Vendas       -->
+<!-- Row 1: 3 Cards base (Custo/Hora, Preço Sugerido, Progresso)   -->
 <!-- ══════════════════════════════════════════════════════════════ -->
 <div class="row g-3 mb-4">
     
@@ -191,7 +188,6 @@ $tempoEstimado    = method_exists($arte, 'getTempoMedioHoras') ? $arte->getTempo
                         <?php if ($metricas['progresso'] !== null): ?>
                             <?php
                             $prog = $metricas['progresso'];
-                            // Cor da barra: verde se ≤100%, vermelho se ultrapassou estimativa
                             $barraClasse = $prog['valor_real'] > 100 ? 'bg-danger' : 'bg-warning';
                             $progressoTexto = $prog['valor_real'] > 100 
                                 ? 'Ultrapassou em ' . round($prog['valor_real'] - 100, 1) . '%'
@@ -201,7 +197,6 @@ $tempoEstimado    = method_exists($arte, 'getTempoMedioHoras') ? $arte->getTempo
                                 <?= $prog['valor_real'] ?>%
                             </h3>
                             
-                            <!-- Barra de progresso visual -->
                             <div class="progress mt-2" style="height: 8px;">
                                 <div class="progress-bar <?= $barraClasse ?>" 
                                      role="progressbar" 
@@ -235,21 +230,118 @@ $tempoEstimado    = method_exists($arte, 'getTempoMedioHoras') ? $arte->getTempo
 
 </div>
 <!-- ══════════════════════════════════════════ -->
-<!-- [M5] FIM dos Cards de Métricas            -->
+<!-- [M5] FIM Row 1 — Cards Base               -->
 <!-- ══════════════════════════════════════════ -->
 
-<!-- ┌──────────────────────────────────────────────┐ -->
-<!-- │ TODO: Cards de Lucro e Rentabilidade          │ -->
-<!-- │ Implementar após módulo Vendas estar estável  │ -->
-<!-- │                                                │ -->
-<!-- │ Card 4: Lucro = preço_venda - preco_custo     │ -->
-<!-- │   Condição: só se status = 'vendida'          │ -->
-<!-- │   Depende de: tabela vendas                   │ -->
-<!-- │                                                │ -->
-<!-- │ Card 5: Rentabilidade = lucro / horas          │ -->
-<!-- │   Condição: vendida + horas > 0               │ -->
-<!-- │   Depende de: tabela vendas                   │ -->
-<!-- └──────────────────────────────────────────────┘ -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- [M5 CROSS-MODULE] Cards de Lucro e Rentabilidade              -->
+<!-- Row 2: Só aparecem para artes VENDIDAS com dados de venda     -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<?php if ($metricas['lucro'] !== null): ?>
+<div class="row g-3 mb-4">
+    
+    <!-- Card 4: Lucro da Venda -->
+    <div class="col-md-6">
+        <div class="card border-start border-4 border-primary h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="card-subtitle text-muted mb-1">
+                            <i class="bi bi-graph-up-arrow text-primary"></i> Lucro da Venda
+                        </h6>
+                        <?php
+                        $lucroData = $metricas['lucro'];
+                        // Cor do lucro: verde se positivo, vermelho se negativo
+                        $lucroClasse = $lucroData['lucro'] >= 0 ? 'text-success' : 'text-danger';
+                        $lucroIcone  = $lucroData['lucro'] >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+                        ?>
+                        <h3 class="mb-0 <?= $lucroClasse ?>">
+                            R$ <?= number_format($lucroData['lucro'], 2, ',', '.') ?>
+                        </h3>
+                        <small class="text-muted">
+                            Vendida por R$ <?= number_format($lucroData['valor_venda'], 2, ',', '.') ?>
+                            — Custo R$ <?= number_format($precoCusto, 2, ',', '.') ?>
+                        </small>
+                    </div>
+                    <div class="fs-1 text-primary opacity-25">
+                        <i class="bi bi-currency-dollar"></i>
+                    </div>
+                </div>
+                
+                <!-- Barra de margem percentual -->
+                <div class="mt-3">
+                    <?php
+                    // Margem: limita visualmente a 200% para não distorcer a barra
+                    $margemVisual = min(100, abs($lucroData['margem_percentual']) / 2);
+                    $margemBarraClasse = $lucroData['margem_percentual'] >= 0 ? 'bg-success' : 'bg-danger';
+                    ?>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted">Margem sobre custo</small>
+                        <small class="fw-bold <?= $lucroClasse ?>">
+                            <i class="bi <?= $lucroIcone ?>"></i>
+                            <?= number_format($lucroData['margem_percentual'], 1, ',', '.') ?>%
+                        </small>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar <?= $margemBarraClasse ?>" 
+                             style="width: <?= $margemVisual ?>%">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 5: Rentabilidade por Hora -->
+    <div class="col-md-6">
+        <div class="card border-start border-4 border-danger h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="card-subtitle text-muted mb-1">
+                            <i class="bi bi-lightning-charge-fill text-danger"></i> Rentabilidade/Hora
+                        </h6>
+                        <?php if ($metricas['rentabilidade'] !== null): ?>
+                            <h3 class="mb-0">
+                                R$ <?= number_format($metricas['rentabilidade'], 2, ',', '.') ?><small class="text-muted">/h</small>
+                            </h3>
+                            <small class="text-muted">
+                                lucro por hora trabalhada
+                            </small>
+                            
+                            <?php
+                            // Comparação: rentabilidade vs custo/hora
+                            // Se rentabilidade > custo/hora, a arte foi lucrativa
+                            if ($metricas['custo_por_hora'] !== null && $metricas['custo_por_hora'] > 0):
+                                $multiplicador = round($metricas['rentabilidade'] / $metricas['custo_por_hora'], 1);
+                            ?>
+                                <div class="mt-2">
+                                    <small class="<?= $multiplicador >= 1 ? 'text-success' : 'text-danger' ?>">
+                                        <i class="bi bi-<?= $multiplicador >= 1 ? 'check-circle' : 'exclamation-circle' ?>"></i>
+                                        <?= $multiplicador ?>× o custo por hora
+                                    </small>
+                                </div>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <h3 class="mb-0 text-muted">N/A</h3>
+                            <small class="text-muted">
+                                Sem horas registradas
+                            </small>
+                        <?php endif; ?>
+                    </div>
+                    <div class="fs-1 text-danger opacity-25">
+                        <i class="bi bi-lightning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<?php endif; ?>
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- [M5 CROSS-MODULE] FIM Row 2 — Cards Lucro/Rentab     -->
+<!-- ══════════════════════════════════════════════════════ -->
 
 
 <div class="row">
@@ -284,13 +376,14 @@ $tempoEstimado    = method_exists($arte, 'getTempoMedioHoras') ? $arte->getTempo
                      title="Clique para ampliar">
             </div>
         <?php else: ?>
-            <!-- Placeholder quando não há imagem -->
             <div class="text-center mb-4 p-4 bg-light rounded border">
                 <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
                 <p class="text-muted mt-2 mb-0">Nenhuma imagem cadastrada</p>
+                <?php if ($status !== 'vendida'): ?>
                 <a href="<?= url('/artes/' . $arte->getId() . '/editar') ?>" class="btn btn-sm btn-outline-primary mt-2">
                     <i class="bi bi-upload"></i> Adicionar imagem
                 </a>
+                <?php endif; ?>
             </div>
         <?php endif; ?>
 
@@ -325,19 +418,8 @@ $tempoEstimado    = method_exists($arte, 'getTempoMedioHoras') ? $arte->getTempo
                         <strong><?= number_format($horasTrabalhadas, 1, ',', '.') ?>h</strong>
                     </div>
                 </div>
-                
-                <!-- [M5] Barra de progresso REMOVIDA daqui -->
-                <!-- Motivo: agora está no Card de Progresso M5 (mais visível e com dados ricos) -->
-                
             </div>
         </div>
-        
-        <!-- ============================================ -->
-        <!-- [M5] Cards Financeiros antigos REMOVIDOS     -->
-        <!-- Motivo: substituídos pelos Cards M5 acima    -->
-        <!-- que mostram mesmos dados + margem + progresso -->
-        <!-- com visual mais rico (border-start, ícones)  -->
-        <!-- ============================================ -->
         
     </div><!-- /col-lg-8 -->
     

@@ -33,7 +33,7 @@ $currentPage = 'vendas';
                 <div class="d-flex justify-content-between">
                     <div>
                         <h6 class="opacity-75">Total Vendas</h6>
-                        <h3 class="mb-0"><?= $estatisticas['total'] ?? 0 ?></h3>
+                        <h3 class="mb-0"><?= $estatisticas['total_vendas'] ?? $estatisticas['total'] ?? 0 ?></h3>
                     </div>
                     <i class="bi bi-cart-check display-6 opacity-50"></i>
                 </div>

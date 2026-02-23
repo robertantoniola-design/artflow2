@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Artes: Documentação Completa
 
-**Data:** 21/02/2026  
-**Status Geral:** ✅ MÓDULO 100% COMPLETO — Fase 1 + 6/6 Melhorias implementadas  
-**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados + Ordenação dinâmica + Upload de Imagem + Estatísticas + Gráficos  
+**Data:** 22/02/2026  
+**Status Geral:** ✅ MÓDULO 100% COMPLETO — Fase 1 + 6/6 Melhorias + Cross-Module OK  
+**Versão Base:** CRUD estabilizado + Paginação + Filtros combinados + Ordenação dinâmica + Upload de Imagem + Estatísticas + Gráficos + Cards Lucro/Rentabilidade  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)  
 **Banco de dados:** `artflow2_db`
 
@@ -12,7 +12,7 @@
 
 O módulo de Artes do ArtFlow 2.0 é o módulo central do sistema — gerencia o portfólio de obras artísticas, incluindo dados de produção (tempo, complexidade, custo), status de disponibilidade, imagens das obras e categorização via Tags (relacionamento N:N). O módulo depende de Tags (seletor no formulário) e é pré-requisito para o módulo de Vendas (select de arte_id no formulário de venda) e para o Dashboard (estatísticas e gráficos).
 
-O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3. A **Melhoria 2 (Ordenação Dinâmica)** foi implementada em 16/02/2026 com 10/10 testes OK, adicionando 6 colunas ordenáveis com headers clicáveis e botões de ordenação. A **Melhoria 4 (Upload de Imagem)** foi implementada em 20/02/2026 com 12/12 testes OK, adicionando upload seguro de imagens JPG/PNG/WEBP com validação por MIME type real, preview JavaScript, thumbnails na listagem e imagem ampliada no show. As **Melhorias 5 e 6** foram implementadas simultaneamente em 21/02/2026, adicionando cards de métricas (Custo/Hora, Preço Sugerido, Progresso) no show.php e cards financeiros + gráficos Chart.js (Doughnut status + Barras complexidade) no index.php.
+O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4 sessões de trabalho (15/02/2026), cobrindo backend (Controller, Service, Validator) e frontend (4 views). Todos os 12 testes CRUD passaram com sucesso. A **Melhoria 1 (Paginação)** foi implementada em 16/02/2026 com 12/12 testes OK, incluindo filtros combinados (status + tag + busca simultâneos) que antecipam a Melhoria 3. A **Melhoria 2 (Ordenação Dinâmica)** foi implementada em 16/02/2026 com 10/10 testes OK, adicionando 6 colunas ordenáveis com headers clicáveis e botões de ordenação. A **Melhoria 4 (Upload de Imagem)** foi implementada em 20/02/2026 com 12/12 testes OK, adicionando upload seguro de imagens JPG/PNG/WEBP com validação por MIME type real, preview JavaScript, thumbnails na listagem e imagem ampliada no show. As **Melhorias 5 e 6** foram implementadas simultaneamente em 21/02/2026, adicionando cards de métricas (Custo/Hora, Preço Sugerido, Progresso) no show.php e cards financeiros + gráficos Chart.js (Doughnut status + Barras complexidade) no index.php. A **pendência cross-module** (Cards Lucro + Rentabilidade) foi implementada em 22/02/2026 após a estabilização do módulo Vendas, completando o show.php com 5 cards de métricas.
 
 ### Status das Fases
 
@@ -25,6 +25,7 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 | Melhoria 4 | Upload de imagem (JPG/PNG/WEBP, 2MB, segurança) | ✅ COMPLETA (20/02/2026) |
 | Melhoria 5 | Estatísticas por arte (cards métricas no show.php) | ✅ COMPLETA (21/02/2026) |
 | Melhoria 6 | Gráficos de distribuição (Chart.js — status + complexidade) | ✅ COMPLETA (21/02/2026) |
+| Cross-Module | Cards Lucro + Rentabilidade (Artes ↔ Vendas) | ✅ COMPLETA (22/02/2026) |
 
 ### Melhorias — Visão Geral
 
@@ -37,20 +38,40 @@ O módulo passou por uma fase de estabilização com **11 bugs corrigidos** em 4
 | 5 | Estatísticas por arte (cards no show.php) | Média | — | ✅ COMPLETA |
 | 6 | Gráfico de distribuição (Doughnut + Barras) | Baixa | — | ✅ COMPLETA |
 
-### ⚠️ PENDÊNCIA CROSS-MODULE (Artes ↔ Vendas)
+### ✅ PENDÊNCIA CROSS-MODULE RESOLVIDA (Artes ↔ Vendas)
 
-| Pendência | Depende de | Onde implementar | Status |
-|-----------|------------|------------------|--------|
-| Card **Lucro** no show.php | Tabela `vendas` (preço de venda) | ArteService + show.php | ⏳ Após Vendas estável |
-| Card **Rentabilidade** no show.php | Tabela `vendas` + horas_trabalhadas | ArteService + show.php | ⏳ Após Vendas estável |
+| Pendência | Depende de | Onde implementado | Status |
+|-----------|------------|-------------------|--------|
+| Card **Lucro** no show.php | Tabela `vendas` (preço de venda) | ArteService + show.php | ✅ COMPLETO (22/02/2026) |
+| Card **Rentabilidade** no show.php | Tabela `vendas` + horas_trabalhadas | ArteService + show.php | ✅ COMPLETO (22/02/2026) |
 
-**Detalhes:** Os cards de Lucro (`preço_venda - preço_custo`) e Rentabilidade (`lucro / horas_trabalhadas`) só fazem sentido para artes vendidas e dependem de uma query na tabela `vendas`. Como o módulo Vendas ainda não foi testado/estabilizado, esses 2 cards foram postergados. TODOs estão marcados no código (`ArteService::getMetricasArte()` e `views/artes/show.php`).
+**Implementação (22/02/2026):**
+1. `ArteService` recebeu `VendaRepository` como 3ª dependência no construtor (auto-wiring)
+2. `getDadosVenda(Arte)` — método privado, busca venda via `findFirstBy('arte_id', $id)`
+3. `calcularLucro(Arte)` — retorna `['valor_venda', 'lucro', 'margem_percentual']` ou null
+4. `calcularRentabilidade(Arte)` — retorna R$/hora ou null
+5. `getMetricasArte()` agora retorna **5 métricas** (antes 3): + `lucro` + `rentabilidade`
+6. `show.php` — Row 2 condicional com 2 cards (só aparece se `status === 'vendida'`)
+7. Card Lucro: valor de venda, lucro em R$, margem % com barra visual (verde/vermelho)
+8. Card Rentabilidade: R$/hora + comparação multiplicadora com custo/hora
 
-**Implementação futura (pós-Vendas):**
-1. Adicionar `calcularLucro(Arte $arte)` no ArteService — query `SELECT valor FROM vendas WHERE arte_id = ?`
-2. Adicionar `calcularRentabilidade(Arte $arte)` no ArteService — `lucro / horas_trabalhadas`
-3. Adicionar 2 cards extras no show.php (reorganizar de 3 para 5 cards)
-4. Condição: só exibir quando `$arte->getStatus() === 'vendida'`
+**Layout final do show.php:**
+```
+ARTE DISPONÍVEL (3 cards):
+┌──────────┐ ┌──────────────┐ ┌───────────┐
+│ Custo/h  │ │ Preço Suger. │ │ Progresso │
+└──────────┘ └──────────────┘ └───────────┘
+
+ARTE VENDIDA (5 cards):
+┌──────────┐ ┌──────────────┐ ┌───────────┐
+│ Custo/h  │ │ Preço Suger. │ │ Progresso │
+└──────────┘ └──────────────┘ └───────────┘
+┌────────────────┐ ┌──────────────────────┐
+│ Lucro da Venda │ │ Rentabilidade/Hora   │
+└────────────────┘ └──────────────────────┘
+```
+
+**Segurança:** getDadosVenda() tem try/catch — erro na consulta NÃO quebra a página. Cards condicionais: sem risco de undefined. Log de inconsistências para artes vendidas sem registro.
 
 ---
 
@@ -65,7 +86,7 @@ src/
 ├── Repositories/
 │   └── ArteRepository.php             🔧 M1 + M6 (+ allPaginated, countAll, countByComplexidade, getResumoFinanceiro)
 ├── Services/
-│   └── ArteService.php                🔧 M4 + M5 + M6 (+ upload, calcularProgresso, getMetricasArte, getDistribuicaoComplexidade, getResumoCards)
+│   └── ArteService.php                🔧 M4 + M5 + M6 + Cross-Module (+ VendaRepository, getDadosVenda, calcularLucro, calcularRentabilidade)
 ├── Controllers/
 │   └── ArteController.php             🔧 M4 + M5 + M6 (store/update + $metricas em show + gráficos em index)
 └── Validators/
@@ -75,7 +96,7 @@ views/
 └── artes/
     ├── index.php                      🔧 M6 (cards financeiros + gráficos Chart.js — substitui cards status antigos)
     ├── create.php                     🔧 Melhoria 4 (+ enctype multipart, input file, preview JS)
-    ├── show.php                       🔧 M5 (3 cards métricas — substitui cards financeiros antigos + barra progresso)
+    ├── show.php                       🔧 M5 + Cross-Module (5 cards métricas: 3 base + 2 condicionais vendida)
     └── edit.php                       🔧 Melhoria 4 (+ imagem atual, checkbox remover, preview nova)
 
 public/
@@ -98,13 +119,14 @@ database/
 
 ```
 ArteController → ArteService + TagService
-ArteService    → ArteRepository + TagRepository + ArteValidator
+ArteService    → ArteRepository + TagRepository + VendaRepository + ArteValidator
 (Depende de Tags para seletor no formulário)
+(Depende de VendaRepository para cards Lucro/Rentabilidade — Cross-Module 22/02/2026)
 
 ArteController::index()     usa ArteService::listarPaginado() + getDistribuicaoComplexidade() + getResumoCards() [M6]
 ArteController::create()    usa TagService::listar() para checkboxes de tags
 ArteController::store()     usa ArteService::criar($dados, $arquivo) [M4: + $arquivo]
-ArteController::show()      usa ArteService::getTags() + getMetricasArte() [M5: métricas unificadas]
+ArteController::show()      usa ArteService::getTags() + getMetricasArte() [M5: 5 métricas unificadas]
 ArteController::edit()      usa TagService::listar() + TagService::getTagIdsArte()
 ArteController::update()    usa ArteService::atualizar($id, $dados, $arquivo, $removerImagem) [M4]
 ArteController::destroy()   usa ArteService::remover() [M4: remove imagem física antes de deletar]
@@ -112,7 +134,7 @@ ArteController::alterarStatus()  usa ArteService::alterarStatus()
 ArteController::adicionarHoras() usa ArteService::adicionarHoras()
 ```
 
-**Nota sobre acoplamento:** O módulo Artes depende de Tags (✅ COMPLETO) para o seletor de categorias. NÃO depende de Vendas ou Metas.
+**Nota sobre acoplamento:** O módulo Artes depende de Tags (✅ COMPLETO) para o seletor de categorias e de VendaRepository (✅ leitura apenas) para cards de métricas de artes vendidas.
 
 **Quem depende de Artes:**
 - VendaService usa ArteRepository para buscar arte e atualizar status para 'vendida'
@@ -149,152 +171,33 @@ CREATE TABLE arte_tags (
     tag_id INT UNSIGNED NOT NULL,
 
     PRIMARY KEY (arte_id, tag_id),
-
     FOREIGN KEY (arte_id) REFERENCES artes(id) ON DELETE CASCADE,
-    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
-
-    INDEX idx_arte_tags_arte (arte_id),
-    INDEX idx_arte_tags_tag (tag_id)
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
-
-### Campos do Formulário (create.php / edit.php)
-
-| Campo | Tipo HTML | Validação | Obrigatório | Notas |
-|-------|-----------|-----------|-------------|-------|
-| nome | text | max:150 | ✅ | — |
-| descricao | textarea | — | ❌ | Texto livre |
-| tempo_medio_horas | number (step 0.5) | min:0 | ❌ | Estimativa de produção |
-| complexidade | select | in:baixa,media,alta | ✅ | Default: media |
-| preco_custo | number (step 0.01) | min:0 | ✅ | Em R$ |
-| horas_trabalhadas | number (step 0.5) | min:0 | ❌ | Acumulativo |
-| status | select | in:disponivel,em_producao,vendida,reservada | ✅ | Default: disponivel |
-| tags[] | checkbox multiple | IDs existentes | ❌ | Relacionamento N:N |
-| imagem | file (accept .jpg,.png,.webp) | MIME + extensão + tamanho ≤2MB | ❌ | [M4] Preview JS antes de enviar |
-| remover_imagem | checkbox | — | ❌ | [M4] Só no edit.php — remove imagem sem substituir |
-
-### Rotas (9 total)
-
-```
-ARTES (7 RESTful + 2 extras)
-  GET    /artes              → ArteController@index         (listar com filtros + ordenação + gráficos M6)
-  GET    /artes/criar        → ArteController@create        (formulário criação)
-  POST   /artes              → ArteController@store         (salvar nova + upload imagem)
-  GET    /artes/{id}         → ArteController@show          (detalhes + tags + métricas M5 + imagem)
-  GET    /artes/{id}/editar  → ArteController@edit          (formulário edição + imagem atual)
-  PUT    /artes/{id}         → ArteController@update        (atualizar + sync tags + upload/remover imagem)
-  DELETE /artes/{id}         → ArteController@destroy       (excluir — CASCADE remove arte_tags + remove imagem física)
-  POST   /artes/{id}/status  → ArteController@alterarStatus (muda status sem editar tudo)
-  POST   /artes/{id}/horas   → ArteController@adicionarHoras(incrementa horas_trabalhadas)
-```
-
----
-
-## ✅ FASE 1 — ESTABILIZAÇÃO CRUD (COMPLETA)
-
-**Status:** ✅ 12/12 testes passando  
-**Data de conclusão:** 15/02/2026  
-**Sessões de trabalho:** 4 sessões no mesmo dia  
-**Total de bugs corrigidos:** 11
-
-### Checklist de Testes
-
-| # | Operação | Rota | O que verificar | Status |
-|---|----------|------|-----------------|--------|
-| T1 | Listar | `GET /artes` | Carrega sem erros, exibe dados dos seeds, tags no filtro | ✅ |
-| T2 | Criar (form) | `GET /artes/criar` | Formulário abre, checkboxes de tags aparecem | ✅ |
-| T3 | Criar (salvar) | `POST /artes` | Validação funciona, salva no banco com tags associadas | ✅ |
-| T4 | Visualizar | `GET /artes/{id}` | Exibe dados + tags + cálculos (custo/hora, preço sugerido) | ✅ |
-| T5 | Editar (form) | `GET /artes/{id}/editar` | Preenche valores existentes, tags marcadas corretamente | ✅ |
-| T6 | Editar (salvar) | `PUT /artes/{id}` | Atualiza dados + sync de tags funciona | ✅ |
-| T7 | Excluir | `DELETE /artes/{id}` | Confirmação funciona, arte some, arte_tags CASCADE | ✅ |
-| T8 | Filtro status | `GET /artes?status=disponivel` | Filtra corretamente | ✅ |
-| T9 | Filtro tag | `GET /artes?tag_id=X` | Retorna artes da tag selecionada | ✅ |
-| T10 | Busca | `GET /artes?termo=X` | Busca por nome e descrição | ✅ |
-| T11 | Alterar status | `POST /artes/{id}/status` | Muda status sem editar toda a arte | ✅ |
-| T12 | Adicionar horas | `POST /artes/{id}/horas` | Incrementa horas_trabalhadas | ✅ |
-
-### Bugs Corrigidos — Resumo
-
-| Bug | Arquivo | Problema | Correção |
-|-----|---------|----------|----------|
-| A1 | ArteValidator | Status 'reservada' ausente | Adicionado ao array $statusValidos |
-| B8 | ArteController | Erros de validação invisíveis | Grava direto em $_SESSION['_errors'] |
-| B9 | ArteController | Dados residuais no edit | limparDadosFormulario() em index/edit/show |
-| — | ArteController | IDs string do Router | $id = (int) $id em todos os métodos |
-| — | ArteController | Falta $statusList | Passa array para create/edit |
-| T1 | ArteService | Busca retorna 0 | Normalização filtros com ?? ?: |
-| T11 | ArteService | Transição 'reservada' bloqueada | Array de transições expandido |
-| — | 4 views | URLs hardcoded + reservada | url() helper + match() corrigidos |
-
----
-
-## ✅ MELHORIA 1 — PAGINAÇÃO NA LISTAGEM (COMPLETA)
-
-**Implementada em:** 16/02/2026 | **Testes:** 12/12 OK  
-**Arquivos:** ArteRepository, ArteService, ArteController, views/artes/index.php
-
-- 12 artes por página com controles Bootstrap 5
-- Filtros combinados (status + tag + busca simultâneos) via WHERE dinâmico
-- Preservação de estado via URL params (helper `arteUrl()`)
-- Indicador "Mostrando X–Y de Z artes"
-- Whitelist de 6 colunas para ORDER BY (preparação para M2)
-
----
-
-## ✅ MELHORIA 2 — ORDENAÇÃO DINÂMICA (COMPLETA)
-
-**Implementada em:** 16/02/2026 | **Testes:** 10/10 OK  
-**Arquivos:** views/artes/index.php (backend já pronto via M1)
-
-- 6 botões de ordenação: Nome, Complexidade, Custo, Horas, Status, Data
-- Headers da tabela clicáveis com setas contextuais (▲/▼)
-- Toggle automático ASC↔DESC + direções padrão por tipo (texto ASC, numérico DESC)
-- Helpers `arteSortUrl()` e `arteSortIcon()` na view
-
----
-
-## ✅ MELHORIA 3 — FILTROS COMBINADOS (BACKEND PRONTO VIA M1)
-
-**Status:** ✅ BACKEND + UI JÁ FUNCIONAIS — Implementados junto com Melhoria 1
-
-- `allPaginated()` constrói WHERE dinâmico com AND (não if/elseif exclusivo)
-- Barra de filtros com 3 campos simultâneos + botão "Limpar Filtros"
-
----
-
-## ✅ MELHORIA 4 — UPLOAD DE IMAGEM (COMPLETA)
-
-**Implementada em:** 20/02/2026 | **Testes:** 12/12 OK | **1 bug corrigido (M4-BUG1)**  
-**Arquivos:** ArteService, ArteController, ArteValidator, Arte (Model), 4 views, 2 .htaccess
-
-- Upload seguro JPG/PNG/WEBP até 2MB com validação por MIME type real (finfo_file)
-- Nomenclatura `arte_{id}_{timestamp}.{ext}` — evita colisões e cache stale
-- Preview JavaScript antes de enviar + substituição/remoção no edit
-- Thumbnail 45x45 na listagem + imagem ampliada 400px no show
-- Segurança: `.htaccess` bloqueia PHP no diretório de uploads
-- Bug M4-BUG1: `getPublicDir()` corrigido de `SCRIPT_FILENAME` para `dirname(__DIR__, 2)`
 
 ---
 
 ## ✅ MELHORIA 5 — ESTATÍSTICAS POR ARTE (COMPLETA)
 
-**Implementada em:** 21/02/2026  
+**Implementada em:** 21/02/2026 (3 cards base) + 22/02/2026 (2 cards cross-module)  
 **Complexidade:** Média  
-**Testes:** 5/5 OK (T7-T11 do guia M5+M6)  
-**Arquivos alterados:** ArteService (+2 métodos), ArteController (show enriquecido), views/artes/show.php (SUBSTITUÍDO)
+**Testes:** 5/5 OK (T7-T11 do guia M5+M6) + testes cross-module OK  
+**Arquivos alterados:** ArteService (+VendaRepository +5 métodos), ArteController (show enriquecido), views/artes/show.php (SUBSTITUÍDO 2×)
 
 ### O Que Foi Implementado
 
-| Recurso | Descrição |
-|---------|-----------|
-| **Card Custo/Hora** | R$/hora investida — exibe "N/A" se horas = 0 |
-| **Card Preço Sugerido** | Multiplicador 2.5× sobre custo + margem calculada |
-| **Card Progresso** | Barra visual 0-100% + % real + horas faltantes |
-| **Barra vermelha** | Se horas ultrapassaram tempo estimado (>100%) |
-| **Substituição de duplicidade** | Cards financeiros antigos e barra de progresso antiga removidos |
+| Recurso | Descrição | Data |
+|---------|-----------|------|
+| **Card Custo/Hora** | R$/hora investida — exibe "N/A" se horas = 0 | 21/02/2026 |
+| **Card Preço Sugerido** | Multiplicador 2.5× sobre custo + margem calculada | 21/02/2026 |
+| **Card Progresso** | Barra visual 0-100% + % real + horas faltantes | 21/02/2026 |
+| **Barra vermelha** | Se horas ultrapassaram tempo estimado (>100%) | 21/02/2026 |
+| **Card Lucro da Venda** | Valor venda, lucro R$, margem % com barra (verde/vermelho) | 22/02/2026 |
+| **Card Rentabilidade/Hora** | R$/hora de lucro + comparação multiplicadora vs custo/hora | 22/02/2026 |
+| **Substituição de duplicidade** | Cards financeiros antigos e barra de progresso antiga removidos | 21/02/2026 |
 
-### Métodos Adicionados
+### Métodos Adicionados/Alterados
 
 **ArteService:**
 ```php
@@ -302,29 +205,37 @@ ARTES (7 RESTful + 2 extras)
 public calcularProgresso(Arte $arte): ?array
 // Retorna: ['percentual' => 0-100, 'valor_real' => float, 'horas_faltam' => float] | null
 
+// [M5 Cross-Module] Busca dados da venda associada (só para status='vendida')
+private getDadosVenda(Arte $arte): ?array
+// Retorna: ['valor_venda', 'lucro', 'rentabilidade_hora', 'data_venda', 'forma_pagamento'] | null
+
+// [M5 Cross-Module] Calcula lucro da venda + margem percentual
+public calcularLucro(Arte $arte): ?array
+// Retorna: ['valor_venda', 'lucro', 'margem_percentual'] | null
+
+// [M5 Cross-Module] Calcula rentabilidade por hora baseada no lucro
+public calcularRentabilidade(Arte $arte): ?float
+// Retorna: R$/hora | null
+
 // [M5] Centraliza TODAS as métricas da arte para o show.php
 public getMetricasArte(Arte $arte): array
-// Retorna: ['custo_por_hora' => float|null, 'preco_sugerido' => float, 'progresso' => array|null]
-// TODO: adicionar 'lucro' e 'rentabilidade' após módulo Vendas estável
+// Retorna: [
+//   'custo_por_hora'   => float|null,       (sempre)
+//   'preco_sugerido'   => float,            (sempre)
+//   'progresso'        => array|null,       (se tem tempo estimado)
+//   'lucro'            => array|null,       (SÓ se status='vendida')
+//   'rentabilidade'    => float|null,       (SÓ se status='vendida' + horas>0)
+// ]
 ```
 
-### Mudanças na View (show.php — arquivo SUBSTITUÍDO)
+### Mudanças na View (show.php)
 
-| Antes | Depois |
-|-------|--------|
-| 3 cards bg-light (Custo, Custo/Hora, Preço Sugerido) dentro de col-lg-8 | 3 cards M5 com border-start colorida, ícones grandes, entre header e row |
-| Barra de progresso dentro de "Informações Técnicas" | Card de Progresso M5 com barra + % + horas faltantes + cor vermelha se >100% |
-| Variáveis locais $custoHora, $precoSugerido, $progresso | $metricas via ArteService::getMetricasArte() |
-| Card "Info Técnica" com 3 colunas (col-md-4) | 4 colunas (col-md-3): Complexidade, Custo Material, Tempo Estimado, Horas |
-
-### Decisões Técnicas
-
-| Decisão | Justificativa |
-|---------|---------------|
-| **Substituir cards antigos** | Evita duplicidade de informação na mesma página |
-| **$metricas centralizado** | Service como fonte única — view não calcula |
-| **Progresso: percentual limitado a 100%** | Barra visual não ultrapassa container, mas valor_real preserva >100% |
-| **Lucro/Rentabilidade postergados** | Dependem de query na tabela vendas — módulo não testado |
+| Antes (21/02) | Depois (22/02) |
+|----------------|----------------|
+| 3 cards M5 (Custo/Hora, Preço Sugerido, Progresso) | 3 cards base + Row 2 condicional |
+| TODO comment para Lucro/Rentabilidade | 2 cards implementados (col-md-6 cada) |
+| — | Card Lucro: barra margem %, cores condicionais |
+| — | Card Rentabilidade: multiplicador vs custo/hora |
 
 ---
 
@@ -332,75 +243,25 @@ public getMetricasArte(Arte $arte): array
 
 **Implementada em:** 21/02/2026  
 **Complexidade:** Baixa  
-**Testes:** 6/6 OK (T1-T6 do guia M5+M6)  
-**Arquivos alterados:** ArteRepository (+2), ArteService (+2), ArteController (index enriquecido), views/artes/index.php (SUBSTITUÍDO)
+**Testes:** 5/5 OK (T12-T16 do guia M5+M6)
 
 ### O Que Foi Implementado
 
-| Recurso | Descrição |
-|---------|-----------|
-| **4 Cards de Resumo** | Total de Artes, Valor em Estoque, Horas Investidas, Disponíveis |
-| **Gráfico Doughnut** | Distribuição por Status (4 fatias: Disponível, Em Produção, Vendida, Reservada) |
-| **Gráfico Barras Horizontais** | Distribuição por Complexidade (3 barras: Baixa, Média, Alta) |
-| **Collapse expansível** | Botão chevron para expandir/recolher gráficos |
-| **Legenda manual HTML** | Bolinhas coloridas com valores numéricos por categoria |
-| **Substituição de duplicidade** | Cards de contagem por status antigos substituídos (info agora no Doughnut) |
-| **Fallback banco vazio** | Se $temDadosGrafico = false, exibe cards simples com zeros |
-| **Bug corrigido** | `class="width: 60px;"` → `style="width: 60px;"` na coluna Imagem |
+| Recurso | Tipo Chart.js | Dados |
+|---------|--------------|-------|
+| **Distribuição por Status** | Doughnut | COUNT(*) GROUP BY status |
+| **Distribuição por Complexidade** | Barras horizontais | COUNT(*) GROUP BY complexidade |
 
 ### Métodos Adicionados
 
 **ArteRepository:**
 ```php
-// [M6] GROUP BY complexidade — retorna ['baixa' => N, 'media' => N, 'alta' => N]
+// [M6] COUNT(*) GROUP BY complexidade
 public countByComplexidade(): array
 
 // [M6] Query única com SUM/COUNT — retorna total, valor_estoque, horas_totais, disponiveis
 public getResumoFinanceiro(): array
 ```
-
-**ArteService:**
-```php
-// [M6] Wrapper para ArteRepository::countByComplexidade()
-public getDistribuicaoComplexidade(): array
-
-// [M6] Wrapper para ArteRepository::getResumoFinanceiro()
-public getResumoCards(): array
-```
-
-### Mudanças na View (index.php — arquivo SUBSTITUÍDO)
-
-| Antes | Depois |
-|-------|--------|
-| 4 cards simples (Disponíveis, Em Produção, Vendidas, Reservadas) | 4 cards financeiros M6 (Total, Estoque, Horas, Disponíveis) com border-start + ícones |
-| — | Card Gráficos com Doughnut (status) + Barras (complexidade) + collapse |
-| — | CDN Chart.js 4.4.7 + script condicional |
-| — | Fallback quando banco vazio (cards com zeros) |
-
-### Fluxo Arquitetural M6
-
-```
-ArteController::index()
-  ├─► ArteService::getDistribuicaoComplexidade()
-  │     └─► ArteRepository::countByComplexidade()
-  │           └─► SELECT complexidade, COUNT(*) GROUP BY complexidade
-  │
-  ├─► ArteService::getResumoCards()
-  │     └─► ArteRepository::getResumoFinanceiro()
-  │           └─► SELECT COUNT(*), SUM(CASE...), SUM(horas), SUM(CASE...)
-  │
-  └─► View: 4 cards + 2 gráficos Chart.js (condicional)
-```
-
-### Decisões Técnicas
-
-| Decisão | Justificativa |
-|---------|---------------|
-| **Cards status → Doughnut** | Gráfico mostra mesma informação + proporção visual |
-| **Chart.js 4.4.7** | Mesmo padrão de Tags M6 e Metas M3 |
-| **maintainAspectRatio: false** | Container altura fixa 280px — evita loop de resize (lição Dashboard) |
-| **Collapse com chart.resize()** | Chart.js precisa recalcular após display:none → block |
-| **$temDadosGrafico** | Proteção contra Canvas vazio quando banco sem artes |
 
 ---
 
@@ -408,13 +269,9 @@ ArteController::index()
 
 ### Bug B8: Validação Invisível (Afeta TODOS os módulos)
 
-**Problema:** A classe `Response` armazena erros de validação em `$_SESSION['_flash']`, mas as funções helper `has_error()` e `errors()` leem de `$_SESSION['_errors']`. Resultado: validação falha silenciosamente.
-
 **Status no módulo Artes:** ✅ Workaround aplicado no ArteController (grava direto em `$_SESSION['_errors']`).
 
 ### Bug B9: Dados Residuais no Edit
-
-**Problema:** Após validação falhar no create, dados ficam em `$_SESSION['_old_input']` e contaminam o edit de outra arte.
 
 **Status no módulo Artes:** ✅ Workaround aplicado — `limparDadosFormulario()` chamado em index(), edit() e show().
 
@@ -438,8 +295,10 @@ ArteController::index()
 | `ArteService::getTags($id)` | ✅ Sim | ✅ Verificado |
 | `ArteService::calcularCustoPorHora($arte)` | ✅ Sim | ✅ Verificado |
 | `ArteService::calcularPrecoSugerido($arte)` | ✅ Sim | ✅ Verificado |
-| `ArteService::getMetricasArte($arte)` | ✅ Sim | ✅ Adicionado Melhoria 5 |
+| `ArteService::getMetricasArte($arte)` | ✅ Sim | ✅ Adicionado M5, expandido Cross-Module (5 métricas) |
 | `ArteService::calcularProgresso($arte)` | ✅ Sim | ✅ Adicionado Melhoria 5 |
+| `ArteService::calcularLucro($arte)` | ✅ Sim | ✅ Adicionado Cross-Module (22/02/2026) |
+| `ArteService::calcularRentabilidade($arte)` | ✅ Sim | ✅ Adicionado Cross-Module (22/02/2026) |
 | `ArteService::getDistribuicaoComplexidade()` | ✅ Sim | ✅ Adicionado Melhoria 6 |
 | `ArteService::getResumoCards()` | ✅ Sim | ✅ Adicionado Melhoria 6 |
 | `TagService::listar()` | ✅ Sim (módulo Tags completo) | ✅ Verificado |
@@ -449,6 +308,7 @@ ArteController::index()
 
 | Método | Adicionado em | Descrição |
 |--------|---------------|-----------|
+| `getDadosVenda($arte)` | Cross-Module (22/02) | Busca venda via findFirstBy('arte_id') — try/catch silencioso |
 | `processarUploadImagem($arquivo, $arteId)` | Melhoria 4 | Move arquivo para public/uploads/artes/ |
 | `removerImagemFisica($arte)` | Melhoria 4 | Remove arquivo de imagem do disco |
 | `getUploadDirAbsoluto()` | Melhoria 4 | Caminho absoluto do diretório de uploads |
@@ -469,6 +329,8 @@ ArteController::index()
 | Container altura fixa para Chart.js | M6 | Evita loop de redimensionamento (lição do Dashboard) |
 | chart.resize() após collapse | M6 | Chart.js precisa recalcular após display:none → block |
 | Substituir em vez de duplicar | M5+M6 | Views novas substituem cards/barras antigos por versões ricas |
+| `findFirstBy()` do BaseRepository | Cross-Module | Usar métodos herdados em vez de criar métodos inexistentes |
+| try/catch em consultas cross-module | Cross-Module | Falha em tabela externa NÃO deve quebrar o módulo principal |
 
 ---
 
@@ -480,8 +342,8 @@ Ordem de estabilização (menor → maior acoplamento):
 1. ✅ Tags         — independente                         → COMPLETO (6/6)
 2. ✅ Clientes     — independente                         → COMPLETO (6/6)
 3. ✅ Metas        — independente (atualizado por Vendas)  → COMPLETO (6/6)
-4. ✅ ARTES        — depende de Tags (✅ pronto)            → COMPLETO (6/6) ★
-5. ⏳ Vendas       — depende de Artes + Clientes + Metas  → NÃO TESTADO (próximo)
+4. ✅ ARTES        — depende de Tags (✅) + VendaRepo (✅)  → COMPLETO (6/6 + Cross-Module) ★
+5. ✅ Vendas       — depende de Artes + Clientes + Metas  → FASE 1 COMPLETA (22/02/2026)
 ```
 
 ### Histórico das Sessões
@@ -496,10 +358,11 @@ Ordem de estabilização (menor → maior acoplamento):
 | 6 | 16/02 tarde | Melhoria 2 — Ordenação | 1 arquivo (view index.php) → 10/10 testes OK |
 | 7 | 20/02 manhã-tarde | Melhoria 4 — Upload de Imagem | 8 arquivos + 4 diagnósticos + 1 bug corrigido → 12/12 testes OK |
 | 8 | 21/02 manhã | Melhorias 5+6 — Estatísticas + Gráficos | 5 arquivos (Repository+2, Service+4, Controller, show, index) → 12/12 testes OK |
+| 9 | 22/02 manhã | Cross-Module — Cards Lucro + Rentabilidade | ArteService (+VendaRepository +3 métodos) + show.php (2 cards condicionais) |
 
 ---
 
-**Última atualização:** 21/02/2026  
-**Status:** ✅ MÓDULO 100% COMPLETO (Fase 1 + 6/6 Melhorias)  
-**Pendência cross-module:** Cards Lucro + Rentabilidade → implementar após módulo Vendas estável  
-**Próximo módulo:** 🎯 Vendas (Fase 1 — estabilização CRUD)
+**Última atualização:** 22/02/2026  
+**Status:** ✅ MÓDULO 100% COMPLETO (Fase 1 + 6/6 Melhorias + Cross-Module OK)  
+**Pendências cross-module:** ✅ TODAS RESOLVIDAS  
+**Próximo módulo:** 🎯 Vendas Melhorias (M1-M6)
