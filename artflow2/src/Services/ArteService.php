@@ -5,13 +5,14 @@ namespace App\Services;
 use App\Models\Arte;
 use App\Repositories\ArteRepository;
 use App\Repositories\TagRepository;
+use App\Repositories\VendaRepository;
 use App\Validators\ArteValidator;
 use App\Exceptions\ValidationException;
 use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * ARTE SERVICE — MELHORIA 4 (Upload de Imagem)
+ * ARTE SERVICE — MELHORIA 4 + M5 COMPLETA
  * ============================================
  * 
  * Camada de lógica de negócio para Artes.
@@ -25,19 +26,27 @@ use App\Exceptions\NotFoundException;
  * Melhoria 4: processarUploadImagem(), removerImagemFisica()
  *             Fluxo criar() e atualizar() agora suportam upload
  *             Fluxo remover() agora limpa arquivo físico
+ * Melhoria 5: calcularProgresso(), getMetricasArte() (3 cards)
+ * 
+ * M5 CROSS-MODULE (22/02/2026):
+ *   Adicionado VendaRepository como dependência para consultar
+ *   dados de venda de artes vendidas. Novos métodos:
+ *   - getDadosVenda(Arte): busca venda associada à arte
+ *   - calcularLucro(Arte): lucro + margem percentual
+ *   - calcularRentabilidade(Arte): R$/hora baseado no lucro
+ *   getMetricasArte() agora retorna 5 métricas (antes 3).
+ *   Cards de Lucro e Rentabilidade só aparecem para status='vendida'.
  * 
  * CORREÇÃO M4-BUG1 (20/02/2026):
  *   getPublicDir() retornava raiz do projeto (artflow2/) em vez de
  *   artflow2/public/ quando SCRIPT_FILENAME apontava para index.php
- *   na raiz. Arquivos iam para artflow2/uploads/artes/ (inacessível).
- *   Solução: Detectar a pasta public/ de forma confiável usando
- *   dirname(__DIR__, 2) que sobe de src/Services/ até a raiz do projeto,
- *   e então concatena /public.
+ *   na raiz. Solução: dirname(__DIR__, 2) + /public.
  */
 class ArteService
 {
     private ArteRepository $arteRepository;
     private TagRepository $tagRepository;
+    private VendaRepository $vendaRepository;
     private ArteValidator $validator;
     
     // ==========================================
@@ -49,23 +58,26 @@ class ArteService
     
     /**
      * [MELHORIA 4] Diretório de upload relativo à pasta public/
-     * 
-     * O caminho COMPLETO no disco será: {PROJECT_ROOT}/public/uploads/artes/
-     * O caminho salvo no BANCO será:    uploads/artes/arte_1_1708123456.jpg
-     * A URL para o NAVEGADOR usará:     url('/uploads/artes/arte_1_1708123456.jpg')
-     * 
-     * Nota: Armazenado dentro de public/ para servir direto via Apache.
-     * O .htaccess no diretório impede execução de scripts PHP.
      */
     const UPLOAD_DIR = 'uploads/artes';
     
+    /**
+     * Construtor — Container resolve via auto-wiring (Reflection)
+     * 
+     * ALTERAÇÃO M5 CROSS-MODULE (22/02/2026):
+     *   Adicionado VendaRepository para consultar dados de vendas
+     *   associadas a artes vendidas (cards Lucro + Rentabilidade).
+     *   O Container resolve automaticamente via type-hint.
+     */
     public function __construct(
         ArteRepository $arteRepository,
         TagRepository $tagRepository,
+        VendaRepository $vendaRepository,
         ArteValidator $validator
     ) {
         $this->arteRepository = $arteRepository;
         $this->tagRepository = $tagRepository;
+        $this->vendaRepository = $vendaRepository;
         $this->validator = $validator;
     }
     
@@ -77,8 +89,6 @@ class ArteService
      * Lista artes com filtros opcionais
      * 
      * [Bug T1 CORRIGIDO] — Normalização de filtros com ?: null
-     * Problema: URL ?status= gera "" (string vazia) → Repository adicionava AND status = '' → 0 resultados
-     * Solução: Encadeamento ?? null ?: null converte "" para null
      */
     public function listar(array $filtros = []): array
     {
@@ -103,9 +113,6 @@ class ArteService
     
     /**
      * [MELHORIA 1] Lista artes com paginação e filtros combinados
-     * 
-     * @param array $filtros ['status', 'termo', 'tag_id', 'pagina', 'ordenar', 'direcao']
-     * @return array ['artes' => [...], 'paginacao' => [...]]
      */
     public function listarPaginado(array $filtros): array
     {
@@ -117,14 +124,12 @@ class ArteService
         $ordenar = $filtros['ordenar'] ?? 'created_at';
         $direcao = $filtros['direcao'] ?? 'DESC';
         
-        // Busca paginada com filtros combinados
         $artes = $this->arteRepository->allPaginated(
             $pagina, self::POR_PAGINA,
             $termo, $status, $tagId,
             $ordenar, $direcao
         );
         
-        // Contagem total para cálculo de paginação
         $total = $this->arteRepository->countAll($termo, $status, $tagId);
         $totalPaginas = max(1, ceil($total / self::POR_PAGINA));
         
@@ -153,20 +158,6 @@ class ArteService
      * Cria nova arte
      * 
      * [MELHORIA 4] — Agora aceita $arquivo para upload de imagem
-     * 
-     * Fluxo:
-     * 1. Validar dados do formulário
-     * 2. Aplicar defaults
-     * 3. INSERT no banco (sem imagem — ID ainda não existe)
-     * 4. Se tem arquivo, processar upload usando o ID recém-criado
-     * 5. UPDATE com o caminho da imagem
-     * 6. Sincronizar tags
-     * 7. Retornar arte completa
-     * 
-     * @param array $dados Dados do formulário
-     * @param array|null $arquivo Dados de $_FILES['imagem'] (ou null se sem upload)
-     * @return Arte
-     * @throws ValidationException
      */
     public function criar(array $dados, ?array $arquivo = null): Arte
     {
@@ -193,13 +184,11 @@ class ArteService
         // [MELHORIA 4] 4. Processa upload se há arquivo válido
         if ($arquivo && $arquivo['error'] === UPLOAD_ERR_OK) {
             $caminhoImagem = $this->processarUploadImagem($arquivo, $arte->getId());
-            
-            // 5. Atualiza registro com o caminho da imagem
             $this->arteRepository->update($arte->getId(), ['imagem' => $caminhoImagem]);
-            $arte = $this->arteRepository->find($arte->getId()); // Recarrega com imagem
+            $arte = $this->arteRepository->find($arte->getId());
         }
         
-        // 6. Associa tags se fornecidas
+        // 5. Associa tags se fornecidas
         if (!empty($dados['tags'])) {
             $this->tagRepository->syncArte($arte->getId(), (array) $dados['tags']);
         }
@@ -211,25 +200,11 @@ class ArteService
      * Atualiza arte existente
      * 
      * [MELHORIA 4] — Agora aceita $arquivo e $removerImagem
-     * 
-     * Fluxo de imagem na edição:
-     * - Se $removerImagem = true  → Remove arquivo físico + limpa campo no banco
-     * - Se $arquivo enviado       → Remove imagem anterior + salva nova
-     * - Se nenhum dos dois        → Mantém imagem atual (não altera)
-     * 
-     * @param int $id
-     * @param array $dados Dados do formulário
-     * @param array|null $arquivo Dados de $_FILES['imagem']
-     * @param bool $removerImagem Se true, remove imagem sem substituir
-     * @return Arte
-     * @throws ValidationException|NotFoundException
      */
     public function atualizar(int $id, array $dados, ?array $arquivo = null, bool $removerImagem = false): Arte
     {
-        // Verifica se existe
         $arte = $this->arteRepository->findOrFail($id);
         
-        // Validação dos dados
         if (!$this->validator->validateUpdate($dados)) {
             throw new ValidationException($this->validator->getErrors());
         }
@@ -243,22 +218,16 @@ class ArteService
         
         // [MELHORIA 4] Processa lógica de imagem ANTES do update
         if ($removerImagem) {
-            // ── Remoção explícita: checkbox "Remover imagem" marcado ──
             $this->removerImagemFisica($arte);
-            $dados['imagem'] = null; // Limpa campo no banco
-            
+            $dados['imagem'] = null;
         } elseif ($arquivo && $arquivo['error'] === UPLOAD_ERR_OK) {
-            // ── Nova imagem enviada: substitui a anterior ──
-            $this->removerImagemFisica($arte); // Remove arquivo anterior (se existir)
+            $this->removerImagemFisica($arte);
             $caminhoImagem = $this->processarUploadImagem($arquivo, $id);
             $dados['imagem'] = $caminhoImagem;
         }
-        // Se nenhum dos dois: $dados não inclui 'imagem' → campo NÃO é alterado no UPDATE
         
-        // Atualiza registro
         $this->arteRepository->update($id, $dados);
         
-        // Atualiza tags se fornecidas
         if (isset($dados['tags'])) {
             $this->tagRepository->syncArte($id, (array) $dados['tags']);
         }
@@ -269,26 +238,21 @@ class ArteService
     /**
      * Remove arte
      * 
-     * [MELHORIA 4] — Agora remove arquivo de imagem antes de deletar
+     * [MELHORIA 4] — Remove arquivo de imagem antes de deletar
      */
     public function remover(int $id): bool
     {
         $arte = $this->arteRepository->findOrFail($id);
         
-        // Verifica se pode ser removida (não vendida)
         if ($arte->getStatus() === 'vendida') {
             throw new ValidationException([
                 'arte' => 'Artes vendidas não podem ser removidas'
             ]);
         }
         
-        // [MELHORIA 4] Remove arquivo de imagem do disco
         $this->removerImagemFisica($arte);
-        
-        // Remove associações com tags
         $this->tagRepository->syncArte($id, []);
         
-        // Remove a arte do banco
         return $this->arteRepository->delete($id);
     }
     
@@ -318,7 +282,7 @@ class ArteService
             'disponivel'  => ['em_producao', 'vendida', 'reservada'],
             'em_producao' => ['disponivel', 'vendida', 'reservada'],
             'reservada'   => ['disponivel', 'em_producao', 'vendida'],
-            'vendida'     => [] // Estado final — não pode sair
+            'vendida'     => []
         ];
         
         if (!isset($transicoesPermitidas[$statusAtual])) {
@@ -412,23 +376,11 @@ class ArteService
      * [M5] Calcula o progresso da arte em relação ao tempo estimado
      * 
      * Fórmula: (horas_trabalhadas / tempo_medio_horas) × 100
-     * Limitado a 100% para não ultrapassar a barra de progresso,
-     * mas o valor real é preservado em 'valor_real' para exibição.
-     * 
-     * Retorna null se não há tempo estimado (campo não preenchido).
-     * 
-     * @param Arte $arte Objeto Arte com dados de horas
-     * @return array|null [
-     *     'percentual'  => int,   // 0-100 (limitado para barra visual)
-     *     'valor_real'  => float, // Percentual real (pode ser >100%)
-     *     'horas_faltam' => float // Horas restantes (0 se já completou)
-     * ] ou null se sem estimativa
      */
     public function calcularProgresso(Arte $arte): ?array
     {
         $tempoEstimado = $arte->getTempoMedioHoras();
         
-        // Sem estimativa de tempo → não é possível calcular progresso
         if ($tempoEstimado === null || $tempoEstimado <= 0) {
             return null;
         }
@@ -437,10 +389,127 @@ class ArteService
         $valorReal = ($horasTrabalhadas / $tempoEstimado) * 100;
         
         return [
-            'percentual'   => min(100, (int) round($valorReal)), // Barra visual: máx 100%
-            'valor_real'    => round($valorReal, 1),              // Exibição: pode ser >100%
+            'percentual'   => min(100, (int) round($valorReal)),
+            'valor_real'    => round($valorReal, 1),
             'horas_faltam'  => max(0, round($tempoEstimado - $horasTrabalhadas, 2)),
         ];
+    }
+
+    /**
+     * [M5 CROSS-MODULE] Busca dados da venda associada a uma arte
+     * 
+     * Cada arte só pode ser vendida UMA vez (status → 'vendida' é terminal),
+     * então findByArte() retorna no máximo 1 registro relevante.
+     * 
+     * SEGURANÇA: Try/catch silencioso — se VendaRepository falhar
+     * (ex: tabela vendas corrompida), os outros 3 cards continuam funcionando.
+     * 
+     * @param Arte $arte Objeto Arte
+     * @return array|null Dados da venda ou null se não vendida/sem registro
+     */
+    private function getDadosVenda(Arte $arte): ?array
+    {
+        // Só consulta vendas para artes com status 'vendida'
+        // Evita query desnecessária para artes em outros status
+        if ($arte->getStatus() !== 'vendida') {
+            return null;
+        }
+        
+        try {
+            // findFirstBy() é do BaseRepository — retorna 1 objeto Venda ou null
+            // Cada arte só é vendida UMA vez, então findFirstBy é suficiente
+            $venda = $this->vendaRepository->findFirstBy('arte_id', $arte->getId());
+            
+            if ($venda === null) {
+                // Arte marcada como vendida mas sem registro na tabela vendas
+                // (possível inconsistência de dados — não bloqueia a view)
+                error_log("[ArteService] Arte #{$arte->getId()} status=vendida mas sem registro em vendas");
+                return null;
+            }
+            
+            return [
+                'valor_venda'        => (float) $venda->getValor(),
+                'lucro'              => (float) ($venda->getLucroCalculado() ?? 0),
+                'rentabilidade_hora' => (float) ($venda->getRentabilidadeHora() ?? 0),
+                'data_venda'         => $venda->getDataVenda(),
+                'forma_pagamento'    => $venda->getFormaPagamento(),
+            ];
+            
+        } catch (\Exception $e) {
+            // Se der erro na consulta, loga e retorna null
+            // Os outros 3 cards (Custo/Hora, Preço Sugerido, Progresso) continuam OK
+            error_log("[ArteService] Erro ao buscar venda para arte #{$arte->getId()}: {$e->getMessage()}");
+            return null;
+        }
+    }
+
+    /**
+     * [M5 CROSS-MODULE] Calcula lucro da venda + margem percentual
+     * 
+     * Lucro: valor_venda - preco_custo (já armazenado como lucro_calculado na venda)
+     * Margem: (lucro / preco_custo) × 100 — quanto % acima do custo
+     * 
+     * Só disponível para artes com status 'vendida'.
+     * 
+     * @param Arte $arte Objeto Arte
+     * @return array|null ['valor_venda', 'lucro', 'margem_percentual'] ou null
+     */
+    public function calcularLucro(Arte $arte): ?array
+    {
+        $dadosVenda = $this->getDadosVenda($arte);
+        
+        if ($dadosVenda === null) {
+            return null;
+        }
+        
+        $precoCusto = $arte->getPrecoCusto();
+        
+        // Margem percentual: quanto % acima do custo foi o lucro
+        // Se custo = 0, qualquer venda é 100% de margem
+        $margemPercentual = $precoCusto > 0 
+            ? round(($dadosVenda['lucro'] / $precoCusto) * 100, 1) 
+            : ($dadosVenda['lucro'] > 0 ? 100.0 : 0);
+        
+        return [
+            'valor_venda'       => $dadosVenda['valor_venda'],
+            'lucro'             => $dadosVenda['lucro'],
+            'margem_percentual' => $margemPercentual,
+        ];
+    }
+
+    /**
+     * [M5 CROSS-MODULE] Calcula rentabilidade por hora
+     * 
+     * Rentabilidade = lucro / horas_trabalhadas
+     * Já armazenado como rentabilidade_hora na venda,
+     * mas recalculamos aqui para consistência com horas atuais.
+     * 
+     * Só disponível para artes vendidas com horas > 0.
+     * 
+     * @param Arte $arte Objeto Arte
+     * @return float|null R$/hora ou null se não aplicável
+     */
+    public function calcularRentabilidade(Arte $arte): ?float
+    {
+        $dadosVenda = $this->getDadosVenda($arte);
+        
+        if ($dadosVenda === null) {
+            return null;
+        }
+        
+        // Se não há horas trabalhadas, retorna o valor direto da venda
+        // (evita divisão por zero)
+        $horasTrabalhadas = $arte->getHorasTrabalhadas();
+        
+        if ($horasTrabalhadas <= 0) {
+            // Usa o valor armazenado na venda como fallback
+            return $dadosVenda['rentabilidade_hora'] > 0 
+                ? $dadosVenda['rentabilidade_hora'] 
+                : null;
+        }
+        
+        // Recalcula: lucro / horas (pode diferir do armazenado se horas foram editadas)
+        return round($dadosVenda['lucro'] / $horasTrabalhadas, 2);
     }
 
     /**
@@ -449,28 +518,31 @@ class ArteService
      * Centraliza TODOS os cálculos de métricas em um único lugar,
      * evitando que o Controller precise chamar múltiplos métodos.
      * 
-     * NOTA: Cards de Lucro e Rentabilidade serão adicionados após
-     * o módulo Vendas estar estabilizado (dependem da tabela vendas).
+     * ATUALIZAÇÃO M5 CROSS-MODULE (22/02/2026):
+     *   Agora retorna 5 métricas (antes 3). Cards de Lucro e
+     *   Rentabilidade são condicionais — retornam null para artes
+     *   não vendidas. A view usa isso para mostrar/esconder cards.
      * 
      * @param Arte $arte Objeto Arte
-     * @return array Métricas calculadas para exibição
+     * @return array Métricas calculadas para exibição:
+     *   - custo_por_hora  (float|null)     — sempre disponível
+     *   - preco_sugerido  (float)          — sempre disponível
+     *   - progresso       (array|null)     — se tem tempo estimado
+     *   - lucro           (array|null)     — SÓ se status='vendida'
+     *   - rentabilidade   (float|null)     — SÓ se status='vendida' + horas>0
      */
     public function getMetricasArte(Arte $arte): array
     {
         return [
+            // ── 3 métricas originais (sempre disponíveis) ──
             'custo_por_hora'   => $this->calcularCustoPorHora($arte),
             'preco_sugerido'   => $this->calcularPrecoSugerido($arte),
             'progresso'        => $this->calcularProgresso($arte),
             
-            // ┌─────────────────────────────────────────────────┐
-            // │ TODO: Adicionar após módulo Vendas estável       │
-            // │                                                   │
-            // │ 'lucro' => $this->calcularLucro($arte),          │
-            // │ 'rentabilidade' => $this->calcularRentab($arte), │
-            // │                                                   │
-            // │ Dependem de: query na tabela vendas               │
-            // │ Condição: só quando status = 'vendida'            │
-            // └─────────────────────────────────────────────────┘
+            // ── 2 métricas cross-module (só para artes vendidas) ──
+            // Retornam null se status != 'vendida' → view não renderiza os cards
+            'lucro'            => $this->calcularLucro($arte),
+            'rentabilidade'    => $this->calcularRentabilidade($arte),
         ];
     }
 
@@ -480,11 +552,6 @@ class ArteService
 
     /**
      * [M6] Retorna distribuição de artes por complexidade
-     * 
-     * Wrapper para ArteRepository::countByComplexidade().
-     * Padrão: Service delega para Repository (mesma abordagem de Tags M6).
-     * 
-     * @return array ['baixa' => N, 'media' => N, 'alta' => N]
      */
     public function getDistribuicaoComplexidade(): array
     {
@@ -493,14 +560,6 @@ class ArteService
 
     /**
      * [M6] Retorna dados para os 4 cards de resumo na index.php
-     * 
-     * Indicadores:
-     * - Total de artes
-     * - Valor em estoque (soma custo das NÃO vendidas)
-     * - Horas totais investidas
-     * - Artes disponíveis para venda
-     * 
-     * @return array Associativo com os indicadores
      */
     public function getResumoCards(): array
     {
@@ -514,24 +573,11 @@ class ArteService
     
     /**
      * Processa upload de imagem e move para diretório final
-     * 
-     * Fluxo:
-     * 1. Garantir que o diretório de uploads existe
-     * 2. Gerar nome seguro: arte_{id}_{timestamp}.{ext}
-     * 3. Mover arquivo do tmp para destino final
-     * 4. Retornar caminho relativo (para salvar no banco)
-     * 
-     * @param array $arquivo Dados de $_FILES['imagem']
-     * @param int $arteId ID da arte (para compor nome do arquivo)
-     * @return string Caminho relativo salvo no banco (ex: "uploads/artes/arte_1_1708123456.jpg")
-     * @throws ValidationException Se falhar ao mover o arquivo
      */
     private function processarUploadImagem(array $arquivo, int $arteId): string
     {
-        // 1. Garante que o diretório existe
         $diretorioAbsoluto = $this->getUploadDirAbsoluto();
         if (!is_dir($diretorioAbsoluto)) {
-            // Cria recursivamente com permissões 0755 (seguro para XAMPP)
             if (!mkdir($diretorioAbsoluto, 0755, true)) {
                 throw new ValidationException([
                     'imagem' => 'Erro ao criar diretório de uploads. Verifique permissões do servidor.'
@@ -539,64 +585,38 @@ class ArteService
             }
         }
         
-        // 2. Gera nome seguro e único
-        // Formato: arte_{id}_{timestamp}.{extensão}
-        // O timestamp evita colisões ao re-enviar imagem para a mesma arte
         $extensao = strtolower(pathinfo($arquivo['name'], PATHINFO_EXTENSION));
         $nomeArquivo = sprintf('arte_%d_%d.%s', $arteId, time(), $extensao);
-        
-        // 3. Caminho completo no disco
-        //    CORREÇÃO M4-BUG1: Usa separadores consistentes (/)
-        //    PHP no Windows aceita ambos, mas misturar causa confusão
         $caminhoAbsoluto = $diretorioAbsoluto . '/' . $nomeArquivo;
         
-        // 4. Move arquivo do tmp para destino final
-        // move_uploaded_file() verifica se o arquivo veio via HTTP POST (segurança)
         if (!move_uploaded_file($arquivo['tmp_name'], $caminhoAbsoluto)) {
             throw new ValidationException([
                 'imagem' => 'Falha ao salvar imagem. Verifique permissões do diretório.'
             ]);
         }
         
-        // 5. Retorna caminho RELATIVO (armazenado no banco)
-        // Formato: "uploads/artes/arte_1_1708123456.jpg"
         return self::UPLOAD_DIR . '/' . $nomeArquivo;
     }
     
     /**
      * Remove arquivo de imagem do disco (se existir)
-     * 
-     * Chamado em:
-     * - atualizar() quando checkbox "Remover imagem" está marcado
-     * - atualizar() quando nova imagem substitui a anterior
-     * - remover() quando arte é deletada
-     * 
-     * CORREÇÃO M4-BUG1: Também tenta remover do local antigo (raiz/uploads)
-     * caso existam arquivos salvos antes do fix.
-     * 
-     * @param Arte $arte Objeto arte com o caminho da imagem
-     * @return void
      */
     private function removerImagemFisica(Arte $arte): void
     {
         $caminhoRelativo = $arte->getImagem();
         
-        // Se não tem imagem, nada a fazer
         if (empty($caminhoRelativo)) {
             return;
         }
         
-        // Monta caminho absoluto CORRETO: {PROJECT_ROOT}/public/{caminho_relativo}
         $caminhoCorreto = $this->getPublicDir() . '/' . $caminhoRelativo;
         
-        // Remove o arquivo se existir no local correto (public/uploads/artes/)
         if (file_exists($caminhoCorreto)) {
             unlink($caminhoCorreto);
             return;
         }
         
-        // CORREÇÃO M4-BUG1: Também tenta o local antigo (raiz/uploads/artes/)
-        // Arquivos salvos antes do fix podem estar em artflow2/uploads/artes/
+        // CORREÇÃO M4-BUG1: Tenta local antigo (raiz/uploads/artes/)
         $projectRoot = dirname($this->getPublicDir());
         $caminhoAntigo = $projectRoot . '/' . $caminhoRelativo;
         
@@ -607,10 +627,6 @@ class ArteService
     
     /**
      * Retorna caminho absoluto do diretório de uploads
-     * 
-     * Exemplo em XAMPP: C:/xampp/htdocs/artflow2/public/uploads/artes
-     * 
-     * @return string
      */
     private function getUploadDirAbsoluto(): string
     {
@@ -621,35 +637,10 @@ class ArteService
      * Retorna caminho absoluto da pasta public/
      * 
      * CORREÇÃO M4-BUG1 (20/02/2026):
-     * ────────────────────────────────
-     * PROBLEMA:
-     *   Método usava dirname(SCRIPT_FILENAME) como primeira opção.
-     *   No XAMPP com artflow2/, o entry point pode ser:
-     *     - artflow2/index.php (raiz) → dirname() = artflow2/ (SEM /public!) ❌
-     *     - artflow2/public/index.php → dirname() = artflow2/public/ ✅
-     *   Quando o entry point era na raiz, os uploads iam para
-     *   artflow2/uploads/artes/ em vez de artflow2/public/uploads/artes/.
-     * 
-     * SOLUÇÃO:
-     *   Usa dirname(__DIR__, 2) como método primário.
-     *   __DIR__ neste arquivo é sempre src/Services/, então:
-     *     dirname('src/Services', 2) = artflow2/  (raiz do projeto)
-     *     + '/public' = artflow2/public/  ✅ SEMPRE CORRETO
-     *   Isso funciona independente de qual index.php é o entry point.
-     * 
-     * JUSTIFICATIVA:
-     *   dirname(__DIR__, 2) é determinístico: baseado na posição FIXA
-     *   deste arquivo no filesystem, não depende de variáveis de ambiente.
-     *   SCRIPT_FILENAME depende de como o Apache foi configurado.
-     * 
-     * @return string Caminho absoluto da pasta public/
+     *   Usa dirname(__DIR__, 2) como método primário (determinístico).
      */
     private function getPublicDir(): string
     {
-        // ── Método primário: baseado na posição deste arquivo ──
-        // Este arquivo está em: {PROJECT_ROOT}/src/Services/ArteService.php
-        // dirname(__DIR__, 2) sobe 2 níveis: Services → src → {PROJECT_ROOT}
-        // Resultado: {PROJECT_ROOT}/public (SEMPRE correto)
         $projectRoot = dirname(__DIR__, 2);
         $publicDir = $projectRoot . '/public';
         
@@ -657,22 +648,17 @@ class ArteService
             return $publicDir;
         }
         
-        // ── Fallback 1: SCRIPT_FILENAME (se public/ não for encontrado acima) ──
-        // Funciona quando o entry point É o public/index.php
         if (isset($_SERVER['SCRIPT_FILENAME'])) {
             $scriptDir = dirname($_SERVER['SCRIPT_FILENAME']);
-            // Verifica se estamos dentro de public/ (contém index.php + assets)
             if (basename($scriptDir) === 'public' || file_exists($scriptDir . '/index.php')) {
                 return $scriptDir;
             }
         }
         
-        // ── Fallback 2: BASE_PATH (se definida no bootstrap) ──
         if (defined('BASE_PATH')) {
             return rtrim(BASE_PATH, '/\\') . '/public';
         }
         
-        // ── Último recurso: retorna o que temos ──
         return $projectRoot . '/public';
     }
 }

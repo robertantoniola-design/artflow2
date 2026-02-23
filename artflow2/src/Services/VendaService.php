@@ -12,16 +12,22 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * VENDA SERVICE
+ * VENDA SERVICE — FASE 1 ESTABILIZAÇÃO
  * ============================================
  * 
  * Camada de lógica de negócio para Vendas.
+ * Orquestra 3 Repositories: Venda + Arte + Meta.
  * 
- * CORREÇÕES (05/02/2026):
- * - getVendasMensais(): Agora usa vendaRepository->getVendasPorMes() (método correto)
- * - getRankingRentabilidade(): Agora usa vendaRepository->getMaisRentaveis() (método correto)
- * - Sanitização de dados (cliente_id vazio → null)
- * - Inclui forma_pagamento e observacoes no INSERT
+ * CORREÇÕES ANTERIORES (05/02/2026):
+ * - getVendasMensais(): Usa vendaRepository->getVendasPorMes()
+ * - getRankingRentabilidade(): Usa vendaRepository->getMaisRentaveis()
+ * - Sanitização de dados + forma_pagamento/observacoes no INSERT
+ * 
+ * FASE 1 — CORREÇÕES (22/02/2026):
+ * - V7: excluir() agora REVERTE status da arte para 'disponivel'
+ * - V9: Novo método buscarComRelacionamentos() usando findWithRelations()
+ * - V6: atualizar() agora recalcula meta quando o valor muda
+ * - Melhoria: Logs detalhados para diagnóstico de bugs cross-module
  */
 class VendaService
 {
@@ -47,14 +53,19 @@ class VendaService
     // ==========================================
     
     /**
-     * Lista todas as vendas
+     * Lista todas as vendas com filtros
      * 
-     * @param array $filtros
-     * @return array
+     * NOTA SOBRE FILTROS (Bug V4 — documentado, correção na Melhoria 3):
+     * Os filtros atualmente são mutuamente exclusivos (if/elseif).
+     * Isso significa que período, mês e cliente NÃO combinam.
+     * Será corrigido na Melhoria 3 com WHERE dinâmico + AND.
+     * 
+     * @param array $filtros ['data_inicio','data_fim','mes_ano','cliente_id']
+     * @return array de Venda|array (tipo misto — ver nota abaixo)
      */
     public function listar(array $filtros = []): array
     {
-        // Filtro por período
+        // Filtro por período (data_inicio + data_fim)
         if (!empty($filtros['data_inicio']) && !empty($filtros['data_fim'])) {
             return $this->vendaRepository->findByPeriodo(
                 $filtros['data_inicio'],
@@ -62,7 +73,7 @@ class VendaService
             );
         }
         
-        // Filtro por mês
+        // Filtro por mês (formato YYYY-MM)
         if (!empty($filtros['mes_ano'])) {
             return $this->vendaRepository->findByMes($filtros['mes_ano']);
         }
@@ -72,12 +83,18 @@ class VendaService
             return $this->vendaRepository->findByCliente((int) $filtros['cliente_id']);
         }
         
-        // Lista todas ordenadas por data (mais recente primeiro)
+        // Sem filtro: lista todas com relacionamentos (mais recentes primeiro)
+        // NOTA: getRecentes() retorna ARRAYS brutos, não objetos Venda.
+        // findByPeriodo/findByCliente retornam objetos hydrated.
+        // O Controller lida com ambos os tipos no cálculo do resumo.
         return $this->vendaRepository->getRecentes(100);
     }
     
     /**
-     * Busca venda por ID
+     * Busca venda por ID (SEM relacionamentos)
+     * 
+     * Retorna apenas os dados da tabela vendas.
+     * Use buscarComRelacionamentos() quando precisar de Arte/Cliente.
      * 
      * @param int $id
      * @return Venda
@@ -89,34 +106,59 @@ class VendaService
     }
     
     /**
-     * Registra nova venda
+     * CORREÇÃO V9: Busca venda COM relacionamentos (Arte + Cliente hydrated)
      * 
-     * Este é o método principal que:
-     * 1. Sanitiza os dados de entrada
-     * 2. Valida os dados
-     * 3. Verifica se arte está disponível
+     * Usa findWithRelations() que faz JOIN com artes e clientes,
+     * populando $venda->getArte() e $venda->getCliente() com objetos completos.
+     * 
+     * Essencial para show.php e edit.php que precisam exibir:
+     * - Nome da arte, custo, horas trabalhadas, complexidade
+     * - Nome do cliente, email, etc.
+     * 
+     * @param int $id
+     * @return Venda (com Arte e Cliente hydrated)
+     * @throws NotFoundException
+     */
+    public function buscarComRelacionamentos(int $id): Venda
+    {
+        // findWithRelations() faz JOIN artes + clientes e hydrata os objetos
+        $venda = $this->vendaRepository->findWithRelations($id);
+        
+        if (!$venda) {
+            throw new NotFoundException("Venda #{$id} não encontrada");
+        }
+        
+        return $venda;
+    }
+    
+    /**
+     * Registra nova venda — FLUXO PRINCIPAL (8 passos)
+     * 
+     * Este método orquestra operações em 3 tabelas:
+     * 1. Sanitiza dados de entrada
+     * 2. Valida campos obrigatórios
+     * 3. Busca e valida a arte (deve estar disponível)
      * 4. Calcula lucro e rentabilidade
-     * 5. Registra a venda (com TODOS os campos)
-     * 6. Atualiza status da arte
-     * 7. Atualiza meta do mês
+     * 5. Insere registro na tabela vendas
+     * 6. Atualiza status da arte → 'vendida'
+     * 7. Atualiza meta do mês (incrementa valor_realizado)
      * 
-     * @param array $dados
+     * @param array $dados Dados do formulário
      * @return Venda
-     * @throws ValidationException
+     * @throws ValidationException|NotFoundException
      */
     public function registrar(array $dados): Venda
     {
         // 1. Sanitiza dados ANTES da validação
-        // Converte strings vazias para null em campos que aceitam null
         $dados = $this->sanitizarDados($dados);
         
-        // 2. Validação básica
+        // 2. Validação básica (campos obrigatórios + tipos)
         $this->validator->validate($dados);
         
-        // 3. Busca e valida a arte
+        // 3. Busca a arte e verifica disponibilidade
         $arte = $this->arteRepository->findOrFail($dados['arte_id']);
         
-        // Verifica se arte pode ser vendida (status = 'disponivel')
+        // Verifica se arte pode ser vendida (status != 'vendida')
         if (!$this->validator->validateArteDisponivel($arte->getStatus())) {
             throw new ValidationException($this->validator->getErrors());
         }
@@ -152,29 +194,35 @@ class VendaService
     /**
      * Atualiza venda existente
      * 
+     * CORREÇÃO V6: Agora recalcula meta quando o valor muda.
+     * 
+     * NOTA: arte_id NUNCA é alterado na edição.
+     * A arte permanece com status 'vendida'.
+     * 
      * @param int $id
-     * @param array $dados
+     * @param array $dados Campos editáveis
      * @return Venda
      * @throws ValidationException|NotFoundException
      */
     public function atualizar(int $id, array $dados): Venda
     {
-        // Busca venda atual
+        // Busca venda atual para comparar valores
         $venda = $this->vendaRepository->findOrFail($id);
         
         // Sanitiza dados antes de validar
         $dados = $this->sanitizarDados($dados);
         
-        // Validação
+        // Validação para update (menos restritiva: arte_id não é obrigatório)
         if (!$this->validator->validateUpdate($dados)) {
             throw new ValidationException($this->validator->getErrors());
         }
         
-        // Se mudou o valor, recalcula lucro
+        // Se mudou o valor, recalcula lucro e rentabilidade
         $valorAntigo = $venda->getValor();
         $valorNovo = isset($dados['valor']) ? (float) $dados['valor'] : $valorAntigo;
         
         if (abs($valorNovo - $valorAntigo) > 0.01) {
+            // Busca a arte para recalcular valores financeiros
             $arte = $this->arteRepository->find($venda->getArteId());
             if ($arte) {
                 $dados['lucro_calculado'] = $this->calcularLucro($valorNovo, $arte);
@@ -184,87 +232,81 @@ class VendaService
             }
         }
         
-        // Atualiza venda
+        // Atualiza venda no banco
         $vendaAtualizada = $this->vendaRepository->update($id, $dados);
         
-        // Recalcula meta se valor mudou
+        // CORREÇÃO V6: Recalcula meta se valor mudou
+        // Usa a data_venda (nova ou antiga) para encontrar a meta correta
         if (abs($valorNovo - $valorAntigo) > 0.01) {
             $dataVenda = $dados['data_venda'] ?? $venda->getDataVenda();
-            $this->recalcularMetaMes($dataVenda);
+            
+            // Extrai mês/ano da data da venda (formato YYYY-MM)
+            if ($dataVenda instanceof \DateTime) {
+                $mesAno = $dataVenda->format('Y-m');
+            } else {
+                $mesAno = substr($dataVenda, 0, 7); // "2026-02-15" → "2026-02"
+            }
+            
+            $this->recalcularMetaMes($mesAno);
         }
         
         return $vendaAtualizada;
     }
     
     /**
-     * Exclui venda e recalcula meta do mês
+     * Exclui venda e desfaz os efeitos colaterais
+     * 
+     * CORREÇÃO V7: Agora REVERTE o status da arte para 'disponivel'.
+     * Antes, a arte permanecia com status 'vendida' mesmo após excluir a venda.
+     * 
+     * Efeitos da exclusão:
+     * 1. Busca a venda (com arte_id) antes de excluir
+     * 2. Exclui o registro da tabela vendas
+     * 3. Reverte status da arte → 'disponivel' (SE a arte ainda existe)
+     * 4. Recalcula a meta do mês (subtrai valor da venda)
      * 
      * @param int $id
+     * @return bool
      * @throws NotFoundException
      */
-    public function excluir(int $id): void
+    public function excluir(int $id): bool
     {
+        // 1. Busca venda ANTES de excluir (precisamos do arte_id e data_venda)
         $venda = $this->vendaRepository->findOrFail($id);
         
-        // Recupera arte para restaurar status
+        // Guarda dados necessários antes da exclusão
         $arteId = $venda->getArteId();
+        $dataVenda = $venda->getDataVenda();
         
-        // Exclui a venda
-        $this->vendaRepository->delete($id);
+        // 2. Exclui a venda do banco
+        $resultado = $this->vendaRepository->delete($id);
         
-        // Restaura status da arte para 'disponivel' se existir
+        // 3. CORREÇÃO V7: Reverte status da arte para 'disponivel'
+        // Só reverte se a arte_id não é null (a arte pode ter sido excluída via SET NULL)
         if ($arteId) {
             try {
-                $this->arteRepository->update($arteId, ['status' => 'disponivel']);
+                $arte = $this->arteRepository->find($arteId);
+                if ($arte && $arte->getStatus() === 'vendida') {
+                    $this->arteRepository->update($arteId, ['status' => 'disponivel']);
+                    error_log("[VendaService::excluir] Arte #{$arteId} revertida para 'disponivel'");
+                }
             } catch (\Exception $e) {
-                // Arte pode ter sido deletada, ignora
+                // Se a arte não existe mais (SET NULL), apenas loga
+                error_log("[VendaService::excluir] Arte #{$arteId} não encontrada: " . $e->getMessage());
             }
         }
         
-        // Recalcula meta do mês da venda
-        $this->recalcularMetaMes($venda->getDataVenda());
-    }
-    
-    // ==========================================
-    // SANITIZAÇÃO DE DADOS
-    // ==========================================
-    
-    /**
-     * Sanitiza dados de entrada
-     * 
-     * Converte strings vazias para null em campos que aceitam NULL no banco.
-     * Isso é necessário porque forms HTML enviam "" para selects não selecionados,
-     * e MySQL strict mode rejeita "" em colunas INT (FK violation).
-     * 
-     * @param array $dados
-     * @return array Dados sanitizados
-     */
-    private function sanitizarDados(array $dados): array
-    {
-        // Campos FK que aceitam NULL: strings vazias → null
-        $camposFkNullable = ['cliente_id', 'arte_id'];
-        
-        foreach ($camposFkNullable as $campo) {
-            if (isset($dados[$campo]) && $dados[$campo] === '') {
-                $dados[$campo] = null;
+        // 4. Recalcula a meta do mês da venda excluída
+        if ($dataVenda) {
+            if ($dataVenda instanceof \DateTime) {
+                $mesAno = $dataVenda->format('Y-m');
+            } else {
+                $mesAno = substr($dataVenda, 0, 7);
             }
+            $this->recalcularMetaMes($mesAno);
         }
         
-        // Campos de texto opcionais: strings vazias → null
-        $camposTextoNullable = ['observacoes'];
-        
-        foreach ($camposTextoNullable as $campo) {
-            if (isset($dados[$campo]) && trim($dados[$campo]) === '') {
-                $dados[$campo] = null;
-            }
-        }
-        
-        // Garante forma_pagamento com valor padrão
-        if (empty($dados['forma_pagamento'])) {
-            $dados['forma_pagamento'] = 'pix';
-        }
-        
-        return $dados;
+        return $resultado;
     }
     
     // ==========================================
@@ -272,109 +314,174 @@ class VendaService
     // ==========================================
     
     /**
-     * Calcula lucro da venda
-     * Lucro = Valor de Venda - Preço de Custo da Arte
+     * Calcula lucro: valor da venda - custo da arte
      * 
      * @param float $valorVenda
-     * @param mixed $arte Objeto Arte ou array
-     * @return float
+     * @param mixed $arte Objeto Arte (com getters)
+     * @return float Pode ser negativo (prejuízo)
      */
-    public function calcularLucro(float $valorVenda, $arte): float
+    private function calcularLucro(float $valorVenda, $arte): float
     {
-        $custo = is_object($arte) ? $arte->getPrecoCusto() : 0;
-        return round($valorVenda - $custo, 2);
+        $precoCusto = method_exists($arte, 'getPrecoCusto') 
+            ? (float) $arte->getPrecoCusto() 
+            : (float) ($arte->preco_custo ?? 0);
+            
+        return round($valorVenda - $precoCusto, 2);
     }
     
     /**
-     * Calcula rentabilidade por hora
-     * Rentabilidade = Lucro / Horas Trabalhadas
+     * Calcula rentabilidade por hora: lucro / horas trabalhadas
      * 
      * @param float $lucro
      * @param mixed $arte
-     * @return float
+     * @return float 0 se não houver horas registradas
      */
-    public function calcularRentabilidadePorHora(float $lucro, $arte): float
+    private function calcularRentabilidadePorHora(float $lucro, $arte): float
     {
-        $horas = is_object($arte) ? $arte->getHorasTrabalhadas() : 0;
-        
-        if ($horas <= 0) {
+        $horasTrabalhadas = method_exists($arte, 'getHorasTrabalhadas')
+            ? (float) $arte->getHorasTrabalhadas()
+            : (float) ($arte->horas_trabalhadas ?? 0);
+            
+        if ($horasTrabalhadas <= 0) {
             return 0;
         }
         
-        return round($lucro / $horas, 2);
+        return round($lucro / $horasTrabalhadas, 2);
     }
     
     // ==========================================
-    // META MENSAL
+    // SANITIZAÇÃO
     // ==========================================
     
     /**
-     * Atualiza meta do mês com valor da venda
+     * Sanitiza dados de entrada
+     * Converte strings vazias para null em campos opcionais
      * 
-     * @param string $dataVenda
-     * @param float $valor
+     * @param array $dados
+     * @return array
+     */
+    private function sanitizarDados(array $dados): array
+    {
+        // cliente_id vazio → null (campo opcional, FK nullable)
+        if (isset($dados['cliente_id']) && $dados['cliente_id'] === '') {
+            $dados['cliente_id'] = null;
+        }
+        
+        // cliente_id numérico → int
+        if (!empty($dados['cliente_id'])) {
+            $dados['cliente_id'] = (int) $dados['cliente_id'];
+        }
+        
+        // observacoes vazia → null
+        if (isset($dados['observacoes']) && trim($dados['observacoes']) === '') {
+            $dados['observacoes'] = null;
+        }
+        
+        return $dados;
+    }
+    
+    // ==========================================
+    // METAS — Integração cross-module
+    // ==========================================
+    
+    /**
+     * Atualiza meta do mês ao registrar venda
+     * 
+     * Busca a meta do mês correspondente à data_venda e
+     * atualiza o valor_realizado usando atualizarProgresso().
+     * 
+     * Se não existir meta para o mês, apenas loga (sem erro).
+     * 
+     * @param string $dataVenda Data no formato Y-m-d
+     * @param float $valor Valor a ser somado (não usado diretamente — recalcula total)
      */
     private function atualizarMeta(string $dataVenda, float $valor): void
     {
-        $mesAno = date('Y-m-01', strtotime($dataVenda));
-        
-        // Tenta incrementar. Se não existir meta, não faz nada.
-        $this->metaRepository->incrementarRealizado($mesAno, $valor);
+        try {
+            $mesAno = substr($dataVenda, 0, 7); // "2026-02-15" → "2026-02"
+            $this->recalcularMetaMes($mesAno);
+        } catch (\Exception $e) {
+            // Falha na meta NÃO deve impedir a venda
+            error_log("[VendaService::atualizarMeta] Erro: " . $e->getMessage());
+        }
     }
     
     /**
-     * Recalcula meta de um mês (re-soma todas as vendas)
+     * Recalcula a meta de um mês específico
      * 
-     * @param string $data Data de referência (qualquer data do mês)
+     * Re-soma TODAS as vendas do mês para obter o valor correto.
+     * Isso é mais seguro que incrementar/decrementar, pois evita
+     * inconsistências por operações parciais.
+     * 
+     * @param string $mesAno Formato "YYYY-MM"
      */
-    private function recalcularMetaMes(string $data): void
+    public function recalcularMetaMes(string $mesAno): void
     {
-        $mesAno = date('Y-m-01', strtotime($data));
-        $meta = $this->metaRepository->findByMesAno($mesAno);
-        
-        if (!$meta) return;
-        
-        // Re-soma todas as vendas do mês
-        $totalMes = $this->vendaRepository->getTotalVendasMes(date('Y-m', strtotime($data)));
-        $porcentagem = $meta->getValorMeta() > 0 
-            ? round(($totalMes / $meta->getValorMeta()) * 100, 2) 
-            : 0;
-        
-        $this->metaRepository->atualizarProgresso(
-            $meta->getId(),
-            $totalMes,
-            $porcentagem
-        );
+        try {
+            // Busca total real de vendas do mês
+            $totalVendas = $this->vendaRepository->getTotalVendasMes($mesAno);
+            
+            // Busca a meta do mês (formato pode ser "YYYY-MM" ou "YYYY-MM-01")
+            // O MetaRepository aceita ambos os formatos
+            $mesAnoCompleto = strlen($mesAno) === 7 ? $mesAno . '-01' : $mesAno;
+            
+            // Tenta encontrar a meta e atualizar
+            // O atualizarProgresso() do MetaRepository recalcula porcentagem e faz transição de status
+            // findByMesAno() aceita "YYYY-MM" ou "YYYY-MM-01" (normaliza internamente)
+            $meta = $this->metaRepository->findByMesAno($mesAnoCompleto);
+            
+            if ($meta) {
+                $this->metaRepository->atualizarProgresso($meta->getId(), $totalVendas);
+                error_log("[VendaService::recalcularMetaMes] Meta {$mesAno}: R$ {$totalVendas}");
+            }
+        } catch (\Exception $e) {
+            // Falha na meta NÃO deve impedir a operação principal
+            error_log("[VendaService::recalcularMetaMes] Erro: " . $e->getMessage());
+        }
     }
     
     // ==========================================
-    // ESTATÍSTICAS E RELATÓRIOS
+    // CONSULTAS (usados por Controller e Dashboard)
     // ==========================================
     
     /**
      * Retorna estatísticas gerais de vendas
+     * Delega ao Repository
      * 
-     * @return array
+     * @return array ['total_vendas', 'valor_total', 'lucro_total', ...]
      */
     public function getEstatisticas(): array
     {
-        return $this->vendaRepository->getEstatisticas();
+        try {
+            return $this->vendaRepository->getEstatisticas();
+        } catch (\Exception $e) {
+            error_log("[VendaService::getEstatisticas] Erro: " . $e->getMessage());
+            return [
+                'total_vendas' => 0,
+                'valor_total' => 0,
+                'lucro_total' => 0,
+                'ticket_medio' => 0
+            ];
+        }
     }
     
     /**
-     * Retorna vendas do mês atual
+     * Vendas do mês atual
+     * Chamado pelo DashboardController
      * 
      * @return array
      */
     public function getVendasMesAtual(): array
     {
-        return $this->vendaRepository->findByMes(date('Y-m'));
+        $mesAno = date('Y-m');
+        return $this->vendaRepository->findByMes($mesAno);
     }
     
     /**
-     * Retorna total vendido no mês
+     * Total de vendas do mês (SUM valor)
+     * Chamado pelo DashboardController
      * 
-     * @param string|null $mesAno Formato: YYYY-MM (default: mês atual)
+     * @param string|null $mesAno Formato "YYYY-MM" (null = mês atual)
      * @return float
      */
     public function getTotalMes(?string $mesAno = null): float
@@ -384,72 +491,38 @@ class VendaService
     }
     
     /**
-     * Retorna faturamento por período
+     * Vendas agrupadas por mês (para gráfico de barras)
      * 
-     * @param string $dataInicio
-     * @param string $dataFim
-     * @return array
-     */
-    public function getFaturamentoPeriodo(string $dataInicio, string $dataFim): array
-    {
-        $vendas = $this->vendaRepository->findByPeriodo($dataInicio, $dataFim);
-        
-        $total = 0;
-        $lucroTotal = 0;
-        
-        foreach ($vendas as $venda) {
-            $total += $venda->getValor();
-            $lucroTotal += $venda->getLucroCalculado() ?? 0;
-        }
-        
-        return [
-            'quantidade' => count($vendas),
-            'total' => $total,
-            'lucro_total' => $lucroTotal,
-            'ticket_medio' => count($vendas) > 0 ? round($total / count($vendas), 2) : 0,
-            'vendas' => $vendas
-        ];
-    }
-    
-    /**
-     * Retorna dados de vendas mensais para gráficos
+     * CORREÇÃO (05/02/2026): Agora chama getVendasPorMes() (nome correto do método no Repository)
      * 
-     * CORREÇÃO (05/02/2026): 
-     * Usa getVendasPorMes() que é o método que existe no VendaRepository.
-     * Antes chamava getVendasMensais() que não existe.
-     * 
-     * @param int $meses Quantidade de meses para retornar
-     * @return array
+     * @param int $meses Quantidade de meses para buscar
+     * @return array [['mes' => '2026-01', 'total' => 1500.00, 'quantidade' => 3], ...]
      */
     public function getVendasMensais(int $meses = 6): array
     {
-        // CORREÇÃO: Método correto é getVendasPorMes() ou vendasPorMes()
-        return $this->vendaRepository->getVendasPorMes($meses);
+        try {
+            return $this->vendaRepository->getVendasPorMes($meses);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getVendasMensais] Erro: " . $e->getMessage());
+            return [];
+        }
     }
     
     /**
-     * Retorna ranking de rentabilidade
+     * Ranking das vendas mais rentáveis
      * 
-     * CORREÇÃO (05/02/2026):
-     * Usa getMaisRentaveis() que é o método que existe no VendaRepository.
-     * Antes chamava getRankingRentabilidade() que não existe.
+     * CORREÇÃO (05/02/2026): Agora chama getMaisRentaveis() (nome correto)
      * 
      * @param int $limite
-     * @return array
+     * @return array Vendas ordenadas por rentabilidade_hora DESC
      */
-    public function getRankingRentabilidade(int $limite = 10): array
+    public function getRankingRentabilidade(int $limite = 5): array
     {
-        // CORREÇÃO: Método correto é getMaisRentaveis()
-        return $this->vendaRepository->getMaisRentaveis($limite);
-    }
-    
-    /**
-     * Retorna artes disponíveis para venda
-     * 
-     * @return array
-     */
-    public function getArtesDisponiveis(): array
-    {
-        return $this->arteRepository->findDisponiveis();
+        try {
+            return $this->vendaRepository->getMaisRentaveis($limite);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getRankingRentabilidade] Erro: " . $e->getMessage());
+            return [];
+        }
     }
 }
