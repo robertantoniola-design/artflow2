@@ -13,7 +13,7 @@ use App\Exceptions\DatabaseException;
 
 /**
  * ============================================
- * VENDA CONTROLLER — FASE 1 ESTABILIZAÇÃO
+ * VENDA CONTROLLER — FASE 1 ESTABILIZAÇÃO + MELHORIAS M1+M2+M3
  * ============================================
  * 
  * Controla o fluxo de vendas (módulo mais acoplado do sistema).
@@ -29,6 +29,13 @@ use App\Exceptions\DatabaseException;
  * - V3: Conversão (int) $id em show(), edit(), update(), destroy()
  * - V9: buscar() agora usa buscarComRelacionamentos() no show() (arte/cliente hydrated)
  * - Padrão: Consistência com ClienteController/ArteController já estabilizados
+ * 
+ * MELHORIAS (23/02/2026):
+ * ──────────
+ * [M1] index() usa listarPaginado() com paginação 12/página
+ * [M2] Ordenação dinâmica via parâmetros 'ordenar' e 'direcao'
+ * [M3] Filtros combinados (termo, cliente_id, forma_pagamento, período)
+ *      Passa $paginacao para a view para os controles de paginação
  */
 class VendaController extends BaseController
 {
@@ -67,48 +74,64 @@ class VendaController extends BaseController
     }
     
     // ==========================================
-    // LISTAGEM
+    // LISTAGEM (M1+M2+M3 — MODIFICADO)
     // ==========================================
     
     /**
-     * Lista vendas com filtros
+     * Lista vendas com paginação, ordenação e filtros combinados
      * GET /vendas
+     * GET /vendas?termo=X&cliente_id=1&forma_pagamento=pix&pagina=2&ordenar=valor&direcao=DESC
+     * 
+     * MELHORIA M1: Paginação 12/página (padrão Tags/Clientes/Artes)
+     * MELHORIA M2: Ordenação dinâmica por qualquer coluna (whitelist no Repository)
+     * MELHORIA M3: Filtros combinados com AND (substitui if/elseif mutuamente exclusivos)
+     * 
+     * MUDANÇA vs ORIGINAL:
+     * - Antes: usava $this->vendaService->listar($filtros) → sem paginação, filtros exclusivos
+     * - Agora: usa $this->vendaService->listarPaginado($filtros) → paginado + filtros AND
+     * - Resumo agora é calculado sobre objetos Venda (allPaginated retorna objetos hydrated)
+     * - Passa $paginacao para a view (controles de paginação)
      */
     public function index(Request $request): Response
     {
         // CORREÇÃO V2 (B9): Limpa dados residuais ao navegar para a lista
         $this->limparDadosFormulario();
         
-        // Filtros opcionais
-        $filtros = $request->only(['cliente_id', 'data_inicio', 'data_fim', 'mes_ano']);
+        // ── M1+M2+M3: Filtros com suporte a paginação + ordenação + filtros combinados ──
+        $filtros = [
+            'termo'           => $request->get('termo'),
+            'cliente_id'      => $request->get('cliente_id'),
+            'forma_pagamento' => $request->get('forma_pagamento'),
+            'data_inicio'     => $request->get('data_inicio'),
+            'data_fim'        => $request->get('data_fim'),
+            'pagina'          => (int) ($request->get('pagina') ?? 1),
+            'ordenar'         => $request->get('ordenar') ?? 'data_venda',
+            'direcao'         => $request->get('direcao') ?? 'DESC'
+        ];
         
-        // Remove filtros vazios
-        $filtros = array_filter($filtros, fn($v) => $v !== '' && $v !== null);
+        // ── M1: Usa listarPaginado() em vez de listar() ──
+        // Retorna ['vendas' => Venda[], 'paginacao' => [...]]
+        $resultado = $this->vendaService->listarPaginado($filtros);
         
-        $vendas = $this->vendaService->listar($filtros);
+        // Estatísticas gerais (cards globais — não afetadas por filtros da listagem)
         $estatisticas = $this->vendaService->getEstatisticas();
+        
+        // Lista de clientes para o dropdown do filtro (M3)
         $clientesSelect = $this->clienteService->getParaSelect();
         
-        // Calcula resumo da listagem atual
-        // NOTA: $vendas pode conter objetos Venda OU arrays brutos,
-        // dependendo do método do Repository que foi chamado.
-        // O getRecentes() retorna arrays, findByPeriodo() retorna objetos.
+        // ── Calcula resumo da página filtrada ──
+        // allPaginated() retorna objetos Venda hydrated, então sempre usamos getters
         $valorTotal = 0;
         $lucroTotal = 0;
-        foreach ($vendas as $venda) {
-            if (is_object($venda)) {
-                $valorTotal += $venda->getValor() ?? 0;
-                $lucroTotal += $venda->getLucroCalculado() ?? 0;
-            } elseif (is_array($venda)) {
-                $valorTotal += $venda['valor'] ?? 0;
-                $lucroTotal += $venda['lucro_calculado'] ?? 0;
-            }
+        foreach ($resultado['vendas'] as $venda) {
+            $valorTotal += $venda->getValor() ?? 0;
+            $lucroTotal += $venda->getLucroCalculado() ?? 0;
         }
         
         $resumo = [
-            'total_vendas' => count($vendas),
-            'valor_total' => $valorTotal,
-            'lucro_total' => $lucroTotal
+            'total_vendas' => $resultado['paginacao']['total'], // Total com filtros (não só da página)
+            'valor_total'  => $valorTotal,
+            'lucro_total'  => $lucroTotal
         ];
         
         if ($request->wantsJson()) {
@@ -116,23 +139,26 @@ class VendaController extends BaseController
                 'success' => true,
                 'data' => array_map(function($v) {
                     return is_object($v) ? $v->toArray() : $v;
-                }, $vendas),
-                'resumo' => $resumo
+                }, $resultado['vendas']),
+                'paginacao'   => $resultado['paginacao'],
+                'resumo'      => $resumo,
+                'estatisticas' => $estatisticas
             ]);
         }
         
         return $this->view('vendas/index', [
             'titulo'         => 'Vendas',
-            'vendas'         => $vendas,
-            'estatisticas'   => $estatisticas,
-            'clientesSelect' => $clientesSelect,
-            'resumo'         => $resumo,
-            'filtros'        => $filtros
+            'vendas'         => $resultado['vendas'],      // Objetos Venda hydrated
+            'paginacao'      => $resultado['paginacao'],    // M1: Dados de paginação
+            'estatisticas'   => $estatisticas,              // Stats globais (cards)
+            'clientesSelect' => $clientesSelect,            // M3: Para dropdown filtro
+            'resumo'         => $resumo,                    // Resumo filtrado
+            'filtros'        => $filtros                    // Para preservar nos links
         ]);
     }
     
     // ==========================================
-    // CRIAR
+    // CRIAR (PRESERVADO 100% DA FASE 1)
     // ==========================================
     
     /**
@@ -257,7 +283,7 @@ class VendaController extends BaseController
     }
     
     // ==========================================
-    // VISUALIZAR
+    // VISUALIZAR (PRESERVADO 100% DA FASE 1)
     // ==========================================
     
     /**
@@ -293,7 +319,7 @@ class VendaController extends BaseController
     }
     
     // ==========================================
-    // EDITAR
+    // EDITAR (PRESERVADO 100% DA FASE 1)
     // ==========================================
     
     /**
@@ -390,7 +416,7 @@ class VendaController extends BaseController
     }
     
     // ==========================================
-    // EXCLUIR
+    // EXCLUIR (PRESERVADO 100% DA FASE 1)
     // ==========================================
     
     /**
@@ -428,7 +454,7 @@ class VendaController extends BaseController
     }
     
     // ==========================================
-    // RELATÓRIO
+    // RELATÓRIO (PRESERVADO 100% DA FASE 1)
     // ==========================================
     
     /**

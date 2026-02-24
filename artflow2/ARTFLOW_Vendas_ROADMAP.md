@@ -1,8 +1,8 @@
 # ArtFlow 2.0 — Módulo Vendas: Documentação Completa
 
-**Data:** 22/02/2026  
-**Status Geral:** ✅ FASE 1 COMPLETA — CRUD estabilizado, 12/12 testes OK  
-**Versão Base:** Código corrigido na Fase 1 (22/02/2026), 6 bugs fixados  
+**Data:** 24/02/2026  
+**Status Geral:** ✅ FASE 1 + M1+M2+M3 COMPLETAS — Paginação, Ordenação e Filtros funcionais  
+**Versão Base:** Código corrigido na Fase 1 (22/02/2026) + Melhorias M1+M2+M3 (23/02/2026)  
 **Ambiente:** XAMPP (Apache + MySQL + PHP 8.x)  
 **Banco de dados:** `artflow2_db`
 
@@ -17,16 +17,16 @@ O módulo é **pré-requisito** para:
 2. ~~**Cards Lucro + Rentabilidade** do módulo Artes (M5 pendência cross-module)~~ ✅ IMPLEMENTADO (22/02/2026)
 3. **Metas funcionais** — o `valor_realizado` e `porcentagem_atingida` dependem de vendas registradas
 
-A Fase 1 foi concluída em 22/02/2026 com **6 bugs corrigidos** e **12/12 testes manuais OK**. Todas as integrações cross-module funcionam nos dois sentidos: registrar venda → arte vendida + meta incrementada, excluir venda → arte disponível + meta decrementada.
+A Fase 1 foi concluída em 22/02/2026 com **6 bugs corrigidos** e **12/12 testes manuais OK**. As melhorias M1+M2+M3 foram implementadas em 23/02/2026 com **14/14 testes OK** (T7 corrigido via fix do bug global scope). Todas as integrações cross-module funcionam nos dois sentidos: registrar venda → arte vendida + meta incrementada, excluir venda → arte disponível + meta decrementada.
 
 ### Status das Fases
 
 | Fase | Descrição | Status |
 |------|-----------|--------|
 | Fase 1 | Estabilização CRUD — 6 bugs corrigidos, 12/12 testes | ✅ COMPLETA (22/02/2026) |
-| Melhoria 1 | Paginação na listagem (12/página) | 📋 PLANEJADA |
-| Melhoria 2 | Ordenação dinâmica (data, valor, cliente, forma pgto) | 📋 PLANEJADA |
-| Melhoria 3 | Filtros combinados (período + cliente + forma pgto) | 📋 PLANEJADA |
+| Melhoria 1 | Paginação na listagem (12/página) | ✅ COMPLETA (23/02/2026) |
+| Melhoria 2 | Ordenação dinâmica (7 colunas clicáveis) | ✅ COMPLETA (23/02/2026) |
+| Melhoria 3 | Filtros combinados (termo + cliente + pgto + período) | ✅ COMPLETA (23/02/2026) |
 | Melhoria 4 | Relatório aprimorado (resumo financeiro + exportação) | 📋 PLANEJADA |
 | Melhoria 5 | Estatísticas por venda (cards métricas no show.php) | 📋 PLANEJADA |
 | Melhoria 6 | Gráficos de vendas (Chart.js — faturamento + ranking) | 📋 PLANEJADA |
@@ -35,9 +35,9 @@ A Fase 1 foi concluída em 22/02/2026 com **6 bugs corrigidos** e **12/12 testes
 
 | # | Melhoria | Complexidade | Dependência | Status |
 |---|----------|--------------|-------------|--------|
-| 1 | Paginação na listagem (12/página) | Baixa | Fase 1 ✅ | 📋 PLANEJADA |
-| 2 | Ordenação dinâmica (5+ colunas) | Baixa | Melhoria 1 | 📋 PLANEJADA |
-| 3 | Filtros combinados (período + cliente + pgto) | Média | Melhoria 1 | 📋 PLANEJADA |
+| 1 | Paginação na listagem (12/página) | Baixa | Fase 1 ✅ | ✅ COMPLETA (23/02) |
+| 2 | Ordenação dinâmica (7 colunas) | Baixa | Melhoria 1 ✅ | ✅ COMPLETA (23/02) |
+| 3 | Filtros combinados (termo + cliente + pgto + período) | Média | Melhoria 1 ✅ | ✅ COMPLETA (23/02) |
 | 4 | Relatório aprimorado + exportação | Média | Fase 1 ✅ | 📋 PLANEJADA |
 | 5 | Estatísticas por venda (cards no show.php) | Média | Fase 1 ✅ | 📋 PLANEJADA |
 | 6 | Gráficos de vendas (Chart.js) | Baixa | Fase 1 ✅ | 📋 PLANEJADA |
@@ -68,17 +68,17 @@ src/
 ├── Models/
 │   └── Venda.php                      ✅ Implementado (getters/setters + Arte/Cliente relacionados)
 ├── Repositories/
-│   └── VendaRepository.php            ✅ Implementado (CRUD + filtros + estatísticas + relatórios)
+│   └── VendaRepository.php            🔧 Fase 1 + M1+M2+M3 (+ allPaginated, countAll)
 ├── Services/
-│   └── VendaService.php               🔧 Fase 1 (V1+V2+V3+V7+V9+findByMesAno corrigidos)
+│   └── VendaService.php               🔧 Fase 1 + M1 (+ listarPaginado, POR_PAGINA)
 ├── Controllers/
-│   └── VendaController.php            🔧 Fase 1 (B8+B9+int cast+limparDados+buscarComRelacionamentos)
+│   └── VendaController.php            🔧 Fase 1 + M1+M2+M3 (index reescrito)
 └── Validators/
     └── VendaValidator.php             ✅ Implementado (arte_id, valor, data, forma_pgto)
 
 views/
 └── vendas/
-    ├── index.php                      ✅ Funcional (lista com filtros e resumo)
+    ├── index.php                      🔧 M1+M2+M3 (reescrito: paginação + filtros + ordenação + R$/h)
     ├── create.php                     ✅ Funcional (selects arte + cliente + campos)
     ├── show.php                       ✅ Funcional (detalhes com arte + cliente hydrated)
     ├── edit.php                       ✅ Funcional (edição com arte_id fixo)
@@ -91,7 +91,7 @@ views/
 VendaController
 ├── __construct(VendaService, ArteService, ClienteService)  ← 3 dependências!
 │
-├── index()     usa VendaService::listar() + getEstatisticas() + ClienteService::getParaSelect()
+├── index()     usa VendaService::listarPaginado() + getEstatisticas() + ClienteService::getParaSelect()  [M1+M2+M3]
 ├── create()    usa ArteService::getDisponiveisParaVenda() + ClienteService::getParaSelect()
 ├── store()     usa VendaService::registrar() [orquestra 3 tabelas]
 ├── show()      usa VendaService::buscarComRelacionamentos() [V9 fix]
@@ -101,7 +101,7 @@ VendaController
 └── relatorio() usa VendaService::getVendasMensais() + getEstatisticas() + getRankingRentabilidade()
 
 VendaService ← ORQUESTRA 3 REPOSITORIES
-├── VendaRepository   — CRUD vendas
+├── VendaRepository   — CRUD vendas + allPaginated/countAll [M1+M2+M3]
 ├── ArteRepository    — buscar arte + atualizar status → 'vendida' / 'disponivel'
 ├── MetaRepository    — incrementar/recalcular meta do mês
 └── VendaValidator    — validação de dados
@@ -212,7 +212,7 @@ VENDAS (7 RESTful + 1 extra)
 | — | **findMesAno() inexistente** — `recalcularMetaMes()` chamava método que não existe no MetaRepository | Corrigido para `findByMesAno()` (nome real no MetaRepository) | VendaService |
 | — | **Chave view relatório** — Card "Total Vendas" mostrava 0 por chave incorreta | `$estatisticas['total']` → `$estatisticas['total_vendas'] ?? $estatisticas['total']` | relatorio.php |
 
-### Checklist de Testes
+### Checklist de Testes Fase 1
 
 | # | Operação | Rota | O que verificar | Status |
 |---|----------|------|-----------------|--------|
@@ -239,94 +239,119 @@ VENDAS (7 RESTful + 1 extra)
 
 ---
 
-## 📋 MELHORIA 1 — PAGINAÇÃO NA LISTAGEM (PLANEJADA)
+## ✅ MELHORIA 1 — PAGINAÇÃO NA LISTAGEM (COMPLETA)
 
-**Complexidade:** Baixa  
+**Status:** ✅ COMPLETA — 23/02/2026  
 **Padrão:** Idêntico a Tags, Clientes e Artes (12 itens por página)  
-**Pré-requisito:** Fase 1 ✅
+**Pré-requisito:** Fase 1 ✅  
+**Testes:** T1–T5 OK (14/14 total com M2+M3)
 
-### Especificação
+### Implementação Realizada
 
 | Recurso | Descrição |
 |---------|-----------|
-| **12 vendas por página** | Controles Bootstrap 5 com janela de 5 páginas |
-| **Preservação de filtros** | Período + cliente + forma pgto mantidos ao paginar |
-| **Indicador** | "Mostrando X–Y de Z vendas" |
-| **Helper URL** | `vendaUrl()` para montar URLs preservando parâmetros |
+| **12 vendas por página** | Controles Bootstrap 5 com janela de 5 páginas centrada |
+| **Preservação de filtros** | Helper `vendaUrl()` mantém todos os parâmetros ao paginar |
+| **Indicador** | "Mostrando X–Y de Z vendas" + "Página N de M" |
+| **Navegação** | Primeira, Anterior, [janela 5 pags], Próxima, Última |
 
-### Nota
+### Arquivos Alterados
 
-O `VendaRepository::findPaginated()` já existe com paginação básica! Pode ser aproveitado/adaptado para o padrão `allPaginated()` + `countAll()` dos outros módulos.
+| Arquivo | Ação | Detalhes |
+|---------|------|---------|
+| VendaRepository | **+2 métodos novos** | `allPaginated()` com JOINs + hydrating, `countAll()` com mesmos filtros |
+| VendaService | **+1 método + 1 constante** | `listarPaginado($filtros)`, `const POR_PAGINA = 12` |
+| VendaController | **index() reescrito** | Usa `listarPaginado()`, passa `$paginacao` para a view |
+| views/vendas/index.php | **Reescrito** | Helper `vendaUrl()`, controles Bootstrap 5, "X–Y de Z" |
 
-### Arquivos a Alterar
+### Nota sobre Compatibilidade
 
-| Arquivo | Ação |
-|---------|------|
-| VendaRepository | Adaptar `findPaginated()` ou criar `allPaginated()` + `countAll()` |
-| VendaService | Criar `listarPaginado($filtros)` retornando `['vendas' => [...], 'paginacao' => [...]]` |
-| VendaController | index() usa `listarPaginado()` |
-| views/vendas/index.php | + controles de paginação + helper vendaUrl() |
+Os métodos originais `listar()`, `paginate()`, `getRecentes()` permanecem intactos para compatibilidade com Dashboard e relatório. O `index()` agora usa exclusivamente `listarPaginado()`.
 
 ---
 
-## 📋 MELHORIA 2 — ORDENAÇÃO DINÂMICA (PLANEJADA)
+## ✅ MELHORIA 2 — ORDENAÇÃO DINÂMICA (COMPLETA)
 
-**Complexidade:** Baixa  
-**Padrão:** Idêntico a Tags, Clientes e Artes (headers clicáveis)  
-**Pré-requisito:** Melhoria 1 ✅
+**Status:** ✅ COMPLETA — 23/02/2026  
+**Padrão:** Idêntico a Tags, Clientes e Artes (headers clicáveis com toggle)  
+**Pré-requisito:** Melhoria 1 ✅  
+**Testes:** T6–T8 OK
 
-### Colunas Ordenáveis
+### Colunas Ordenáveis (7 colunas)
 
 | Coluna | Campo BD | Direção padrão | Tipo ícone |
 |--------|----------|----------------|------------|
-| Data | data_venda | DESC (recentes) — **PADRÃO** | bi-sort-down/up |
-| Arte | arte_nome (via JOIN) | ASC (A→Z) | bi-sort-alpha-down/up |
-| Cliente | cliente_nome (via JOIN) | ASC (A→Z) | bi-sort-alpha-down/up |
-| Valor | valor | DESC (maior primeiro) | bi-sort-numeric-down/up |
-| Lucro | lucro_calculado | DESC (maior primeiro) | bi-sort-numeric-down/up |
-| Forma Pgto | forma_pagamento | ASC (ordem ENUM) | bi-sort-alpha-down/up |
+| Data | `v.data_venda` | DESC (recentes) — **PADRÃO** | bi-sort-down/up |
+| Arte | `a.nome` (via JOIN) | ASC (A→Z) | bi-sort-alpha-down/up |
+| Cliente | `c.nome` (via JOIN) | ASC (A→Z) | bi-sort-alpha-down/up |
+| Valor | `v.valor` | DESC (maior primeiro) | bi-sort-numeric-down/up |
+| Lucro | `v.lucro_calculado` | DESC (maior primeiro) | bi-sort-numeric-down/up |
+| R$/h | — | — (não ordenável, exibição apenas) | — |
+| Forma Pgto | `v.forma_pagamento` | ASC (ordem ENUM) | bi-sort-alpha-down/up |
 
-### Arquivos a Alterar
+### Implementação
 
-| Arquivo | Ação |
-|---------|------|
-| VendaRepository | Whitelist de colunas + ORDER BY dinâmico no `allPaginated()` |
-| views/vendas/index.php | + headers clicáveis + helpers `vendaSortUrl()` e `vendaSortIcon()` |
+| Componente | Descrição |
+|-----------|-----------|
+| **Whitelist** | `$colunasPermitidas` no Repository mapeia nomes da URL → colunas SQL com alias |
+| **Segurança** | Apenas colunas na whitelist aceitas; fallback para `v.data_venda` |
+| **Toggle** | `vendaSortUrl()` inverte ASC↔DESC se coluna já ativa; reset para pag 1 |
+| **Ícones** | `vendaSortIcon()` — ativo: azul com direção, inativo: cinza neutro |
+
+### ⚠️ Bug Corrigido: Global Scope em Helpers (23/02/2026)
+
+**Problema:** Os helpers `vendaUrl()`, `vendaSortUrl()`, `vendaSortIcon()` usavam `global $filtros`, mas o framework renderiza views dentro de `extract()` que cria escopo local. `global` aponta para o escopo global (vazio), não para a variável local `$filtros`.
+
+**Sintoma:** T6 (primeira ordenação) passava por coincidência, T7 (toggle) falhava pois `$ordenarAtual` sempre era o default `'data_venda'`.
+
+**Fix aplicado:**
+```php
+// Topo do index.php — empurra para escopo global
+$GLOBALS['_vendaFiltros'] = $filtros ?? [];
+
+// Dentro dos helpers — lê do escopo global
+$filtros = $GLOBALS['_vendaFiltros'] ?? [];
+```
+
+**⚠️ VERIFICAR:** Este mesmo bug pode existir nos módulos Tags, Clientes e Artes se usam `global $filtros` em helpers das views index.php. Todos devem usar `$GLOBALS['_key']` em vez de `global`.
 
 ---
 
-## 📋 MELHORIA 3 — FILTROS COMBINADOS (PLANEJADA)
+## ✅ MELHORIA 3 — FILTROS COMBINADOS (COMPLETA)
 
-**Complexidade:** Média  
+**Status:** ✅ COMPLETA — 23/02/2026  
 **Padrão:** WHERE dinâmico com AND (mesmo de Artes M1/M3)  
-**Pré-requisito:** Melhoria 1 ✅
+**Pré-requisito:** Melhoria 1 ✅  
+**Testes:** T9–T14 OK
 
-### Filtros Combinados
+### Filtros Implementados (5 campos combinados com AND)
 
 | Filtro | Tipo | Campo BD | UI |
 |--------|------|----------|-----|
-| Período | date range | data_venda BETWEEN | 2 inputs date |
-| Cliente | select | cliente_id = ? | Dropdown com clientes |
-| Forma pagamento | select | forma_pagamento = ? | Dropdown com 6 opções |
-| Busca (termo) | text | arte_nome LIKE ou observacoes LIKE | Input text |
+| Busca (termo) | text | `a.nome LIKE` OR `v.observacoes LIKE` | Input text com placeholder |
+| Cliente | select | `v.cliente_id = ?` | Dropdown com todos os clientes |
+| Forma pagamento | select | `v.forma_pagamento = ?` | Dropdown com 6 opções |
+| Data início | date | `v.data_venda >= ?` | Input date |
+| Data fim | date | `v.data_venda <= ?` | Input date |
 
-**Problema atual:** `VendaService::listar()` usa if/elseif mutuamente exclusivo. A M3 deve converter para WHERE dinâmico com AND, idêntico ao padrão de Artes.
+### Implementação
 
-### Arquivos a Alterar
+| Componente | Descrição |
+|-----------|-----------|
+| VendaRepository `allPaginated()` | WHERE dinâmico com AND — 5 filtros combinados simultaneamente |
+| VendaRepository `countAll()` | **MESMOS filtros** que `allPaginated()` — crucial para paginação consistente |
+| VendaService `listarPaginado()` | Normaliza filtros com `?? null ?: null` (strings vazias → null) |
+| VendaController `index()` | Extrai 8 parâmetros da URL (5 filtros + pagina + ordenar + direcao) |
+| views/vendas/index.php | Barra de filtros com 5 campos + botões Filtrar/Limpar |
 
-| Arquivo | Ação |
-|---------|------|
-| VendaRepository | `allPaginated()` com WHERE dinâmico (AND) + JOINs para filtro por nome |
-| VendaService | `listarPaginado()` normaliza filtros com `?? null ?: null` |
-| VendaController | index() extrai todos os filtros |
-| views/vendas/index.php | Barra de filtros com 4 campos + botão "Limpar" |
+**Superado:** O bug V4 (filtros mutuamente exclusivos no `listar()`) agora é irrelevante para a listagem, pois `index()` usa `listarPaginado()` com WHERE dinâmico. O método `listar()` permanece intacto para compatibilidade com código legado.
 
 ---
 
 ## 📋 MELHORIA 4 — RELATÓRIO APRIMORADO (PLANEJADA)
 
 **Complexidade:** Média  
-**Pré-requisito:** Fase 1 ✅  
+**Pré-requisito:** Fase 1 ✅ (recomendado: após M6 para reaproveitar gráficos)  
 **Rota:** `GET /vendas/relatorio` (já existe)
 
 ### Especificação
@@ -370,14 +395,14 @@ O `VendaRepository::findPaginated()` já existe com paginação básica! Pode se
 | **Faturamento Mensal** | Barras verticais | SUM(valor) por mês (últimos 6-12 meses) | index.php (topo) |
 | **Forma de Pagamento** | Doughnut | COUNT por forma_pagamento | index.php (topo) |
 
-### Cards de Resumo no index.php
+### Cards de Resumo no index.php (já implementados em M1)
 
-| Indicador | Cálculo |
-|-----------|---------|
-| **Total de Vendas** | COUNT(*) |
-| **Faturamento Total** | SUM(valor) |
-| **Lucro Total** | SUM(lucro_calculado) |
-| **Ticket Médio** | AVG(valor) ou SUM/COUNT |
+| Indicador | Cálculo | Status |
+|-----------|---------|--------|
+| **Total de Vendas** | COUNT(*) | ✅ Implementado |
+| **Faturamento Total** | SUM(valor) | ✅ Implementado |
+| **Lucro Total** | SUM(lucro_calculado) | ✅ Implementado |
+| **Ticket Médio** | AVG(valor) ou SUM/COUNT | ✅ Implementado |
 
 ---
 
@@ -395,23 +420,73 @@ O `VendaRepository::findPaginated()` já existe com paginação básica! Pode se
 
 **Status no módulo Vendas:** ✅ Corrigido — `$id = (int) $id` em show(), edit(), update(), destroy().
 
+### ⚠️ Bug Global Scope em Helpers de Views (NOVO — 23/02/2026)
+
+**Escopo:** Potencialmente afeta TODOS os módulos que usam `global $variavel` dentro de funções helper definidas em views.
+
+**Causa:** O framework renderiza views dentro de `extract($data)`, criando escopo local. Funções definidas na view (helpers) usam `global $variavel` que aponta para o escopo **global** (vazio), não para a variável local criada por `extract()`.
+
+**Fix:** Usar `$GLOBALS['_chave']` em vez de `global $variavel`:
+```php
+// No topo da view — empurra variável para escopo global
+$GLOBALS['_vendaFiltros'] = $filtros ?? [];
+
+// Dentro dos helpers — lê de $GLOBALS
+function vendaUrl(array $override = []): string {
+    $filtros = $GLOBALS['_vendaFiltros'] ?? [];
+    // ...
+}
+```
+
+**Status por módulo:**
+
+| Módulo | Usa helpers com global? | Fix aplicado? |
+|--------|------------------------|---------------|
+| Tags index.php | ⚠️ VERIFICAR | ❓ Pendente |
+| Clientes index.php | ⚠️ VERIFICAR | ❓ Pendente |
+| Artes index.php | ⚠️ VERIFICAR | ❓ Pendente |
+| Vendas index.php | ✅ Usa helpers | ✅ Corrigido (23/02) |
+
 ---
 
 ## 📌 MAPA DE MÉTODOS — VERIFICAÇÃO CRUZADA
+
+### Métodos do VendaRepository
+
+| Método | Melhoria | Descrição |
+|--------|----------|-----------|
+| `allPaginated(...)` | **M1+M2+M3** | Query paginada com JOINs + WHERE dinâmico + whitelist ORDER BY |
+| `countAll(...)` | **M1+M3** | COUNT com mesmos filtros — crucial para paginação |
+| `allWithRelations()` | Base | Lista todas com JOINs (LEGADO — usar allPaginated) |
+| `findWithRelations($id)` | Base | Busca por ID com JOINs (usado em show/edit) |
+| `findByPeriodo($inicio, $fim)` | Base | Filtro por período |
+| `findByMesAno($ano, $mes)` | Base | Filtro por mês/ano |
+| `findByMes($mesAno)` | Base | Alias para findByMesAno (formato YYYY-MM) |
+| `getTotalVendasMes($mesAno)` | Base | SUM(valor) do mês |
+| `somaVendasMes($ano, $mes)` | Base | SUM(valor) por ano+mês |
+| `getEstatisticas()` | Base | COUNT, SUM, AVG globais |
+| `vendasPorMes($meses)` | Base | GROUP BY mês (gráficos) |
+| `vendasPorCliente()` | Base | GROUP BY cliente |
+| `paginate($page, $perPage, $filters)` | Base | Paginação básica (LEGADO) |
+| `findByCliente($clienteId)` | Base | Filtro por cliente |
+| `getRecentes($limit)` | Base | Últimas vendas (arrays brutos) |
+| `getVendasPorMes($meses)` | Base | Alias para vendasPorMes |
+| `getMaisRentaveis($limit)` | Base | TOP N por rentabilidade_hora |
 
 ### Métodos do VendaService chamados no Controller
 
 | Método no Controller | Existe no Service? | Status |
 |---------------------|--------------------|--------|
-| `listar($filtros)` | ✅ | Filtros mutuamente exclusivos — corrigir M3 |
+| `listarPaginado($filtros)` | ✅ | **NOVO M1** — substitui listar() no index |
+| `listar($filtros)` | ✅ | LEGADO — mantido para Dashboard/relatório |
 | `buscar($id)` | ✅ | Usa `findOrFail()` |
 | `buscarComRelacionamentos($id)` | ✅ | **NOVO Fase 1** — usa `findWithRelations()` |
 | `registrar($dados)` | ✅ | Fluxo de 8 passos — corrigido Fase 1 |
 | `atualizar($id, $dados)` | ✅ | Recalcula meta se valor mudou (V6 fix) |
 | `excluir($id)` | ✅ | Reverte arte + recalcula meta (V7 fix) |
-| `getEstatisticas()` | ✅ | Delega ao Repository |
-| `getVendasMensais($meses)` | ✅ | Chama `getVendasPorMes()` |
-| `getRankingRentabilidade($limite)` | ✅ | Chama `getMaisRentaveis()` |
+| `getEstatisticas()` | ✅ | Delega ao Repository (com try/catch + fallback) |
+| `getVendasMensais($meses)` | ✅ | Chama `getVendasPorMes()` (com try/catch) |
+| `getRankingRentabilidade($limite)` | ✅ | Chama `getMaisRentaveis()` (com try/catch) |
 | `getTotalMes($mesAno)` | ✅ | Chamado pelo Dashboard |
 
 ---
@@ -423,11 +498,46 @@ O `VendaRepository::findPaginated()` já existe com paginação básica! Pode se
 | B8 workaround (`$_SESSION['_errors']` direto) | Clientes/Artes | ✅ Fase 1 — Controller |
 | B9 workaround (`limparDadosFormulario()`) | Clientes/Artes | ✅ Fase 1 — Controller |
 | Conversão `(int) $id` | Artes (Router bug) | ✅ Fase 1 — Controller |
-| Normalização filtros `?? null ?: null` | Artes (T1) | 📋 Melhoria 3 — Service |
-| Paginação 12/página + helper URL | Tags/Clientes/Artes | 📋 Melhoria 1 |
-| Headers clicáveis + whitelist ORDER BY | Tags/Clientes/Artes | 📋 Melhoria 2 |
-| WHERE dinâmico com AND | Artes M1/M3 | 📋 Melhoria 3 |
-| Chart.js 4.4.7 + container 280px fixo | Tags/Metas/Artes | 📋 Melhoria 6 |
+| Normalização filtros `?? null ?: null` | Artes (T1) | ✅ M3 — Service |
+| Paginação 12/página + helper URL | Tags/Clientes/Artes | ✅ M1 — View + Service |
+| Headers clicáveis + whitelist ORDER BY | Tags/Clientes/Artes | ✅ M2 — Repository + View |
+| WHERE dinâmico com AND | Artes M1/M3 | ✅ M3 — Repository |
+| `$GLOBALS['_key']` vs `global` em helpers | **NOVO** Vendas M2 | ✅ View (corrige bug de escopo) |
+| Chart.js 4.4.7 + container 280px fixo | Tags/Metas/Artes | 📋 M6 (planejada) |
+
+---
+
+## 📌 CHECKLIST DE TESTES M1+M2+M3 (14 cenários)
+
+### CRUD Básico (T1–T5)
+| # | Teste | Como Verificar | Status |
+|---|-------|----------------|--------|
+| T1 | Lista carrega | GET /vendas → tabela com dados | ✅ OK |
+| T2 | Paginação funciona | Inserir >12 vendas → ver controles de página | ✅ OK |
+| T3 | Criar funciona | POST /vendas/criar → venda aparece na lista | ✅ OK |
+| T4 | Editar funciona | PUT /vendas/{id}/editar → valor atualizado | ✅ OK |
+| T5 | Excluir funciona | DELETE → venda removida, arte volta 'disponivel' | ✅ OK |
+
+### Ordenação M2 (T6–T8)
+| # | Teste | Como Verificar | Status |
+|---|-------|----------------|--------|
+| T6 | Ordenar por Valor | Clicar "Valor" → URL tem `?ordenar=valor&direcao=DESC` | ✅ OK |
+| T7 | Toggle direção | Clicar "Valor" de novo → `direcao=ASC` | ✅ OK (fix global scope) |
+| T8 | Ícone muda | Coluna ativa = ícone azul, outras = cinza neutro | ✅ OK |
+
+### Filtros M3 (T9–T12)
+| # | Teste | Como Verificar | Status |
+|---|-------|----------------|--------|
+| T9 | Filtro por cliente | Selecionar cliente no dropdown → só vendas dele | ✅ OK |
+| T10 | Filtro por período | Preencher De/Até → vendas no intervalo | ✅ OK |
+| T11 | Filtros combinados | Cliente + Forma pgto → interseção (AND) | ✅ OK |
+| T12 | Limpar filtros | Clicar ✕ → URL volta para /vendas limpa | ✅ OK |
+
+### Integração M1+M2+M3 (T13–T14)
+| # | Teste | Como Verificar | Status |
+|---|-------|----------------|--------|
+| T13 | Filtro + paginação | Aplicar filtro → mudar página → filtro preservado na URL | ✅ OK |
+| T14 | Ordenação + paginação | Ordenar → mudar página → ordenação preservada na URL | ✅ OK |
 
 ---
 
@@ -440,8 +550,8 @@ Ordem de estabilização (menor → maior acoplamento):
 2. ✅ Clientes     — independente                         → COMPLETO (6/6)
 3. ✅ Metas        — independente (atualizado por Vendas)  → COMPLETO (6/6)
 4. ✅ Artes        — depende de Tags (✅)                   → COMPLETO (6/6 + cross-module OK)
-5. ✅ VENDAS       — depende de Artes + Clientes + Metas  → FASE 1 COMPLETA ★
-6. 🔄 Dashboard   — depende de TODOS                     → Funcional, revisitar após Vendas M1-M6
+5. 🔧 VENDAS      — depende de Artes + Clientes + Metas  → FASE 1 + M1+M2+M3 COMPLETAS ★
+6. 🔄 Dashboard   — depende de TODOS                     → Funcional, revisitar após Vendas M4-M6
 ```
 
 ### Impacto de Vendas em Outros Módulos
@@ -475,25 +585,28 @@ Vendas → Clientes:
 |---|------|------|----------|
 | 1 | 22/02 | Fase 1 — Análise + Correções + Testes T1-T12 | VendaController + VendaService (6 bugs) + diagnostico + relatorio fix |
 | 2 | 22/02 | Cross-module Artes M5 | ArteService (+VendaRepository +3 métodos) + show.php (2 cards novos) |
+| 3 | 23/02 | M1+M2+M3 — Paginação + Ordenação + Filtros | VendaRepository (+2), VendaService (+1+const), VendaController (index reescrito), index.php (reescrito) |
+| 4 | 23/02 | Revisão anti-regressão + Bug fix global scope | 18 regressões corrigidas nos 4 arquivos + fix `$GLOBALS` nos helpers da view |
 
 ---
 
 ## 📌 SEQUÊNCIA RECOMENDADA (PRÓXIMOS PASSOS)
 
 ```
-MELHORIAS (sequência recomendada)
-├── M1: Paginação (base para M2 e M3)
-├── M2: Ordenação (depende de M1)
-├── M3: Filtros combinados (depende de M1)
-├── M5: Estatísticas show.php (independente)
-├── M6: Gráficos index.php (independente)
-└── M4: Relatório aprimorado (pode incorporar gráficos de M6)
+MELHORIAS RESTANTES (sequência recomendada)
+├── M5: Estatísticas show.php (independente — cards de métricas por venda)
+├── M6: Gráficos index.php (independente — Chart.js faturamento + forma pgto)
+└── M4: Relatório aprimorado (beneficia-se de M6 pronto para reaproveitar gráficos)
+
+PÓS-VENDAS
+├── ⚠️ Verificar bug global scope em Tags, Clientes, Artes (index.php helpers)
+└── 🏠 Dashboard — revisitar com dados de Vendas completos (5 de 8 métricas dependem de Vendas)
 ```
 
 ---
 
-**Última atualização:** 22/02/2026  
-**Status:** ✅ FASE 1 COMPLETA — CRUD estabilizado, 12/12 testes OK  
+**Última atualização:** 24/02/2026  
+**Status:** ✅ FASE 1 + M1+M2+M3 COMPLETAS — 14/14 testes OK  
 **Cross-module:** ✅ Cards Lucro + Rentabilidade implementados no módulo Artes  
-**Próxima ação:** Melhoria 1 — Paginação (12/página)  
+**Próxima ação:** Melhoria 5 — Estatísticas por venda (cards no show.php)  
 **Dependências satisfeitas:** Tags ✅, Clientes ✅, Metas ✅, Artes ✅

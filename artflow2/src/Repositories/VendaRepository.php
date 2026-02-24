@@ -6,7 +6,20 @@ use App\Models\Arte;
 use App\Models\Cliente;
 
 /**
- * REPOSITORY: VENDAS
+ * ============================================
+ * REPOSITORY: VENDAS — FASE 1 + MELHORIAS M1+M2+M3
+ * ============================================
+ * 
+ * FASE 1 (22/02/2026): Estabilização CRUD — todos os métodos originais
+ * 
+ * MELHORIAS (23/02/2026):
+ * ──────────
+ * [M1] allPaginated() — Paginação 12/página com JOINs + hydrating
+ * [M2] Ordenação dinâmica via whitelist de colunas (segurança SQL)
+ * [M3] countAll() + filtros combinados (WHERE dinâmico com AND)
+ * 
+ * NOTA: Os métodos paginate() e findPaginated() antigos permanecem
+ * para compatibilidade. O index() deve usar allPaginated() + countAll().
  */
 class VendaRepository extends BaseRepository
 {
@@ -17,6 +30,225 @@ class VendaRepository extends BaseRepository
         'lucro_calculado', 'rentabilidade_hora',
         'forma_pagamento', 'observacoes'
     ];
+    
+    // ==========================================
+    // PAGINAÇÃO + FILTROS COMBINADOS (M1+M2+M3 — NOVO)
+    // ==========================================
+    
+    /**
+     * ============================================
+     * M1+M2+M3: Lista vendas paginadas com filtros combinados e ordenação
+     * ============================================
+     * 
+     * Método principal para a listagem index(). Substitui paginate() na
+     * view porque aplica paginação + filtros combinados + ordenação dinâmica.
+     * 
+     * DIFERENÇA vs paginate() antigo:
+     * - paginate() não suporta busca por termo nem forma de pagamento
+     * - allPaginated() aplica TODOS os filtros simultaneamente (AND)
+     * - Usa whitelist de colunas para ORDER BY (segurança contra SQL Injection)
+     * - Retorna objetos Venda hydrated (não arrays brutos)
+     * 
+     * Padrão idêntico a ArteRepository::allPaginated() e ClienteRepository::allPaginated().
+     * 
+     * @param int $pagina Página atual (1-based)
+     * @param int $porPagina Itens por página (default 12)
+     * @param string|null $termo Busca por nome da arte ou observações
+     * @param string|null $clienteId Filtro por cliente específico
+     * @param string|null $formaPagamento Filtro por forma de pagamento
+     * @param string|null $dataInicio Filtro: data_venda >= (BETWEEN início)
+     * @param string|null $dataFim Filtro: data_venda <= (BETWEEN fim)
+     * @param string $ordenarPor Coluna de ordenação (whitelist validada)
+     * @param string $direcao ASC ou DESC
+     * @return array Array de objetos Venda com Arte e Cliente hydrated
+     */
+    public function allPaginated(
+        int $pagina = 1,
+        int $porPagina = 12,
+        ?string $termo = null,
+        ?string $clienteId = null,
+        ?string $formaPagamento = null,
+        ?string $dataInicio = null,
+        ?string $dataFim = null,
+        string $ordenarPor = 'data_venda',
+        string $direcao = 'DESC'
+    ): array {
+        // ── WHITELIST DE COLUNAS (previne SQL Injection) ──
+        // Mapeia nomes amigáveis da URL para colunas reais do SQL
+        // Vendas usa JOINs, então os nomes incluem alias de tabela
+        $colunasPermitidas = [
+            'data_venda'       => 'v.data_venda',        // Data da venda (padrão)
+            'arte_nome'        => 'a.nome',              // Nome da arte (via JOIN)
+            'cliente_nome'     => 'c.nome',              // Nome do cliente (via JOIN)
+            'valor'            => 'v.valor',             // Valor da venda
+            'lucro_calculado'  => 'v.lucro_calculado',   // Lucro calculado
+            'forma_pagamento'  => 'v.forma_pagamento',   // Forma de pagamento
+            'created_at'       => 'v.created_at'         // Data de criação
+        ];
+        
+        // Se coluna não está na whitelist, usa data_venda como fallback seguro
+        $colunaOrdem = $colunasPermitidas[$ordenarPor] ?? 'v.data_venda';
+        
+        // Sanitiza direção: apenas ASC ou DESC são válidos
+        $direcao = strtoupper($direcao) === 'DESC' ? 'DESC' : 'ASC';
+        
+        // ── CONSTRUÇÃO DINÂMICA DO WHERE (filtros combinados com AND) ──
+        $where = [];
+        $params = [];
+        
+        // Filtro 1: Busca por termo (nome da arte OU observações da venda)
+        // Usa LIKE com % nas duas pontas para busca parcial
+        if ($termo !== null && $termo !== '') {
+            $where[] = "(a.nome LIKE :termo1 OR v.observacoes LIKE :termo2)";
+            $params['termo1'] = "%{$termo}%";
+            $params['termo2'] = "%{$termo}%";
+        }
+        
+        // Filtro 2: Cliente específico
+        if ($clienteId !== null && $clienteId !== '') {
+            $where[] = "v.cliente_id = :cliente_id";
+            $params['cliente_id'] = (int) $clienteId;
+        }
+        
+        // Filtro 3: Forma de pagamento
+        if ($formaPagamento !== null && $formaPagamento !== '') {
+            $where[] = "v.forma_pagamento = :forma_pagamento";
+            $params['forma_pagamento'] = $formaPagamento;
+        }
+        
+        // Filtro 4: Período (data início e/ou data fim)
+        // Permite filtrar só por início, só por fim, ou ambos (BETWEEN)
+        if ($dataInicio !== null && $dataInicio !== '') {
+            $where[] = "v.data_venda >= :data_inicio";
+            $params['data_inicio'] = $dataInicio;
+        }
+        if ($dataFim !== null && $dataFim !== '') {
+            $where[] = "v.data_venda <= :data_fim";
+            $params['data_fim'] = $dataFim;
+        }
+        
+        // Monta cláusula WHERE (vazia = sem filtros = lista tudo)
+        $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        
+        // ── OFFSET para paginação ──
+        $offset = ($pagina - 1) * $porPagina;
+        
+        // ── QUERY PRINCIPAL com JOINs + filtros + ordenação + LIMIT ──
+        // LEFT JOIN garante que vendas sem arte ou sem cliente apareçam
+        $sql = "SELECT v.*,
+                    a.nome as arte_nome, a.status as arte_status,
+                    c.nome as cliente_nome, c.email as cliente_email
+                FROM {$this->table} v
+                LEFT JOIN artes a ON v.arte_id = a.id
+                LEFT JOIN clientes c ON v.cliente_id = c.id
+                {$whereClause}
+                ORDER BY {$colunaOrdem} {$direcao}
+                LIMIT {$porPagina} OFFSET {$offset}";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // ── HYDRATA OBJETOS com relacionamentos ──
+        // Mesmo padrão do allWithRelations(): cria Venda + Arte + Cliente
+        return array_map(function($row) {
+            $venda = Venda::fromArray($row);
+            
+            // Hydrata Arte se existir (FK pode ser NULL por ON DELETE SET NULL)
+            if (!empty($row['arte_id'])) {
+                $venda->setArte(Arte::fromArray([
+                    'id'     => $row['arte_id'],
+                    'nome'   => $row['arte_nome'] ?? '',
+                    'status' => $row['arte_status'] ?? ''
+                ]));
+            }
+            
+            // Hydrata Cliente se existir (FK pode ser NULL)
+            if (!empty($row['cliente_id'])) {
+                $venda->setCliente(Cliente::fromArray([
+                    'id'    => $row['cliente_id'],
+                    'nome'  => $row['cliente_nome'] ?? '',
+                    'email' => $row['cliente_email'] ?? ''
+                ]));
+            }
+            
+            return $venda;
+        }, $rows);
+    }
+    
+    /**
+     * ============================================
+     * M1+M3: Conta total de vendas com os mesmos filtros combinados
+     * ============================================
+     * 
+     * CRUCIAL: Deve usar EXATAMENTE os mesmos filtros do allPaginated()
+     * para que a contagem de páginas seja consistente.
+     * 
+     * Se allPaginated() retorna 5 vendas por página com filtro "pix",
+     * countAll() deve contar apenas vendas com forma_pagamento = 'pix'.
+     * 
+     * @param string|null $termo Busca por nome da arte ou observações
+     * @param string|null $clienteId Filtro por cliente
+     * @param string|null $formaPagamento Filtro por forma de pagamento
+     * @param string|null $dataInicio Filtro: data_venda >=
+     * @param string|null $dataFim Filtro: data_venda <=
+     * @return int Total de registros que atendem os filtros
+     */
+    public function countAll(
+        ?string $termo = null,
+        ?string $clienteId = null,
+        ?string $formaPagamento = null,
+        ?string $dataInicio = null,
+        ?string $dataFim = null
+    ): int {
+        // ── MESMA LÓGICA de filtros do allPaginated() ──
+        $where = [];
+        $params = [];
+        
+        if ($termo !== null && $termo !== '') {
+            $where[] = "(a.nome LIKE :termo1 OR v.observacoes LIKE :termo2)";
+            $params['termo1'] = "%{$termo}%";
+            $params['termo2'] = "%{$termo}%";
+        }
+        
+        if ($clienteId !== null && $clienteId !== '') {
+            $where[] = "v.cliente_id = :cliente_id";
+            $params['cliente_id'] = (int) $clienteId;
+        }
+        
+        if ($formaPagamento !== null && $formaPagamento !== '') {
+            $where[] = "v.forma_pagamento = :forma_pagamento";
+            $params['forma_pagamento'] = $formaPagamento;
+        }
+        
+        if ($dataInicio !== null && $dataInicio !== '') {
+            $where[] = "v.data_venda >= :data_inicio";
+            $params['data_inicio'] = $dataInicio;
+        }
+        
+        if ($dataFim !== null && $dataFim !== '') {
+            $where[] = "v.data_venda <= :data_fim";
+            $params['data_fim'] = $dataFim;
+        }
+        
+        $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        
+        // JOIN com artes é necessário porque o filtro de termo busca em a.nome
+        $sql = "SELECT COUNT(*) 
+                FROM {$this->table} v
+                LEFT JOIN artes a ON v.arte_id = a.id
+                LEFT JOIN clientes c ON v.cliente_id = c.id
+                {$whereClause}";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute($params);
+        
+        return (int) $stmt->fetchColumn();
+    }
+    
+    // ==========================================
+    // MÉTODOS ORIGINAIS (PRESERVADO 100% DA FASE 1)
+    // ==========================================
     
     /**
      * Busca vendas com relacionamentos (arte e cliente)
@@ -215,7 +447,8 @@ class VendaRepository extends BaseRepository
     }
     
     /**
-     * Paginação com filtros
+     * Paginação com filtros (LEGADO — para index use allPaginated())
+     * Mantido para compatibilidade com código antigo.
      */
     public function paginate(int $page = 1, int $perPage = 10, array $filters = []): array
     {

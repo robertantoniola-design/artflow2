@@ -12,7 +12,7 @@ use App\Exceptions\NotFoundException;
 
 /**
  * ============================================
- * VENDA SERVICE — FASE 1 ESTABILIZAÇÃO
+ * VENDA SERVICE — FASE 1 ESTABILIZAÇÃO + MELHORIAS M1+M2+M3
  * ============================================
  * 
  * Camada de lógica de negócio para Vendas.
@@ -28,6 +28,14 @@ use App\Exceptions\NotFoundException;
  * - V9: Novo método buscarComRelacionamentos() usando findWithRelations()
  * - V6: atualizar() agora recalcula meta quando o valor muda
  * - Melhoria: Logs detalhados para diagnóstico de bugs cross-module
+ * 
+ * MELHORIAS (23/02/2026):
+ * ──────────
+ * [M1] listarPaginado() — paginação 12/página com filtros combinados
+ *      Substitui listar() na listagem index. Os filtros são aplicados
+ *      simultaneamente (não mais mutuamente exclusivos).
+ * [M2] Ordenação dinâmica — parâmetros 'ordenar' e 'direcao' nos filtros
+ * [M3] Filtros combinados — termo, cliente_id, forma_pagamento, período
  */
 class VendaService
 {
@@ -35,6 +43,10 @@ class VendaService
     private ArteRepository $arteRepository;
     private MetaRepository $metaRepository;
     private VendaValidator $validator;
+    
+    // ── Constante de paginação M1 (mesmo padrão de Tags/Clientes/Artes) ──
+    // 12 itens = 3 linhas × 4 colunas em layout XL, ou 4 linhas × 3 em LG
+    const POR_PAGINA = 12;
     
     public function __construct(
         VendaRepository $vendaRepository,
@@ -49,7 +61,104 @@ class VendaService
     }
     
     // ==========================================
-    // OPERAÇÕES CRUD
+    // PAGINAÇÃO COM FILTROS (M1+M2+M3 — NOVO)
+    // ==========================================
+    
+    /**
+     * ============================================
+     * M1+M2+M3: Lista vendas paginadas com filtros combinados
+     * ============================================
+     * 
+     * Método principal para a listagem index(). Substitui listar() na
+     * view de listagem porque aplica paginação + filtros combinados.
+     * 
+     * DIFERENÇA vs listar():
+     * - listar() usa if/elseif (filtros mutuamente exclusivos)
+     * - listarPaginado() aplica TODOS os filtros simultaneamente
+     *   via VendaRepository::allPaginated() (query dinâmica com AND)
+     * 
+     * Padrão idêntico ao ArteService::listarPaginado() e
+     * ClienteService::listarPaginado().
+     * 
+     * @param array $filtros Filtros da URL:
+     *   - 'termo'           => string|null  Busca por nome da arte/observações
+     *   - 'cliente_id'      => string|null  Filtro por cliente
+     *   - 'forma_pagamento' => string|null  Filtro por forma de pagamento
+     *   - 'data_inicio'     => string|null  Filtro: data_venda >= (YYYY-MM-DD)
+     *   - 'data_fim'        => string|null  Filtro: data_venda <= (YYYY-MM-DD)
+     *   - 'pagina'          => int          Página atual (default 1)
+     *   - 'ordenar'         => string       Coluna (default 'data_venda')
+     *   - 'direcao'         => string       ASC|DESC (default 'DESC')
+     * 
+     * @return array [
+     *     'vendas'     => Venda[],    // Vendas da página atual (com Arte+Cliente)
+     *     'paginacao'  => [
+     *         'total'        => int,  // Total de registros com filtros
+     *         'porPagina'    => int,  // Itens por página (12)
+     *         'paginaAtual'  => int,  // Página corrente
+     *         'totalPaginas' => int,  // Total de páginas
+     *         'temAnterior'  => bool, // Tem página anterior?
+     *         'temProxima'   => bool, // Tem próxima página?
+     *     ]
+     * ]
+     */
+    public function listarPaginado(array $filtros = []): array
+    {
+        // ── Extrai parâmetros com defaults seguros ──
+        // Normalização com ?: null resolve strings vazias → null
+        // (mesmo padrão aplicado em ArteService::listarPaginado)
+        $termo          = $filtros['termo']           ?? null ?: null;
+        $clienteId      = $filtros['cliente_id']      ?? null ?: null;
+        $formaPagamento = $filtros['forma_pagamento'] ?? null ?: null;
+        $dataInicio     = $filtros['data_inicio']     ?? null ?: null;
+        $dataFim        = $filtros['data_fim']        ?? null ?: null;
+        $pagina         = max(1, (int)($filtros['pagina'] ?? 1));
+        $ordenar        = $filtros['ordenar']  ?? 'data_venda';
+        $direcao        = $filtros['direcao']  ?? 'DESC';
+        
+        // ── 1. Conta total de registros (com os mesmos filtros) ──
+        $total = $this->vendaRepository->countAll(
+            $termo, $clienteId, $formaPagamento, $dataInicio, $dataFim
+        );
+        
+        // ── 2. Calcula total de páginas ──
+        $totalPaginas = $total > 0 ? (int) ceil($total / self::POR_PAGINA) : 1;
+        
+        // ── 3. Ajusta página se exceder o total ──
+        // Ex: Usuário está na pag 5 e aplica filtro que retorna só 1 página
+        if ($totalPaginas > 0 && $pagina > $totalPaginas) {
+            $pagina = $totalPaginas;
+        }
+        
+        // ── 4. Busca vendas da página atual ──
+        $vendas = $this->vendaRepository->allPaginated(
+            $pagina,
+            self::POR_PAGINA,
+            $termo,
+            $clienteId,
+            $formaPagamento,
+            $dataInicio,
+            $dataFim,
+            $ordenar,
+            $direcao
+        );
+        
+        // ── 5. Monta retorno padronizado ──
+        return [
+            'vendas' => $vendas,
+            'paginacao' => [
+                'total'        => $total,
+                'porPagina'    => self::POR_PAGINA,
+                'paginaAtual'  => $pagina,
+                'totalPaginas' => $totalPaginas,
+                'temAnterior'  => $pagina > 1,
+                'temProxima'   => $pagina < $totalPaginas,
+            ]
+        ];
+    }
+    
+    // ==========================================
+    // OPERAÇÕES CRUD (PRESERVADO 100% DA FASE 1)
     // ==========================================
     
     /**
@@ -59,6 +168,10 @@ class VendaService
      * Os filtros atualmente são mutuamente exclusivos (if/elseif).
      * Isso significa que período, mês e cliente NÃO combinam.
      * Será corrigido na Melhoria 3 com WHERE dinâmico + AND.
+     * 
+     * NOTA M1+M2+M3: Este método é LEGADO para a listagem index.
+     * O index() agora usa listarPaginado(). Mantido para compatibilidade
+     * com código que ainda chame listar() diretamente (ex: Dashboard).
      * 
      * @param array $filtros ['data_inicio','data_fim','mes_ano','cliente_id']
      * @return array de Venda|array (tipo misto — ver nota abaixo)
@@ -310,7 +423,7 @@ class VendaService
     }
     
     // ==========================================
-    // CÁLCULOS FINANCEIROS
+    // CÁLCULOS FINANCEIROS (PRESERVADO 100%)
     // ==========================================
     
     /**
@@ -350,7 +463,7 @@ class VendaService
     }
     
     // ==========================================
-    // SANITIZAÇÃO
+    // SANITIZAÇÃO (PRESERVADO 100%)
     // ==========================================
     
     /**
@@ -381,7 +494,7 @@ class VendaService
     }
     
     // ==========================================
-    // METAS — Integração cross-module
+    // METAS — Integração cross-module (PRESERVADO 100%)
     // ==========================================
     
     /**
@@ -441,7 +554,7 @@ class VendaService
     }
     
     // ==========================================
-    // CONSULTAS (usados por Controller e Dashboard)
+    // CONSULTAS — usados por Controller e Dashboard (PRESERVADO 100%)
     // ==========================================
     
     /**
