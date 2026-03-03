@@ -298,7 +298,7 @@ class VendaRepository extends BaseRepository
         $sql = "SELECT v.*,
                     a.id as arte_id, a.nome as arte_nome, a.status as arte_status,
                     a.preco_custo as arte_preco_custo, a.horas_trabalhadas as arte_horas,
-                    c.id as cliente_id, c.nome as cliente_nome, c.email as cliente_email
+                    c.id as cliente_id, c.nome as cliente_nome, c.email as cliente_email, c.telefone as cliente_telefone
                 FROM {$this->table} v
                 LEFT JOIN artes a ON v.arte_id = a.id
                 LEFT JOIN clientes c ON v.cliente_id = c.id
@@ -326,7 +326,8 @@ class VendaRepository extends BaseRepository
             $venda->setCliente(Cliente::fromArray([
                 'id' => $row['cliente_id'],
                 'nome' => $row['cliente_nome'],
-                'email' => $row['cliente_email']
+                'email' => $row['cliente_email'],
+                'telefone' => $row['cliente_telefone'] ?? null
             ]));
         }
         
@@ -556,4 +557,308 @@ class VendaRepository extends BaseRepository
         $stmt = $this->getConnection()->query($sql);
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // [MELHORIA 5] Estatísticas por Venda — Métodos para show.php
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * [M5] Retorna a posição de uma venda no ranking de rentabilidade
+     * 
+     * Conta quantas vendas têm rentabilidade_hora MAIOR que a venda atual,
+     * então posição = count + 1. Se a venda não tem rentabilidade, retorna 0.
+     * 
+     * Exemplo: Se 3 vendas têm R$/h maior → posição = 4° lugar
+     * 
+     * @param int $vendaId ID da venda
+     * @return int Posição no ranking (1 = mais rentável), 0 se sem rentabilidade
+     */
+    public function getPosicaoRanking(int $vendaId): int
+    {
+        // Primeiro busca a rentabilidade da venda específica
+        $sqlCheck = "SELECT COALESCE(rentabilidade_hora, 0) 
+                     FROM {$this->table} WHERE id = :id";
+        $stmtCheck = $this->getConnection()->prepare($sqlCheck);
+        $stmtCheck->execute(['id' => $vendaId]);
+        $rentabilidade = (float) $stmtCheck->fetchColumn();
+        
+        // Se não tem rentabilidade, retorna 0 (sem posição no ranking)
+        if ($rentabilidade <= 0) {
+            return 0;
+        }
+        
+        // Conta quantas vendas têm rentabilidade MAIOR que esta
+        $sql = "SELECT COUNT(*) 
+                FROM {$this->table} 
+                WHERE rentabilidade_hora > :rentabilidade
+                AND rentabilidade_hora IS NOT NULL";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute(['rentabilidade' => $rentabilidade]);
+        
+        // Posição = quantas acima + 1
+        return (int) $stmt->fetchColumn() + 1;
+    }
+
+    /**
+     * [M5] Retorna o total de vendas com rentabilidade calculada
+     * 
+     * Usado para exibir "X° de Y vendas" no ranking do show.php.
+     * Conta apenas vendas que têm rentabilidade_hora > 0.
+     * 
+     * @return int Total de vendas com rentabilidade
+     */
+    public function countComRentabilidade(): int
+    {
+        $sql = "SELECT COUNT(*) FROM {$this->table} 
+                WHERE rentabilidade_hora IS NOT NULL 
+                AND rentabilidade_hora > 0";
+        
+        return (int) $this->getConnection()->query($sql)->fetchColumn();
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // [MELHORIA 6] Gráficos — Distribuição por Forma de Pagamento
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * [M6] Conta vendas agrupadas por forma de pagamento
+     * 
+     * Retorna array associativo para alimentar o gráfico Doughnut
+     * de distribuição de formas de pagamento no index.php.
+     * 
+     * Retorno: [['forma_pagamento' => 'pix', 'total' => 15], ...]
+     * 
+     * @return array Lista de formas de pagamento com contagem
+     */
+    public function countByFormaPagamento(): array
+    {
+        $sql = "SELECT forma_pagamento, COUNT(*) as total
+                FROM {$this->table}
+                GROUP BY forma_pagamento
+                ORDER BY total DESC";
+        
+        return $this->getConnection()->query($sql)->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+
+
+    // ══════════════════════════════════════════════════════════════
+    // [MELHORIA 4] Relatório Aprimorado — Queries filtradas
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * [M4] Retorna anos distintos com vendas registradas
+     * 
+     * Alimenta o dropdown de filtro por ano no relatório.
+     * Se não houver vendas, retorna array com o ano atual como fallback.
+     * 
+     * @return array Ex: [2026, 2025, 2024] (DESC)
+     */
+    public function getAnosDisponiveis(): array
+    {
+        $sql = "SELECT DISTINCT YEAR(data_venda) as ano 
+                FROM {$this->table} 
+                WHERE data_venda IS NOT NULL
+                ORDER BY ano DESC";
+        
+        $rows = $this->getConnection()
+                     ->query($sql)
+                     ->fetchAll(\PDO::FETCH_COLUMN);
+        
+        // Fallback: se não houver vendas, retorna ano atual
+        return !empty($rows) ? $rows : [(int) date('Y')];
+    }
+
+    /**
+     * [M4] Estatísticas filtradas por período
+     * 
+     * Mesma lógica do getEstatisticas() global, mas com WHERE opcional.
+     * Quando dataInicio/dataFim são null, retorna stats de TODAS as vendas
+     * (comportamento idêntico ao getEstatisticas() original).
+     * 
+     * Adiciona campo margem_media (%) que o getEstatisticas() não tem.
+     * 
+     * @param string|null $dataInicio Formato YYYY-MM-DD (inclusive)
+     * @param string|null $dataFim Formato YYYY-MM-DD (inclusive)
+     * @return array Stats com total_vendas, valor_total, ticket_medio, lucro_total, margem_media, rentabilidade_media
+     */
+    public function getEstatisticasFiltradas(?string $dataInicio = null, ?string $dataFim = null): array
+    {
+        // ── Construção dinâmica do WHERE ──
+        $where = [];
+        $params = [];
+        
+        if ($dataInicio !== null && $dataInicio !== '') {
+            $where[] = "data_venda >= :data_inicio";
+            $params['data_inicio'] = $dataInicio;
+        }
+        if ($dataFim !== null && $dataFim !== '') {
+            $where[] = "data_venda <= :data_fim";
+            $params['data_fim'] = $dataFim;
+        }
+        
+        $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        
+        // ── Query com margem média (novo campo vs getEstatisticas) ──
+        // margem_media = AVG((lucro / valor) * 100) — só vendas com valor > 0
+        $sql = "SELECT 
+                    COUNT(*) as total_vendas,
+                    COALESCE(SUM(valor), 0) as valor_total,
+                    COALESCE(AVG(valor), 0) as ticket_medio,
+                    COALESCE(SUM(lucro_calculado), 0) as lucro_total,
+                    COALESCE(AVG(
+                        CASE WHEN valor > 0 AND lucro_calculado IS NOT NULL 
+                             THEN (lucro_calculado / valor) * 100 
+                        END
+                    ), 0) as margem_media,
+                    COALESCE(AVG(
+                        CASE WHEN rentabilidade_hora IS NOT NULL AND rentabilidade_hora > 0
+                             THEN rentabilidade_hora
+                        END
+                    ), 0) as rentabilidade_media
+                FROM {$this->table}
+                {$whereClause}";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute($params);
+        
+        return $stmt->fetch(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * [M4] Vendas detalhadas com JOINs para tabela do relatório
+     * 
+     * Retorna arrays brutos (não objetos) com dados de arte e cliente
+     * para exibição na tabela detalhada do relatório.
+     * 
+     * Inclui custo e horas da arte para cálculos na view.
+     * 
+     * @param string|null $dataInicio Formato YYYY-MM-DD
+     * @param string|null $dataFim Formato YYYY-MM-DD
+     * @param int $limit Máximo de registros (default 200)
+     * @return array Arrays com dados completos da venda + arte + cliente
+     */
+    public function getVendasDetalhadas(?string $dataInicio = null, ?string $dataFim = null, int $limit = 200): array
+    {
+        $where = [];
+        $params = [];
+        
+        if ($dataInicio !== null && $dataInicio !== '') {
+            $where[] = "v.data_venda >= :data_inicio";
+            $params['data_inicio'] = $dataInicio;
+        }
+        if ($dataFim !== null && $dataFim !== '') {
+            $where[] = "v.data_venda <= :data_fim";
+            $params['data_fim'] = $dataFim;
+        }
+        
+        $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        
+        // LEFT JOIN: preserva vendas sem arte ou sem cliente (FK SET NULL)
+        $sql = "SELECT v.id, v.valor, v.data_venda, v.lucro_calculado, 
+                       v.rentabilidade_hora, v.forma_pagamento,
+                       a.nome as arte_nome, a.preco_custo as arte_custo,
+                       a.horas_trabalhadas as arte_horas,
+                       c.nome as cliente_nome
+                FROM {$this->table} v
+                LEFT JOIN artes a ON v.arte_id = a.id
+                LEFT JOIN clientes c ON v.cliente_id = c.id
+                {$whereClause}
+                ORDER BY v.data_venda DESC
+                LIMIT {$limit}";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * [M4] Vendas agrupadas por mês com filtro de período
+     * 
+     * Similar ao vendasPorMes(), mas aceita filtros de data e
+     * inclui campos adicionais (ticket_medio, margem_media) para
+     * a tabela de comparativo mensal.
+     * 
+     * @param string|null $dataInicio Formato YYYY-MM-DD
+     * @param string|null $dataFim Formato YYYY-MM-DD
+     * @return array Dados mensais com faturamento, lucro, ticket, margem
+     */
+    public function vendasPorMesFiltradas(?string $dataInicio = null, ?string $dataFim = null): array
+    {
+        $where = [];
+        $params = [];
+        
+        if ($dataInicio !== null && $dataInicio !== '') {
+            $where[] = "data_venda >= :data_inicio";
+            $params['data_inicio'] = $dataInicio;
+        }
+        if ($dataFim !== null && $dataFim !== '') {
+            $where[] = "data_venda <= :data_fim";
+            $params['data_fim'] = $dataFim;
+        }
+        
+        $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        
+        $sql = "SELECT 
+                    DATE_FORMAT(data_venda, '%Y-%m') as mes,
+                    COUNT(*) as quantidade,
+                    COALESCE(SUM(valor), 0) as faturamento,
+                    COALESCE(SUM(lucro_calculado), 0) as lucro,
+                    COALESCE(AVG(valor), 0) as ticket_medio,
+                    COALESCE(AVG(
+                        CASE WHEN valor > 0 AND lucro_calculado IS NOT NULL 
+                             THEN (lucro_calculado / valor) * 100 
+                        END
+                    ), 0) as margem_media
+                FROM {$this->table}
+                {$whereClause}
+                GROUP BY DATE_FORMAT(data_venda, '%Y-%m')
+                ORDER BY mes ASC";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * [M4] Distribuição por forma de pagamento filtrada por período
+     * 
+     * Similar ao countByFormaPagamento() (M6), mas com WHERE período.
+     * Alimenta o gráfico Doughnut do relatório filtrado.
+     * 
+     * @param string|null $dataInicio Formato YYYY-MM-DD
+     * @param string|null $dataFim Formato YYYY-MM-DD
+     * @return array [['forma_pagamento' => 'pix', 'total' => 15], ...]
+     */
+    public function countByFormaPagamentoFiltrada(?string $dataInicio = null, ?string $dataFim = null): array
+    {
+        $where = [];
+        $params = [];
+        
+        if ($dataInicio !== null && $dataInicio !== '') {
+            $where[] = "data_venda >= :data_inicio";
+            $params['data_inicio'] = $dataInicio;
+        }
+        if ($dataFim !== null && $dataFim !== '') {
+            $where[] = "data_venda <= :data_fim";
+            $params['data_fim'] = $dataFim;
+        }
+        
+        $whereClause = empty($where) ? '' : 'WHERE ' . implode(' AND ', $where);
+        
+        $sql = "SELECT forma_pagamento, COUNT(*) as total
+                FROM {$this->table}
+                {$whereClause}
+                GROUP BY forma_pagamento
+                ORDER BY total DESC";
+        
+        $stmt = $this->getConnection()->prepare($sql);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
 }

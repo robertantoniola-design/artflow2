@@ -638,4 +638,223 @@ class VendaService
             return [];
         }
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // [MELHORIA 5] Estatísticas por Venda — Cards no show.php
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * [M5] Calcula métricas detalhadas para uma venda específica
+     * 
+     * Retorna dados para os 4 cards de estatísticas no show.php:
+     * - Margem de lucro (%)
+     * - Comparativo com ticket médio geral
+     * - Posição no ranking de rentabilidade
+     * - Rentabilidade vs média geral
+     * 
+     * Os cálculos são feitos no Service (não na view) para manter
+     * a separação de responsabilidades do padrão MVC.
+     * 
+     * @param int $vendaId ID da venda
+     * @param float $valor Valor da venda (passado para evitar query extra)
+     * @param float $lucro Lucro calculado da venda
+     * @param float $rentabilidade Rentabilidade/hora da venda
+     * @return array Métricas calculadas para a view
+     */
+    public function getEstatisticasVenda(
+        int $vendaId, 
+        float $valor, 
+        float $lucro, 
+        float $rentabilidade
+    ): array {
+        try {
+            // Busca estatísticas gerais (método já existente — reutiliza)
+            $estatGerais = $this->getEstatisticas();
+            
+            // Ticket médio geral para comparação
+            $ticketMedio = (float) ($estatGerais['ticket_medio'] ?? 0);
+            
+            // ── Card 1: Margem de lucro ──
+            // Fórmula: (lucro / valor) × 100
+            // Proteção contra divisão por zero
+            $margemLucro = $valor > 0 
+                ? round(($lucro / $valor) * 100, 1) 
+                : 0;
+            
+            // ── Card 2: Comparativo vs ticket médio ──
+            // Positivo = acima da média, Negativo = abaixo
+            $diferencaTicket = $ticketMedio > 0 
+                ? round((($valor - $ticketMedio) / $ticketMedio) * 100, 1) 
+                : 0;
+            
+            // ── Card 3: Posição no ranking de rentabilidade ──
+            $posicaoRanking = $this->vendaRepository->getPosicaoRanking($vendaId);
+            $totalComRentabilidade = $this->vendaRepository->countComRentabilidade();
+            
+            // ── Card 4: Rentabilidade vs média geral ──
+            $rentabilidadeMedia = (float) ($estatGerais['rentabilidade_media'] ?? 0);
+            $diferencaRent = $rentabilidadeMedia > 0 
+                ? round((($rentabilidade - $rentabilidadeMedia) / $rentabilidadeMedia) * 100, 1) 
+                : 0;
+            
+            return [
+                // Card 1: Margem de Lucro
+                'margem_lucro'         => $margemLucro,          // Ex: 42.5 (%)
+                
+                // Card 2: Comparativo com Ticket Médio
+                'ticket_medio_geral'   => $ticketMedio,          // Ex: 350.00 (R$)
+                'diferenca_ticket'     => $diferencaTicket,      // Ex: +15.3 (%)
+                
+                // Card 3: Posição no Ranking
+                'posicao_ranking'      => $posicaoRanking,       // Ex: 3 (3° lugar)
+                'total_com_ranking'    => $totalComRentabilidade, // Ex: 27 (de 27)
+                
+                // Card 4: Rentabilidade vs Média
+                'rentabilidade_media'  => $rentabilidadeMedia,   // Ex: 45.20 (R$/h)
+                'diferenca_rent'       => $diferencaRent,        // Ex: +22.1 (%)
+                
+                // Totais gerais (contexto)
+                'total_vendas'         => (int) ($estatGerais['total_vendas'] ?? 0),
+                'valor_total_geral'    => (float) ($estatGerais['valor_total'] ?? 0),
+            ];
+        } catch (\Exception $e) {
+            // Fallback: cards simplesmente não aparecem
+            error_log("[VendaService::getEstatisticasVenda] Erro: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // [MELHORIA 6] Gráficos — Distribuição por Forma de Pagamento
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * [M6] Retorna distribuição de vendas por forma de pagamento
+     * 
+     * Wrapper para VendaRepository::countByFormaPagamento().
+     * Dados usados no gráfico Doughnut do index.php.
+     * 
+     * Inclui try/catch + fallback vazio (padrão de outros módulos)
+     * para evitar quebra da view se houver erro no banco.
+     * 
+     * @return array [['forma_pagamento' => 'pix', 'total' => 15], ...]
+     */
+    public function getDistribuicaoFormaPagamento(): array
+    {
+        try {
+            return $this->vendaRepository->countByFormaPagamento();
+        } catch (\Exception $e) {
+            // Fallback silencioso — gráfico simplesmente não aparece
+            error_log("[VendaService::getDistribuicaoFormaPagamento] Erro: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    
+
+    // ══════════════════════════════════════════════════════════════
+    // [MELHORIA 4] Relatório Aprimorado — Orquestrador de dados
+    // ══════════════════════════════════════════════════════════════
+
+    /**
+     * [M4] Coleta TODOS os dados necessários para o relatório
+     * 
+     * Método orquestrador que chama os 5 novos métodos do Repository
+     * e monta o pacote completo de dados para a view relatorio.php.
+     * 
+     * LÓGICA DE FILTROS:
+     * - Se apenas 'ano' é informado → converte para período 01/jan–31/dez
+     * - Se data_inicio e/ou data_fim → usa como filtro direto
+     * - Se nenhum filtro → retorna dados de TODAS as vendas (global)
+     * 
+     * Padrão: Envelopa todas as queries em try/catch individual
+     * para que falha em uma query não quebre todo o relatório.
+     * 
+     * @param array $filtros Filtros da URL:
+     *   - 'data_inicio' => string|null (YYYY-MM-DD)
+     *   - 'data_fim'    => string|null (YYYY-MM-DD)
+     *   - 'ano'         => string|null (YYYY)
+     * 
+     * @return array Pacote completo com todos os dados do relatório
+     */
+    public function getDadosRelatorio(array $filtros = []): array
+    {
+        // ── Normaliza filtros (strings vazias → null) ──
+        $dataInicio = $filtros['data_inicio'] ?? null ?: null;
+        $dataFim    = $filtros['data_fim']    ?? null ?: null;
+        $ano        = $filtros['ano']         ?? null ?: null;
+        
+        // ── Se filtro por ano sem datas específicas, converte para período ──
+        // Ex: ano=2026 → data_inicio=2026-01-01, data_fim=2026-12-31
+        if ($ano && !$dataInicio && !$dataFim) {
+            $dataInicio = "{$ano}-01-01";
+            $dataFim    = "{$ano}-12-31";
+        }
+        
+        // ── Coleta dados com try/catch por seção ──
+        // Se uma query falha, as outras ainda funcionam
+        
+        try {
+            $estatisticas = $this->vendaRepository->getEstatisticasFiltradas($dataInicio, $dataFim);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getDadosRelatorio] Erro estatísticas: " . $e->getMessage());
+            $estatisticas = [
+                'total_vendas' => 0, 'valor_total' => 0, 'ticket_medio' => 0,
+                'lucro_total' => 0, 'margem_media' => 0, 'rentabilidade_media' => 0
+            ];
+        }
+        
+        try {
+            $vendasMensais = $this->vendaRepository->vendasPorMesFiltradas($dataInicio, $dataFim);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getDadosRelatorio] Erro mensais: " . $e->getMessage());
+            $vendasMensais = [];
+        }
+        
+        try {
+            $vendasDetalhadas = $this->vendaRepository->getVendasDetalhadas($dataInicio, $dataFim);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getDadosRelatorio] Erro detalhadas: " . $e->getMessage());
+            $vendasDetalhadas = [];
+        }
+        
+        try {
+            $distribuicaoPgto = $this->vendaRepository->countByFormaPagamentoFiltrada($dataInicio, $dataFim);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getDadosRelatorio] Erro pgto: " . $e->getMessage());
+            $distribuicaoPgto = [];
+        }
+        
+        try {
+            // Ranking usa getMaisRentaveis() global (não faz sentido filtrar por período)
+            $rankingRentabilidade = $this->vendaRepository->getMaisRentaveis(10);
+        } catch (\Exception $e) {
+            error_log("[VendaService::getDadosRelatorio] Erro ranking: " . $e->getMessage());
+            $rankingRentabilidade = [];
+        }
+        
+        try {
+            $anosDisponiveis = $this->vendaRepository->getAnosDisponiveis();
+        } catch (\Exception $e) {
+            error_log("[VendaService::getDadosRelatorio] Erro anos: " . $e->getMessage());
+            $anosDisponiveis = [(int) date('Y')];
+        }
+        
+        return [
+            'estatisticas'          => $estatisticas,
+            'vendasMensais'         => $vendasMensais,
+            'vendasDetalhadas'      => $vendasDetalhadas,
+            'distribuicaoPgto'      => $distribuicaoPgto,
+            'rankingRentabilidade'  => $rankingRentabilidade,
+            'anosDisponiveis'       => $anosDisponiveis,
+            // Período efetivamente aplicado (para exibir na view)
+            'periodoAplicado'       => [
+                'data_inicio' => $dataInicio,
+                'data_fim'    => $dataFim,
+                'ano'         => $ano
+            ]
+        ];
+    }
+
+
 }

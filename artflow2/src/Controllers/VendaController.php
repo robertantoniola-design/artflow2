@@ -74,23 +74,22 @@ class VendaController extends BaseController
     }
     
     // ==========================================
-    // LISTAGEM (M1+M2+M3 — MODIFICADO)
+    // M6: LISTAGEM — index() MODIFICADO
     // ==========================================
-    
+    // MUDANÇAS vs M1+M2+M3:
+    // ① Adiciona chamada getVendasMensais(6) para gráfico de barras
+    // ② Adiciona chamada getDistribuicaoFormaPagamento() para doughnut
+    // ③ Passa $vendasMensais e $distribuicaoPgto para a view
+    // O RESTO É 100% IDÊNTICO AO CÓDIGO M1+M2+M3
+    // ==========================================
+
     /**
      * Lista vendas com paginação, ordenação e filtros combinados
      * GET /vendas
-     * GET /vendas?termo=X&cliente_id=1&forma_pagamento=pix&pagina=2&ordenar=valor&direcao=DESC
      * 
-     * MELHORIA M1: Paginação 12/página (padrão Tags/Clientes/Artes)
-     * MELHORIA M2: Ordenação dinâmica por qualquer coluna (whitelist no Repository)
-     * MELHORIA M3: Filtros combinados com AND (substitui if/elseif mutuamente exclusivos)
-     * 
-     * MUDANÇA vs ORIGINAL:
-     * - Antes: usava $this->vendaService->listar($filtros) → sem paginação, filtros exclusivos
-     * - Agora: usa $this->vendaService->listarPaginado($filtros) → paginado + filtros AND
-     * - Resumo agora é calculado sobre objetos Venda (allPaginated retorna objetos hydrated)
-     * - Passa $paginacao para a view (controles de paginação)
+     * [M6] Agora também busca dados para os gráficos Chart.js:
+     * - Faturamento mensal (últimos 6 meses)
+     * - Distribuição por forma de pagamento
      */
     public function index(Request $request): Response
     {
@@ -110,7 +109,6 @@ class VendaController extends BaseController
         ];
         
         // ── M1: Usa listarPaginado() em vez de listar() ──
-        // Retorna ['vendas' => Venda[], 'paginacao' => [...]]
         $resultado = $this->vendaService->listarPaginado($filtros);
         
         // Estatísticas gerais (cards globais — não afetadas por filtros da listagem)
@@ -119,8 +117,13 @@ class VendaController extends BaseController
         // Lista de clientes para o dropdown do filtro (M3)
         $clientesSelect = $this->clienteService->getParaSelect();
         
+        // ── [M6] NOVO: Dados para os gráficos Chart.js ──
+        // Faturamento mensal: últimos 6 meses (barras verticais)
+        $vendasMensais = $this->vendaService->getVendasMensais(6);
+        // Distribuição por forma de pagamento (doughnut)
+        $distribuicaoPgto = $this->vendaService->getDistribuicaoFormaPagamento();
+        
         // ── Calcula resumo da página filtrada ──
-        // allPaginated() retorna objetos Venda hydrated, então sempre usamos getters
         $valorTotal = 0;
         $lucroTotal = 0;
         foreach ($resultado['vendas'] as $venda) {
@@ -129,7 +132,7 @@ class VendaController extends BaseController
         }
         
         $resumo = [
-            'total_vendas' => $resultado['paginacao']['total'], // Total com filtros (não só da página)
+            'total_vendas' => $resultado['paginacao']['total'],
             'valor_total'  => $valorTotal,
             'lucro_total'  => $lucroTotal
         ];
@@ -147,13 +150,15 @@ class VendaController extends BaseController
         }
         
         return $this->view('vendas/index', [
-            'titulo'         => 'Vendas',
-            'vendas'         => $resultado['vendas'],      // Objetos Venda hydrated
-            'paginacao'      => $resultado['paginacao'],    // M1: Dados de paginação
-            'estatisticas'   => $estatisticas,              // Stats globais (cards)
-            'clientesSelect' => $clientesSelect,            // M3: Para dropdown filtro
-            'resumo'         => $resumo,                    // Resumo filtrado
-            'filtros'        => $filtros                    // Para preservar nos links
+            'titulo'           => 'Vendas',
+            'vendas'           => $resultado['vendas'],
+            'paginacao'        => $resultado['paginacao'],
+            'estatisticas'     => $estatisticas,
+            'clientesSelect'   => $clientesSelect,
+            'resumo'           => $resumo,
+            'filtros'          => $filtros,
+            'vendasMensais'    => $vendasMensais,      // [M6] NOVO
+            'distribuicaoPgto' => $distribuicaoPgto,    // [M6] NOVO
         ]);
     }
     
@@ -289,6 +294,9 @@ class VendaController extends BaseController
     /**
      * Exibe detalhes da venda
      * GET /vendas/{id}
+     * 
+     * [M5] Agora calcula e passa estatísticas derivadas para a view:
+     * margem de lucro, comparativo ticket médio, posição ranking, etc.
      */
     public function show(Request $request, $id): Response
     {
@@ -301,16 +309,25 @@ class VendaController extends BaseController
         try {
             // CORREÇÃO V9: Usa buscarComRelacionamentos() em vez de buscar()
             // Assim $venda->getArte() e $venda->getCliente() retornam objetos populados
-            // em vez de null (findWithRelations vs findOrFail)
             $venda = $this->vendaService->buscarComRelacionamentos($id);
+            
+            // ── [M5] NOVO: Calcula estatísticas derivadas para os cards ──
+            // Passa os valores da venda para evitar queries extras no Service
+            $estatisticasVenda = $this->vendaService->getEstatisticasVenda(
+                $id,
+                (float) ($venda->getValor() ?? 0),
+                (float) ($venda->getLucroCalculado() ?? 0),
+                (float) ($venda->getRentabilidadeHora() ?? 0)
+            );
             
             if ($request->wantsJson()) {
                 return $this->json(['success' => true, 'data' => $venda->toArray()]);
             }
             
             return $this->view('vendas/show', [
-                'titulo' => 'Venda #' . $id,
-                'venda'  => $venda
+                'titulo'            => 'Venda #' . $id,
+                'venda'             => $venda,
+                'estatisticasVenda' => $estatisticasVenda,  // [M5] NOVO
             ]);
             
         } catch (NotFoundException $e) {
@@ -453,16 +470,23 @@ class VendaController extends BaseController
         }
     }
     
+
+
     // ==========================================
-    // RELATÓRIO (PRESERVADO 100% DA FASE 1)
+    // RELATÓRIO APRIMORADO (M4 — SUBSTITUIR INTEIRO)
     // ==========================================
-    
+
     /**
-     * Relatório de vendas
+     * [M4] Relatório de vendas aprimorado
      * GET /vendas/relatorio
      * 
-     * REGRA CRÍTICA: Esta rota DEVE estar declarada ANTES de $router->resource('/vendas')
-     * no routes.php, senão "relatorio" é interpretado como {id} pelo Router (Bug V8).
+     * Filtros suportados:
+     * - ?ano=2026 → período 01/01/2026 a 31/12/2026
+     * - ?data_inicio=2026-01-01&data_fim=2026-06-30 → período específico
+     * - Sem filtros → dados globais (todas as vendas)
+     * 
+     * REGRA CRÍTICA: Esta rota DEVE estar declarada ANTES de
+     * $router->resource('/vendas') no routes.php.
      */
     public function relatorio(Request $request): Response
     {
@@ -470,43 +494,50 @@ class VendaController extends BaseController
         $this->limparDadosFormulario();
         
         try {
-            // Filtros de período para o relatório
-            $mes = $request->get('mes');
-            $ano = $request->get('ano') ?? date('Y');
+            // ── Extrai filtros da URL ──
+            $filtros = [
+                'data_inicio' => $request->get('data_inicio'),
+                'data_fim'    => $request->get('data_fim'),
+                'ano'         => $request->get('ano'),
+            ];
             
-            // Dados para os gráficos e tabelas
-            $vendasMensais = $this->vendaService->getVendasMensais(12);
-            $estatisticas = $this->vendaService->getEstatisticas();
-            $rankingRentabilidade = $this->vendaService->getRankingRentabilidade(10);
+            // ── Coleta TODOS os dados via Service (M4) ──
+            // getDadosRelatorio() orquestra 5 queries + fallbacks
+            $dados = $this->vendaService->getDadosRelatorio($filtros);
             
-            // Relatório do período (se filtro aplicado)
-            $relatorio = [];
-            if ($mes && $ano) {
-                $relatorio = $this->vendaService->listar([
-                    'mes_ano' => "{$ano}-{$mes}"
-                ]);
+            if ($request->wantsJson()) {
+                return $this->json(['success' => true, 'data' => $dados]);
             }
             
             return $this->view('vendas/relatorio', [
                 'titulo'                => 'Relatório de Vendas',
-                'relatorio'             => $relatorio,
-                'vendasMensais'         => $vendasMensais,
-                'estatisticas'          => $estatisticas,
-                'rankingRentabilidade'  => $rankingRentabilidade,
-                'filtros'               => ['mes' => $mes, 'ano' => $ano]
+                'estatisticas'          => $dados['estatisticas'],
+                'vendasMensais'         => $dados['vendasMensais'],
+                'vendasDetalhadas'      => $dados['vendasDetalhadas'],
+                'distribuicaoPgto'      => $dados['distribuicaoPgto'],
+                'rankingRentabilidade'  => $dados['rankingRentabilidade'],
+                'anosDisponiveis'       => $dados['anosDisponiveis'],
+                'periodoAplicado'       => $dados['periodoAplicado'],
+                'filtros'               => $filtros,
             ]);
             
         } catch (\Exception $e) {
-            error_log("[VendaController::relatorio] Erro: " . $e->getMessage());
+            error_log("[VendaController::relatorio] Erro geral: " . $e->getMessage());
             
             // Fallback seguro: renderiza página com dados vazios
             return $this->view('vendas/relatorio', [
                 'titulo'                => 'Relatório de Vendas',
-                'relatorio'             => [],
+                'estatisticas'          => [
+                    'total_vendas' => 0, 'valor_total' => 0, 'ticket_medio' => 0,
+                    'lucro_total' => 0, 'margem_media' => 0, 'rentabilidade_media' => 0
+                ],
                 'vendasMensais'         => [],
-                'estatisticas'          => ['total_vendas' => 0, 'valor_total' => 0, 'lucro_total' => 0],
+                'vendasDetalhadas'      => [],
+                'distribuicaoPgto'      => [],
                 'rankingRentabilidade'  => [],
-                'filtros'               => ['mes' => null, 'ano' => date('Y')]
+                'anosDisponiveis'       => [(int) date('Y')],
+                'periodoAplicado'       => ['data_inicio' => null, 'data_fim' => null, 'ano' => null],
+                'filtros'               => ['data_inicio' => null, 'data_fim' => null, 'ano' => null],
             ]);
         }
     }
