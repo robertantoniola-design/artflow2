@@ -17,8 +17,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Chart.js (para gráficos) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>    
     <!-- CSS Customizado -->
     <link href="<?= asset('css/app.css') ?>" rel="stylesheet">
     

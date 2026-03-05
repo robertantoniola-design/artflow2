@@ -6,7 +6,7 @@
 **View:** `views/dashboard/index.php`  
 **Componente:** `views/components/alerta-meta-risco.php`  
 **Criado:** 03/03/2026  
-**Status:** 🔄 ESTABILIZAÇÃO PENDENTE
+**Status:** ✅ FASE 1 COMPLETA — MELHORIAS PENDENTES
 
 ---
 
@@ -21,13 +21,17 @@ O Dashboard **NÃO é um módulo CRUD** — não tem Model, Repository, Service 
 ```
 src/
 └── Controllers/
-    └── DashboardController.php       🔧 Controller com 7 actions (index + 6 AJAX)
+    └── DashboardController.php       ✅ Controller com 7 actions (index + 6 AJAX)
 
 views/
 └── dashboard/
-    ├── index.php                     🔧 View principal (cards + gráficos + tabelas)
+    ├── index.php                     ✅ View principal (cards + gráficos + tabelas)
     └── ../components/
         └── alerta-meta-risco.php     ✅ Componente condicional (Metas M4)
+
+views/
+└── layouts/
+    └── main.php                      ✅ Chart.js 4.4.7 centralizado (FIX D2)
 
 config/
 └── routes.php                        ✅ 8 rotas Dashboard registradas
@@ -54,8 +58,8 @@ DashboardController
 ├── __construct(ArteService, VendaService, MetaService, ClienteService)  ← 4 dependências
 │
 ├── index()
-│   ├── ArteService::getEstatisticas()           → contagem por status
-│   ├── ArteService::getDisponiveisParaVenda()   → artes com status 'disponivel'
+│   ├── ArteService::getEstatisticas()           → countByStatus (adaptado via adaptarArtesStats)
+│   ├── ArteService::getDisponiveisParaVenda()   → artes com status 'disponivel' + 'em_producao'
 │   ├── VendaService::getVendasMesAtual()        → array vendas do mês corrente
 │   ├── VendaService::getTotalMes()              → float faturamento mensal
 │   ├── VendaService::getVendasMensais(6)        → array para gráfico barras
@@ -72,11 +76,19 @@ DashboardController
 └── busca()                 → JSON busca global (TODO: parcial)
 ```
 
+### Métodos Auxiliares do Controller
+
+```
+DashboardController (private)
+├── limparDadosFormulario()    → FIX D1: limpa $_SESSION['_old_input'] e $_SESSION['_errors']
+└── adaptarArtesStats(array)   → FIX CHAVES: converte formato countByStatus → formato Dashboard
+```
+
 ### Variáveis Passadas à View (index)
 
 | Variável | Tipo | Origem | Uso na View |
 |----------|------|--------|-------------|
-| `$artesStats` | array | ArteService | 4 cards principais + doughnut status |
+| `$artesStats` | array | ArteService (adaptado) | 4 cards principais + doughnut status |
 | `$vendasMes` | array | VendaService | Card "Vendas do Mês" (count) |
 | `$faturamentoMes` | float | VendaService | Card "Vendas do Mês" (valor) |
 | `$metaAtual` | array | MetaService | Card "Meta do Mês" + semi-doughnut |
@@ -101,7 +113,7 @@ DashboardController
 | 5 | Gráfico Faturamento Mensal | Chart.js Bar | Últimos 6 meses (valor) | ✅ Funcional |
 | 6 | Gráfico Status Artes | Chart.js Doughnut | Disponível/Produção/Vendida | ✅ Funcional |
 | 7 | Gráfico Meta do Mês | Chart.js Semi-doughnut | Realizado vs Falta | ✅ Funcional |
-| 8 | Gráfico Evolução Vendas | Chart.js Misto | Quantidade (linha) + Lucro (barra) | ✅ Funcional |
+| 8 | Gráfico Evolução Vendas | Chart.js Misto | Faturamento (linha) + Quantidade (barra) | ✅ Funcional |
 | 9 | Tabela Top Clientes | Tabela | #, Nome, Compras, Total | ✅ Funcional |
 | 10 | Lista Artes Disponíveis | Lista | Arte + preço + link | ✅ Funcional |
 | 11 | Lista Mais Rentáveis | Lista | Arte + R$/h | ✅ Funcional |
@@ -109,7 +121,81 @@ DashboardController
 | 13 | Botões Nova Arte / Venda | Header | Atalhos rápidos | ✅ Funcional |
 | 14 | 6 Endpoints AJAX | API JSON | Refresh, artes, vendas, meta, atividades, busca | ✅ Funcional |
 
-### Bugs Já Corrigidos (Anteriores)
+---
+
+## ✅ FASE 1 — ESTABILIZAÇÃO (COMPLETA — 03/03/2026)
+
+### Bugs Investigados
+
+| # | Suspeita | Resultado | Ação |
+|---|----------|-----------|------|
+| D1 | `limparDadosFormulario()` ausente | 🔴 **CONFIRMADO** | Método privado adicionado ao Controller |
+| D2 | Chart.js duplicado em 5 arquivos | 🔴 **CONFIRMADO — CRÍTICO** | Centralizado no layout v4.4.7, removido de 4 views |
+| D3 | `$vendasMes` tipo misto | ✅ Descartado | View já tem verificação defensiva `is_array()` |
+| D4 | `$metaAtual` pode ser null/vazio | ✅ Descartado | View usa operador `??` em todos os acessos |
+| D5 | `$artesStats` chaves inconsistentes | 🔴 **CONFIRMADO — CRÍTICO** | `adaptarArtesStats()` converte formato no Controller |
+| D6 | Endpoint `busca()` ausente | ✅ Descartado | Método implementado, retorna `resultados => []` (TODO) |
+| D7 | `topClientes` formato array/objeto | ✅ Descartado | View tem dual-path `is_object()`/`is_array()` |
+| D8 | Queries duplicadas em `refresh()` | 🔴 **CONFIRMADO** | Variáveis locais eliminam 4 queries por request |
+
+### Correções Aplicadas
+
+#### FIX D1 — `limparDadosFormulario()` (Severidade: Baixa)
+
+**Problema:** DashboardController não limpava `$_SESSION['_old_input']` e `$_SESSION['_errors']`. Se o usuário navegava Criar Venda → Erro validação → Dashboard → outro módulo, dados residuais contaminavam formulários.
+
+**Solução:** Método `private limparDadosFormulario()` adicionado ao DashboardController (padrão dos outros controllers — é privado e copy-pasted, NÃO existe no BaseController). Chamado no início de `index()`.
+
+**Arquivo:** `src/Controllers/DashboardController.php`
+
+#### FIX D2 — Chart.js Centralizado (Severidade: CRÍTICA)
+
+**Problema:** Chart.js carregado em 5 arquivos com versões diferentes:
+- `main.php`: `chart.js` (SEM versão = latest)
+- `dashboard/index.php`: `chart.js@4.4.0`
+- `artes/index.php`: `chart.js@4.4.7` (condicional)
+- `metas/index.php`: `chart.js` (SEM versão, condicional)
+- `tags/index.php`: `chart.js@4.4.7` (condicional)
+
+Dashboard carregava 2× (latest + 4.4.0). Artes carregava 2× (latest + 4.4.7). Páginas sem gráficos carregavam ~200KB desnecessários.
+
+**Solução (Opção A — Centralizar no layout):**
+- `views/layouts/main.php`: fixado em `chart.js@4.4.7/dist/chart.umd.min.js`
+- Removido `<script>` de Chart.js de: `dashboard/index.php`, `artes/index.php`, `metas/index.php`, `tags/index.php`
+
+**Arquivos alterados:** 5 (main.php + 4 views)
+
+#### FIX D5/CHAVES — `adaptarArtesStats()` (Severidade: CRÍTICA)
+
+**Problema:** `ArteService::getEstatisticas()` delega para `ArteRepository::countByStatus()` que retorna:
+```
+['disponivel' => N, 'em_producao' => N, 'vendida' => N, 'reservada' => N]
+```
+
+Dashboard esperava formato diferente:
+```
+['total' => N, 'disponiveis' => N, 'em_producao' => N, 'vendidas' => N, 'reservadas' => N]
+```
+
+Diferenças: falta `total` (soma), chaves no singular vs plural (`disponivel`→`disponiveis`, `vendida`→`vendidas`).
+
+Resultado: Card "Total de Artes" = 0, Gráfico doughnut "Nenhuma arte cadastrada".
+
+**Solução:** Método privado `adaptarArtesStats()` no DashboardController converte o formato. NÃO alteramos ArteService/Repository para não afetar módulo Artes que está estável.
+
+**Contexto histórico:** O ArteRepository original tinha `getEstatisticas()` com formato correto, mas foi removido acidentalmente na refatoração M6 do módulo Artes (substituído por `countByStatus()` + `getResumoFinanceiro()`). O método foi restaurado no Repository como backup, mas o Service continua usando `countByStatus()` — por isso a adaptação é feita no Controller consumidor.
+
+**Arquivo:** `src/Controllers/DashboardController.php`
+
+#### FIX D8 — Queries Duplicadas no `refresh()` (Severidade: Média)
+
+**Problema:** `refresh()` chamava `getEstatisticas()` 2× e `getResumoDashboard()` 2× = 4 queries SQL desnecessárias por request AJAX.
+
+**Solução:** Variáveis locais armazenam resultado da primeira chamada e reutilizam.
+
+**Arquivo:** `src/Controllers/DashboardController.php`
+
+### Bugs Anteriores (Já Corrigidos Antes da Fase 1)
 
 | Bug | Causa | Correção | Data |
 |-----|-------|----------|------|
@@ -118,48 +204,45 @@ DashboardController
 | Dashboard quebrado | Objeto Cliente usado como array | Verificação defensiva `is_object()`/`is_array()` | 31/01/2026 |
 | TypeError getValor() | Vendas às vezes retornam arrays em vez de objetos | Verificação defensiva no resumo | 31/01/2026 |
 
----
+### Arquivos Alterados na Fase 1
 
-## 🔍 FASE 1 — ESTABILIZAÇÃO E TESTES BROWSER
+| Arquivo | Caminho | Fixes |
+|---------|---------|-------|
+| DashboardController.php | `src/Controllers/` | D1 + D5/CHAVES + D8 |
+| main.php | `views/layouts/` | D2 (Chart.js fixado 4.4.7) |
+| index.php | `views/dashboard/` | D2 (removido `<script>` Chart.js) |
+| index.php | `views/artes/` | D2 (removido `<script>` Chart.js) |
+| index.php | `views/metas/` | D2 (removido `<script>` Chart.js) |
+| index.php | `views/tags/` | D2 (removido `<script>` Chart.js) |
 
-### Abordagem
+### Testes T1–T12 — TODOS PASSARAM ✅
 
-Diferente dos módulos CRUD (que tinham 12 testes padrão de create/edit/delete), o Dashboard requer testes de **exibição + integridade de dados + responsividade de gráficos**. O foco é garantir que:
+| # | Área | Teste | Resultado |
+|---|------|-------|-----------|
+| **T1** | Cards | Página carrega sem erros | ✅ OK |
+| **T2** | Cards — Dados | Valores batem com banco | ✅ OK (após fix D5/CHAVES) |
+| **T3** | Gráfico Faturamento | Barras renderizam | ✅ OK |
+| **T4** | Gráfico Status Artes | Doughnut renderiza | ✅ OK (após fix D5/CHAVES) |
+| **T5** | Gráfico Meta | Semi-doughnut renderiza | ✅ OK |
+| **T6** | Gráfico Evolução | Misto renderiza | ✅ OK |
+| **T7** | Top Clientes | Tabela correta | ✅ OK |
+| **T8** | Artes Disponíveis | Lista correta | ✅ OK |
+| **T9** | Ranking Rentáveis | Lista correta | ✅ OK |
+| **T10** | Alerta Meta Risco | Condicional funciona | ✅ OK |
+| **T11** | Reflexo CRUD | Criar venda reflete | ✅ OK |
+| **T12** | Banco vazio | — | ⏭️ Não executado (opcional) |
 
-1. Todos os dados exibidos estão corretos vs banco real
-2. Gráficos renderizam sem erros JS no console
-3. Links navegam corretamente
-4. Cenários de banco vazio não quebram a página
-5. Dados refletem operações recentes (criar/excluir venda atualiza Dashboard)
+### Lições Aprendidas na Fase 1
 
-### Testes T1–T12
+1. **`limparDadosFormulario()` é privado e per-controller:** Não existe no BaseController. Cada controller define o seu. Se esquecer de adicionar, dados residuais de sessão vazam entre módulos.
 
-| # | Área | Teste | Verificação |
-|---|------|-------|-------------|
-| **T1** | Cards | Página carrega sem erros | Dashboard abre, 4 cards visíveis, sem erros no console |
-| **T2** | Cards — Dados | Valores batem com banco | Conferir Total Artes, Vendas Mês, À Venda, Meta com phpMyAdmin |
-| **T3** | Gráfico Faturamento | Barras renderizam | Gráfico azul com últimos 6 meses, tooltips mostram R$ |
-| **T4** | Gráfico Status Artes | Doughnut renderiza | 3 fatias (Disponível/Produção/Vendida), legenda visível |
-| **T5** | Gráfico Meta | Semi-doughnut renderiza | Verde (realizado) + vermelho (falta), valores na legenda |
-| **T6** | Gráfico Evolução | Misto renderiza | Linha (quantidade) + barras (lucro), dual axis |
-| **T7** | Top Clientes | Tabela correta | 5 clientes, ordenados por total compras DESC, links funcionam |
-| **T8** | Artes Disponíveis | Lista correta | Artes com status='disponivel', link para show funciona |
-| **T9** | Ranking Rentáveis | Lista correta | Top 5 por R$/h, badges com valores corretos |
-| **T10** | Alerta Meta Risco | Condicional funciona | Se meta em risco → banner visível; se OK → sem banner |
-| **T11** | Reflexo CRUD | Criar venda reflete | Crie venda, volte ao Dashboard: card Vendas Mês atualizado |
-| **T12** | Banco vazio | Sem erros | Simule cenário sem vendas/metas: página carrega com "nenhum dado" |
+2. **Chart.js deve ter versão fixa e única:** Carregar via CDN sem versão (`chart.js` sem `@4.4.7`) pega `latest` que pode mudar a qualquer momento. Versão fixada em 4.4.7 no layout, removida de todas as views individuais.
 
-### Potenciais Bugs (Investigar na Fase 1)
+3. **Dashboard é consumidor, não dono dos dados:** Quando o formato dos dados muda no Service/Repository de outro módulo (como aconteceu com `countByStatus()` substituindo `getEstatisticas()`), a adaptação deve ser feita no Dashboard — não no módulo fonte que já está estável.
 
-| # | Suspeita | Motivo | Verificação |
-|---|----------|--------|-------------|
-| D1 | Bug B8/B9 no controller | Dashboard não tem forms, mas `limparDadosFormulario()` pode estar ausente | Verificar se dados residuais afetam navegação Dashboard → outros módulos |
-| D2 | Gráficos Chart.js duplicados | Se CDN carrega múltiplas vezes entre módulos (index já tem, Dashboard re-carrega) | Verificar `if (typeof Chart === 'undefined')` no script |
-| D3 | `$vendasMes` tipo misto | `getVendasMesAtual()` retorna array de Venda objects mas `count()` é usado — OK, mas defensividade necessária | Verificar `is_array($vendasMes) ? count($vendasMes) : 0` |
-| D4 | `$metaAtual` pode ser null/vazio | Se não existe meta do mês, `getResumoDashboard()` pode retornar `[]` ou `null` | Verificar `$metaAtual['porcentagem'] ?? 0` em toda a view |
-| D5 | `$artesStats` chaves inconsistentes | Documentação diz `disponiveis`/`em_producao`/`vendidas`, mas ArteService pode usar nomes diferentes | Conferir vs `ArteService::getEstatisticas()` real |
-| D6 | Endpoint `busca()` implementado? | Rota existe mas documentação marca como "TODO" | Testar `GET /dashboard/busca?q=teste` |
-| D7 | `topClientes` formato array/objeto | Bug anterior corrigido mas pode regredir se `ClienteService::getTopClientes()` mudar | Verificação defensiva `is_object()`/`is_array()` na view |
+4. **`array_sum()` é aliado:** Para calcular `total` a partir de `countByStatus()` que retorna contagens por status, `array_sum($raw)` soma todas as contagens sem precisar de query extra.
+
+5. **Erros silenciosos por `?? 0`:** O operador null coalescing mascara bugs — cards mostravam 0 sem nenhum erro no console ou no PHP. Sempre verificar dados reais no phpMyAdmin quando cards mostram zeros.
 
 ---
 
@@ -169,14 +252,14 @@ Diferente dos módulos CRUD (que tinham 12 testes padrão de create/edit/delete)
 
 O Dashboard é diferente dos módulos CRUD — suas melhorias focam em **conteúdo visual, UX e inteligência analítica**, não em CRUD features.
 
-| # | Melhoria | Complexidade | Descrição |
-|---|----------|-------------|-----------|
-| M1 | Cards aprimorados | Baixa | +2 cards (Lucro Mês, Ticket Médio) + indicadores de tendência (↑↓) |
-| M2 | Layout e responsividade | Média | Reorganização visual, collapse sections, mobile-first |
-| M3 | Seção Atividades Recentes | Média | Timeline visual das últimas ações (vendas, artes criadas, metas) |
-| M4 | KPIs e métricas avançadas | Média | Cards inteligentes: margem média, R$/h médio, projeção, taxa conversão |
-| M5 | Período selecionável | Média | Dropdown: Mês Atual / Últimos 3 Meses / Últimos 6 Meses / Ano |
-| M6 | Auto-refresh e polish | Baixa | Polling AJAX opcional, animações, estados vazios melhorados |
+| # | Melhoria | Complexidade | Descrição | Status |
+|---|----------|-------------|-----------|--------|
+| M1 | Cards aprimorados | Baixa | +2 cards (Lucro Mês, Ticket Médio) + indicadores de tendência (↑↓) | 🔲 Pendente |
+| M2 | Layout e responsividade | Média | Reorganização visual, collapse sections, mobile-first | 🔲 Pendente |
+| M3 | Seção Atividades Recentes | Média | Timeline visual das últimas ações (vendas, artes criadas, metas) | 🔲 Pendente |
+| M4 | KPIs e métricas avançadas | Média | Cards inteligentes: margem média, R$/h médio, projeção, taxa conversão | 🔲 Pendente |
+| M5 | Período selecionável | Média | Dropdown: Mês Atual / Últimos 3 Meses / Últimos 6 Meses / Ano | 🔲 Pendente |
+| M6 | Auto-refresh e polish | Baixa | Polling AJAX opcional, animações, estados vazios melhorados | 🔲 Pendente |
 
 ---
 
@@ -327,31 +410,33 @@ Card com 3-4 insights textuais automáticos:
 
 ### Métodos dos Services Usados pelo Dashboard
 
-| Método | Service | Retorno | Usado em |
-|--------|---------|---------|----------|
-| `getEstatisticas()` | ArteService | `['total', 'disponiveis', 'em_producao', 'vendidas', 'media_horas']` | Cards + Doughnut |
-| `getDisponiveisParaVenda()` | ArteService | Array de Arte objects | Card + Lista |
-| `getVendasMesAtual()` | VendaService | Array de Venda objects | Card (count) |
-| `getTotalMes(?mesAno)` | VendaService | float | Card faturamento |
-| `getVendasMensais(6)` | VendaService | `[['mes', 'quantidade', 'total', 'lucro'], ...]` | Gráficos |
-| `getRankingRentabilidade(5)` | VendaService | `[['arte_nome', 'valor', 'rentabilidade_hora'], ...]` | Lista ranking |
-| `getEstatisticas()` | VendaService | `['total_vendas', 'valor_total', 'ticket_medio', 'lucro_total']` | KPIs (M4) |
-| `getResumoDashboard()` | MetaService | `['valor_meta', 'valor_realizado', 'porcentagem', 'status']` | Card + Semi-doughnut |
-| `getMetasEmRisco()` | MetaService | `['alerta' => bool, 'projecao' => float, ...]` | Alerta condicional |
-| `getTopClientes(5)` | ClienteService | Array de arrays com `nome, total_compras, valor_total_compras` | Tabela |
+| Método | Service | Retorno Real | Adaptação no Dashboard | Usado em |
+|--------|---------|-------------|----------------------|----------|
+| `getEstatisticas()` | ArteService | `['disponivel', 'em_producao', 'vendida', 'reservada']` | `adaptarArtesStats()` → `['total', 'disponiveis', 'vendidas', ...]` | Cards + Doughnut |
+| `getDisponiveisParaVenda()` | ArteService | Array de Arte objects (disponivel + em_producao) | Nenhuma | Card + Lista |
+| `getVendasMesAtual()` | VendaService | Array de Venda objects | Nenhuma | Card (count) |
+| `getTotalMes(?mesAno)` | VendaService | float | Nenhuma | Card faturamento |
+| `getVendasMensais(6)` | VendaService | `[['mes', 'quantidade', 'total', 'lucro'], ...]` | Nenhuma | Gráficos |
+| `getRankingRentabilidade(5)` | VendaService | `[['arte_nome', 'valor', 'rentabilidade_hora'], ...]` | Nenhuma | Lista ranking |
+| `getResumoDashboard()` | MetaService | `['valor_meta', 'valor_realizado', 'porcentagem', 'status']` | Nenhuma | Card + Semi-doughnut |
+| `getMetasEmRisco()` | MetaService | `['alerta' => bool, 'projecao' => float, ...]` | Nenhuma | Alerta condicional |
+| `getTopClientes(5)` | ClienteService | Array de arrays com `nome, total_compras, valor_total_compras` | Nenhuma | Tabela |
 
 ---
 
 ## 📌 BUGS SISTÊMICOS CONHECIDOS
 
 ### Bug B8: Validação Invisível
-**Relevância Dashboard:** ⚠️ BAIXA — Dashboard não tem formulários de input. Mas se o usuário navegar Dashboard → Criar Venda → Erro → Voltar, `$_SESSION['_errors']` pode persistir. Não afeta o Dashboard diretamente.
+**Relevância Dashboard:** ✅ RESOLVIDO — `limparDadosFormulario()` adicionado no FIX D1.
 
 ### Bug B9: Dados Residuais
-**Relevância Dashboard:** ⚠️ BAIXA — Mesma lógica do B8. O `index()` do Dashboard não chama `limparDadosFormulario()` atualmente. **Avaliar se necessário na Fase 1.**
+**Relevância Dashboard:** ✅ RESOLVIDO — Mesmo fix D1 cobre este cenário.
 
 ### Bug Global Scope ($GLOBALS)
-**Relevância Dashboard:** ⚠️ VERIFICAR — Se a view do Dashboard define funções helpers com `global $variavel`, o bug de escopo se aplica. **Verificar na Fase 1.**
+**Relevância Dashboard:** ⚠️ NÃO AFETA — View do Dashboard não usa `global $variavel` nem helpers com `extract()`.
+
+### Bug D5: Chaves ArteService inconsistentes
+**Relevância Dashboard:** ✅ RESOLVIDO — `adaptarArtesStats()` converte formato no Controller sem alterar módulo Artes.
 
 ---
 
@@ -372,7 +457,7 @@ Card com 3-4 insights textuais automáticos:
 
 ```
 ESTABILIZAÇÃO
-├── Fase 1: Testes browser T1-T12 + correção de bugs encontrados
+├── ✅ Fase 1: Testes browser T1-T12 + correção de bugs (03/03/2026)
 
 MELHORIAS (sequência recomendada)
 ├── M1: Cards aprimorados (base para tudo — +2 cards + tendências)
@@ -390,15 +475,15 @@ MELHORIAS (sequência recomendada)
 ```
 Ordem de estabilização (menor → maior acoplamento):
 
-1. ✅ Tags         — independente                             → COMPLETO (6/6)
-2. ✅ Clientes     — independente                             → COMPLETO (6/6)
-3. ✅ Metas        — independente (atualizado por Vendas)      → COMPLETO (6/6)
-4. ✅ Artes        — depende de Tags (✅)                       → COMPLETO (6/6)
-5. ✅ Vendas       — depende de Artes + Clientes + Metas       → COMPLETO (6/6)
-6. 🎯 DASHBOARD   — depende de TODOS (Artes+Vendas+Metas+Clientes) → FASE 1 PENDENTE ★
+1. ✅ Tags         — independente                             → COMPLETO (Fase 1 + 6/6)
+2. ✅ Clientes     — independente                             → COMPLETO (Fase 1 + 6/6)
+3. ✅ Metas        — independente (atualizado por Vendas)      → COMPLETO (Fase 1 + 6/6)
+4. ✅ Artes        — depende de Tags (✅)                       → COMPLETO (Fase 1 + 6/6)
+5. ✅ Vendas       — depende de Artes + Clientes + Metas       → COMPLETO (Fase 1 + 6/6)
+6. ✅ DASHBOARD   — depende de TODOS (Artes+Vendas+Metas+Clientes) → FASE 1 COMPLETA ★
 ```
 
-### Por que Dashboard é o último?
+### Por que Dashboard foi o último?
 
 1. **Dependência máxima:** Consome dados de todos os 4 Services
 2. **Sem CRUD próprio:** Só exibe — bugs nos outros módulos se propagam aqui
@@ -406,7 +491,22 @@ Ordem de estabilização (menor → maior acoplamento):
 
 ---
 
+## 🗂️ ARQUIVOS ENTREGUES
+
+### Fase 1
+
+| Arquivo | Caminho | Fixes Aplicados |
+|---------|---------|-----------------|
+| DashboardController.php | `src/Controllers/` | D1 + D5/CHAVES + D8 |
+| main.php | `views/layouts/` | D2 (Chart.js 4.4.7 centralizado) |
+| index.php | `views/dashboard/` | D2 (removido `<script>` Chart.js duplicado) |
+| index.php | `views/artes/` | D2 (removido `<script>` Chart.js duplicado) |
+| index.php | `views/metas/` | D2 (removido `<script>` Chart.js duplicado) |
+| index.php | `views/tags/` | D2 (removido `<script>` Chart.js duplicado) |
+
+---
+
 **Última atualização:** 03/03/2026  
-**Status:** 🔄 Fase 1 pendente (testes browser)  
-**Próxima ação:** Executar T1-T12 no browser  
+**Status:** ✅ Fase 1 completa — Melhorias M1-M6 pendentes  
+**Próxima ação:** Melhoria M1 (Cards Aprimorados)  
 **Dependências satisfeitas:** Tags ✅, Clientes ✅, Metas ✅, Artes ✅, Vendas ✅

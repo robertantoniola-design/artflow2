@@ -379,7 +379,7 @@ function confirmarExclusao(id) {
      existirem dados para exibir (evita request desnecessário).
      ===================================================== -->
 <?php if (isset($desempenhoAnual) && !empty($desempenhoAnual) && isset($estatisticasAno) && $estatisticasAno['total_metas'] > 0): ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
 /**
  * Gráfico de Evolução Anual — Meta vs Realizado

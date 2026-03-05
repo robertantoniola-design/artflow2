@@ -560,7 +560,7 @@ $metaFalta = max(0, $metaValor - $metaRealizado);
 <!-- ============================================ -->
 <!-- CHART.JS + SCRIPTS DOS GRÁFICOS              -->
 <!-- ============================================ -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 
 <script>
 // Dados do PHP → JS

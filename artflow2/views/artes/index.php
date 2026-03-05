@@ -738,7 +738,7 @@ $complexCores  = ['baixa' => 'success', 'media' => 'warning', 'alta' => 'danger'
 <!-- Padrão: Chart.js 4.4.7 (mesmo de Tags M6 e Metas M3)        -->
 <!-- ══════════════════════════════════════════════════════════════ -->
 <?php if ($temDadosGrafico): ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
 
 <script>
 /**
