@@ -6,7 +6,7 @@
 **View:** `views/dashboard/index.php`  
 **Componente:** `views/components/alerta-meta-risco.php`  
 **Criado:** 03/03/2026  
-**Status:** ✅ FASE 1 COMPLETA — MELHORIAS PENDENTES
+**Status:** ✅ FASE 1 COMPLETA + M1 ✅ + M2 ✅ — M3-M6 PENDENTES
 
 ---
 
@@ -22,10 +22,11 @@ O Dashboard **NÃO é um módulo CRUD** — não tem Model, Repository, Service 
 src/
 └── Controllers/
     └── DashboardController.php       ✅ Controller com 7 actions (index + 6 AJAX)
+                                         + 4 métodos privados auxiliares
 
 views/
 └── dashboard/
-    ├── index.php                     ✅ View principal (cards + gráficos + tabelas)
+    ├── index.php                     ✅ View principal (6 cards + 3 seções colapsáveis)
     └── ../components/
         └── alerta-meta-risco.php     ✅ Componente condicional (Metas M4)
 
@@ -62,13 +63,16 @@ DashboardController
 │   ├── ArteService::getDisponiveisParaVenda()   → artes com status 'disponivel' + 'em_producao'
 │   ├── VendaService::getVendasMesAtual()        → array vendas do mês corrente
 │   ├── VendaService::getTotalMes()              → float faturamento mensal
-│   ├── VendaService::getVendasMensais(6)        → array para gráfico barras
+│   ├── VendaService::getVendasMensais(6)        → array para gráfico barras + tendências M1
 │   ├── VendaService::getRankingRentabilidade(5) → top 5 mais rentáveis
 │   ├── MetaService::getResumoDashboard()        → meta atual + % + projeção
 │   ├── MetaService::getMetasEmRisco()           → alerta meta em risco
-│   └── ClienteService::getTopClientes(5)        → top 5 compradores
+│   ├── ClienteService::getTopClientes(5)        → top 5 compradores
+│   ├── [M1] calcularLucroMes($vendasMes)        → soma lucro_calculado dos objetos Venda
+│   ├── [M1] calcularTendencias(...)             → variação % vs mês anterior (4 métricas)
+│   └── [M1] Cálculos diretos: ticketMedio, margemMes (zero queries extras)
 │
-├── refresh()               → JSON cards atualizados (AJAX polling)
+├── refresh()               → JSON cards atualizados (AJAX) — inclui novos cards M1
 ├── estatisticasArtes()     → JSON stats artes por status
 ├── estatisticasVendas()    → JSON vendas mensais + ranking
 ├── progressoMeta()         → JSON meta + dias restantes + projeção
@@ -80,23 +84,30 @@ DashboardController
 
 ```
 DashboardController (private)
-├── limparDadosFormulario()    → FIX D1: limpa $_SESSION['_old_input'] e $_SESSION['_errors']
-└── adaptarArtesStats(array)   → FIX CHAVES: converte formato countByStatus → formato Dashboard
+├── limparDadosFormulario()         → FIX D1: limpa $_SESSION['_old_input'] e $_SESSION['_errors']
+├── adaptarArtesStats(array)        → FIX CHAVES: converte formato countByStatus → formato Dashboard
+├── [M1] calcularLucroMes(array)    → Soma getLucroCalculado() dos objetos Venda do mês
+├── [M1] calcularTendencias(...)    → Busca mês anterior em vendasMensais, compara 4 métricas
+└── [M1] calcularVariacao(float, float) → Retorna ['percentual', 'anterior'] com proteção divisão/zero
 ```
 
 ### Variáveis Passadas à View (index)
 
 | Variável | Tipo | Origem | Uso na View |
 |----------|------|--------|-------------|
-| `$artesStats` | array | ArteService (adaptado) | 4 cards principais + doughnut status |
-| `$vendasMes` | array | VendaService | Card "Vendas do Mês" (count) |
-| `$faturamentoMes` | float | VendaService | Card "Vendas do Mês" (valor) |
+| `$artesStats` | array | ArteService (adaptado) | Cards + doughnut status |
+| `$vendasMes` | array | VendaService | Card "Vendas no Mês" (count) |
+| `$faturamentoMes` | float | VendaService | Card "Faturamento" |
 | `$metaAtual` | array | MetaService | Card "Meta do Mês" + semi-doughnut |
 | `$metaEmRisco` | array | MetaService | Alerta condicional (componente) |
 | `$topClientes` | array | ClienteService | Tabela Top 5 Clientes |
-| `$artesDisponiveis` | array | ArteService | Card "À Venda" + lista |
-| `$vendasMensais` | array | VendaService | Gráfico barras + gráfico evolução |
+| `$artesDisponiveis` | array | ArteService | Subtexto card Total Artes + lista |
+| `$vendasMensais` | array | VendaService | Gráficos barras + evolução |
 | `$maisRentaveis` | array | VendaService | Lista ranking rentabilidade |
+| `$lucroMes` | float | **M1**: calculado no Controller | Card "Lucro do Mês" |
+| `$ticketMedio` | float | **M1**: calculado no Controller | Card "Ticket Médio" |
+| `$margemMes` | float | **M1**: calculado no Controller | Badge margem no card Lucro |
+| `$tendencias` | array | **M1**: calculado no Controller | Badges ↑↓% em 4 cards |
 
 ---
 
@@ -106,20 +117,27 @@ DashboardController (private)
 
 | # | Componente | Tipo | Descrição | Status |
 |---|-----------|------|-----------|--------|
-| 1 | Card Total de Artes | Card | Total + disponíveis | ✅ Funcional |
-| 2 | Card Vendas do Mês | Card | Quantidade + faturamento | ✅ Funcional |
-| 3 | Card À Venda | Card | Artes disponíveis para venda | ✅ Funcional |
-| 4 | Card Meta do Mês | Card | Porcentagem atingida | ✅ Funcional |
-| 5 | Gráfico Faturamento Mensal | Chart.js Bar | Últimos 6 meses (valor) | ✅ Funcional |
-| 6 | Gráfico Status Artes | Chart.js Doughnut | Disponível/Produção/Vendida | ✅ Funcional |
-| 7 | Gráfico Meta do Mês | Chart.js Semi-doughnut | Realizado vs Falta | ✅ Funcional |
-| 8 | Gráfico Evolução Vendas | Chart.js Misto | Faturamento (linha) + Quantidade (barra) | ✅ Funcional |
-| 9 | Tabela Top Clientes | Tabela | #, Nome, Compras, Total | ✅ Funcional |
-| 10 | Lista Artes Disponíveis | Lista | Arte + preço + link | ✅ Funcional |
-| 11 | Lista Mais Rentáveis | Lista | Arte + R$/h | ✅ Funcional |
-| 12 | Alerta Meta em Risco | Componente | Banner condicional (Metas M4) | ✅ Funcional |
-| 13 | Botões Nova Arte / Venda | Header | Atalhos rápidos | ✅ Funcional |
-| 14 | 6 Endpoints AJAX | API JSON | Refresh, artes, vendas, meta, atividades, busca | ✅ Funcional |
+| 1 | Card Total de Artes | Card | Total + disponíveis + em produção | ✅ M1 aprimorado |
+| 2 | Card Vendas no Mês | Card | Quantidade + tendência ↑↓% | ✅ M1 aprimorado |
+| 3 | Card Faturamento | Card | Valor total + tendência ↑↓% | ✅ **M1 NOVO** (era subtexto) |
+| 4 | Card Lucro do Mês | Card | Lucro + margem % + tendência ↑↓% | ✅ **M1 NOVO** |
+| 5 | Card Ticket Médio | Card | Valor médio por venda + tendência ↑↓% | ✅ **M1 NOVO** |
+| 6 | Card Meta do Mês | Card | Porcentagem + barra progresso | ✅ M1 reorganizado |
+| 7 | Seção Gráficos (colapsável) | Collapse | 4 gráficos Chart.js | ✅ **M2 NOVO** |
+| 8 | Gráfico Faturamento Mensal | Chart.js Bar | Últimos 6 meses (valor + lucro) | ✅ Funcional |
+| 9 | Gráfico Status Artes | Chart.js Doughnut | Disponível/Produção/Vendida | ✅ Funcional |
+| 10 | Gráfico Meta do Mês | Chart.js Semi-doughnut | Realizado vs Falta | ✅ Funcional |
+| 11 | Gráfico Evolução Vendas | Chart.js Misto | Faturamento (linha) + Quantidade (barra) | ✅ Funcional |
+| 12 | Seção Rankings (colapsável) | Collapse | Top Clientes + Mais Rentáveis | ✅ **M2 NOVO** |
+| 13 | Tabela Top Clientes | Tabela | #, Nome, Compras, Total | ✅ Funcional |
+| 14 | Lista Mais Rentáveis | Lista | Arte + R$/h | ✅ Funcional |
+| 15 | Seção Detalhes (colapsável) | Collapse | Resumo Mensal + Disponíveis | ✅ **M2 NOVO** |
+| 16 | Tabela Resumo Mensal | Tabela | Mês, Qtd, Faturamento, Lucro | ✅ Funcional |
+| 17 | Lista Artes Disponíveis | Lista | Arte + custo + horas | ✅ Funcional |
+| 18 | Alerta Meta em Risco | Componente | Banner condicional (Metas M4) | ✅ Funcional |
+| 19 | Botões Nova Arte / Venda | Header | Atalhos rápidos | ✅ Funcional |
+| 20 | Tooltips nos Cards | Bootstrap 5 | 6 ícones ℹ️ com explicações | ✅ **M2 NOVO** |
+| 21 | 6 Endpoints AJAX | API JSON | Refresh (M1 ampliado), artes, vendas, meta, atividades, busca | ✅ Funcional |
 
 ---
 
@@ -246,70 +264,189 @@ Resultado: Card "Total de Artes" = 0, Gráfico doughnut "Nenhuma arte cadastrada
 
 ---
 
-## 📋 MELHORIAS PLANEJADAS (M1–M6)
-
-### Visão Geral
-
-O Dashboard é diferente dos módulos CRUD — suas melhorias focam em **conteúdo visual, UX e inteligência analítica**, não em CRUD features.
-
-| # | Melhoria | Complexidade | Descrição | Status |
-|---|----------|-------------|-----------|--------|
-| M1 | Cards aprimorados | Baixa | +2 cards (Lucro Mês, Ticket Médio) + indicadores de tendência (↑↓) | 🔲 Pendente |
-| M2 | Layout e responsividade | Média | Reorganização visual, collapse sections, mobile-first | 🔲 Pendente |
-| M3 | Seção Atividades Recentes | Média | Timeline visual das últimas ações (vendas, artes criadas, metas) | 🔲 Pendente |
-| M4 | KPIs e métricas avançadas | Média | Cards inteligentes: margem média, R$/h médio, projeção, taxa conversão | 🔲 Pendente |
-| M5 | Período selecionável | Média | Dropdown: Mês Atual / Últimos 3 Meses / Últimos 6 Meses / Ano | 🔲 Pendente |
-| M6 | Auto-refresh e polish | Baixa | Polling AJAX opcional, animações, estados vazios melhorados | 🔲 Pendente |
-
----
-
-### 📋 MELHORIA 1 — CARDS APRIMORADOS
+## ✅ MELHORIA 1 — CARDS APRIMORADOS (COMPLETA — 05/03/2026)
 
 **Complexidade:** Baixa  
 **Pré-requisito:** Fase 1 ✅  
-**Arquivos:** DashboardController.php (editar), views/dashboard/index.php (editar)
+**Arquivos alterados:** DashboardController.php (editar), views/dashboard/index.php (editar)
 
-#### Especificação
+### O Que Foi Implementado
 
 | Recurso | Descrição |
 |---------|-----------|
-| **+Card Lucro do Mês** | SUM(lucro_calculado) das vendas do mês corrente |
-| **+Card Ticket Médio** | AVG(valor) das vendas do mês corrente |
-| **Indicadores de tendência** | Compara mês atual vs mês anterior: ↑ +15% (verde) ou ↓ -8% (vermelho) |
-| **Subtextos informativos** | Cada card mostra contexto: "12 vendas este mês", "vs R$ 350 mês passado" |
+| **+Card Faturamento** | Card próprio (antes era subtexto de Vendas) com tendência ↑↓% |
+| **+Card Lucro do Mês** | SUM(lucro_calculado) + badge margem % (verde ≥40%, amarelo ≥20%, vermelho <20%) |
+| **+Card Ticket Médio** | faturamento ÷ qtd vendas + tendência ↑↓% |
+| **Indicadores de tendência** | 4 cards com badges comparando mês atual vs anterior: ↑ +15% (verde) ou ↓ -8% (vermelho) |
+| **Subtextos informativos** | Card Artes: "X à venda · Y em produção". Card Lucro: margem %. Card Meta: barra progresso |
+| **Card "À Venda" absorvido** | Info migrada para subtexto do card Total Artes — ganho de espaço para novos cards |
 
-#### Dados Necessários (já disponíveis)
-
-| Dado | Origem | Método |
-|------|--------|--------|
-| Lucro do mês | VendaService | `getVendasMensais(2)` → último mês tem campo `lucro` |
-| Ticket médio | VendaService | `getEstatisticas()['ticket_medio']` |
-| Mês anterior | VendaService | `getVendasMensais(2)` → compara posições [0] vs [1] |
-
-#### Layout: 6 Cards (2 linhas de 3)
+### Layout: 6 Cards (2 linhas de 3)
 
 ```
-Linha 1: [Total Artes] [Vendas do Mês] [Faturamento Mês]
-Linha 2: [Lucro do Mês] [Ticket Médio]  [Meta do Mês %]
+Linha 1: [Total Artes]  [Vendas no Mês ↑↓%]  [Faturamento ↑↓%]
+Linha 2: [Lucro + Margem ↑↓%]  [Ticket Médio ↑↓%]  [Meta do Mês %]
 ```
+
+### Dados Necessários (nenhuma query extra)
+
+| Dado | Fonte | Cálculo |
+|------|-------|---------|
+| Lucro do mês | `$vendasMes` (já buscado) | `calcularLucroMes()` soma getLucroCalculado() |
+| Ticket médio | `$faturamentoMes` / `count($vendasMes)` | Divisão direta no Controller |
+| Margem % | `$lucroMes` / `$faturamentoMes` × 100 | Divisão direta no Controller |
+| Tendências | `$vendasMensais` (já buscado com 6 meses) | `calcularTendencias()` compara mês atual vs anterior |
+
+### Métodos Privados Adicionados ao Controller
+
+| Método | Parâmetros | Retorno | Descrição |
+|--------|-----------|---------|-----------|
+| `calcularLucroMes()` | `array $vendasMes` | `float` | Itera objetos Venda, soma getLucroCalculado(). Defensivo: suporta arrays |
+| `calcularTendencias()` | `$vendasMensais, $fatAtual, $lucroAtual, $qtdAtual, $ticketAtual` | `array` | Busca mês anterior (YYYY-MM) no array, compara 4 métricas |
+| `calcularVariacao()` | `float $atual, float $anterior` | `array ['percentual', 'anterior']` | Proteção divisão/zero. Se anterior=0 e atual>0 → +100% |
+
+### Helper na View
+
+```php
+function renderTendencia(?array $tendencia, string $prefixo, bool $isMoney): string
+```
+Gera badge HTML com cor semântica (verde/vermelho/cinza) + ícone ↑↓ + percentual + valor anterior.
+
+### Endpoint refresh() Ampliado
+
+| Chave | Antes | Depois (M1) |
+|-------|-------|-------------|
+| `cards.total_artes` | ✅ | ✅ |
+| `cards.artes_disponiveis` | ✅ | ✅ |
+| `cards.vendas_mes` | ✅ (era faturamento) | ✅ renomeado |
+| `cards.qtd_vendas_mes` | — | ✅ **NOVO** |
+| `cards.faturamento_mes` | — | ✅ **NOVO** |
+| `cards.lucro_mes` | — | ✅ **NOVO** |
+| `cards.ticket_medio` | — | ✅ **NOVO** |
+| `cards.margem_mes` | — | ✅ **NOVO** |
+| `cards.meta_progresso` | ✅ | ✅ |
+
+### Arquivos Alterados
+
+| Arquivo | Caminho | Alterações |
+|---------|---------|-----------|
+| DashboardController.php | `src/Controllers/` | +3 métodos privados, index() +5 linhas cálculo, +4 variáveis na view, refresh() ampliado |
+| index.php | `views/dashboard/` | Cards reescritos (4→6, 1 linha→2 linhas), helper renderTendencia() |
+
+### Checklist de Testes M1 — TODOS PASSARAM ✅
+
+| # | Teste | O que verificar | Status |
+|---|-------|-----------------|--------|
+| P1 | Página carrega | 6 cards visíveis, 2 linhas de 3, sem erro PHP | ✅ OK |
+| P2 | Cards numéricos | Total Artes, Vendas, Faturamento batem com banco | ✅ OK |
+| P3 | Cards novos | Lucro + Ticket Médio corretos | ✅ OK |
+| P4 | Tendências | Badges ↑↓% aparecem se houver dados do mês anterior | ✅ OK |
+| P5 | Sem mês anterior | Mostra "Sem dados anteriores" | ✅ OK |
+| P6 | Gráficos intactos | 4 gráficos renderizam normalmente | ✅ OK |
 
 ---
 
-### 📋 MELHORIA 2 — LAYOUT E RESPONSIVIDADE
+## ✅ MELHORIA 2 — LAYOUT E RESPONSIVIDADE (COMPLETA — 05/03/2026)
 
 **Complexidade:** Média  
 **Pré-requisito:** M1 ✅  
-**Arquivos:** views/dashboard/index.php (reescrever)
+**Arquivos alterados:** views/dashboard/index.php (somente view — Controller NÃO muda)
 
-#### Especificação
+### O Que Foi Implementado
 
 | Recurso | Descrição |
 |---------|-----------|
-| **Seções colapsáveis** | Gráficos em collapse (padrão Vendas M6 / Artes M6) |
-| **Ordem lógica** | Cards → Gráficos → Top Clientes + Ranking → Artes Disponíveis |
-| **Responsividade** | Cards: col-6 em mobile, col-lg-3 em desktop. Gráficos full-width em mobile |
-| **Breadcrumb** | Manter consistência visual com outros módulos |
-| **Ícones informativos** | Tooltips nos cards explicando cada métrica |
+| **3 Seções colapsáveis** | Gráficos, Rankings e Detalhes em cards com collapse (padrão Artes M6 / Tags M6 / Vendas M6) |
+| **Chart.resize() no collapse** | `Chart.instances.forEach(chart => chart.resize())` no `shown.bs.collapse` — obrigatório para Chart.js recalcular após display:none→block |
+| **Tooltips informativos** | 6 ícones ℹ️ nos cards com `data-bs-toggle="tooltip"` + inicialização Bootstrap 5 |
+| **Responsividade melhorada** | Cards: `col-6` mobile (2/linha) → `col-lg-4` desktop (3/linha). Gráficos: `col-12` mobile → `col-lg-8`/`col-lg-4` desktop |
+| **Ícones responsivos** | Ícones grandes dos cards: `d-none d-sm-block` (ocultos < 576px) |
+| **setupCollapse() DRY** | Função JS reutilizável para registrar handlers de collapse (evita repetição) |
+
+### Estrutura Visual M2
+
+```
+[CARDS — 6 cards em 2 linhas de 3 (sempre visíveis)]
+
+[ANÁLISE GRÁFICA — Colapsável ▼]
+  ├── Faturamento Mensal (col-8) + Status Artes (col-4)
+  └── Meta do Mês (col-4) + Evolução Vendas (col-8)
+
+[RANKINGS — Colapsável ▼]
+  ├── Top Clientes (col-6)
+  └── Artes Mais Rentáveis (col-6)
+
+[DETALHES — Colapsável ▼]
+  ├── Resumo Mensal (col-6)
+  └── Disponíveis para Venda (col-6)
+```
+
+### Seções Colapsáveis
+
+| Seção | ID Collapse | Conteúdo | Chart.resize() | Padrão aberto |
+|-------|-------------|----------|----------------|---------------|
+| Análise Gráfica | `graficosCollapse` | 4 gráficos Chart.js | ✅ Sim | ✅ Sim |
+| Rankings | `rankingsCollapse` | Top Clientes + Rentáveis | Não necessário | ✅ Sim |
+| Detalhes | `detalhesCollapse` | Resumo Mensal + Disponíveis | Não necessário | ✅ Sim |
+
+### JavaScript M2 Adicionado
+
+```javascript
+// Função DRY para registrar handlers de collapse
+function setupCollapse(collapseId, iconId, hasCharts) { ... }
+
+// 3 registros
+setupCollapse('graficosCollapse', 'collapseIconGraficos', true);   // COM chart.resize()
+setupCollapse('rankingsCollapse', 'collapseIconRankings', false);
+setupCollapse('detalhesCollapse', 'collapseIconDetalhes', false);
+
+// Inicializa tooltips Bootstrap 5
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+```
+
+### Arquivos Alterados
+
+| Arquivo | Caminho | Alterações |
+|---------|---------|-----------|
+| index.php | `views/dashboard/` | Seções reorganizadas em 3 collapses, tooltips nos cards, JS collapse handlers + tooltip init |
+
+### Checklist de Testes M2 — TODOS PASSARAM ✅
+
+| # | Teste | O que verificar | Status |
+|---|-------|-----------------|--------|
+| P1 | Cards intactos | 6 cards visíveis com tendências (M1 preservado) | ✅ OK |
+| P2 | Tooltips | Hover no ℹ️ dos cards mostra explicação | ✅ OK |
+| P3 | Collapse gráficos | Clicar chevron recolhe/expande os 4 gráficos | ✅ OK |
+| P4 | Chart.resize | Após recolher e expandir, gráficos renderizam corretamente | ✅ OK |
+| P5 | Collapse rankings | Top Clientes e Rentáveis recolhem/expandem | ✅ OK |
+| P6 | Collapse detalhes | Resumo Mensal e Disponíveis recolhem/expandem | ✅ OK |
+| P7 | Mobile | Cards 2/linha, gráficos full-width ao redimensionar | ✅ OK |
+| P8 | Chevron anima | Ícone muda de ↑ para ↓ ao recolher cada seção | ✅ OK |
+
+### Lições Aprendidas M1 + M2
+
+6. **Zero queries extras para tendências:** Todos os dados para calcular lucro, ticket médio, margem e tendências já existiam nos resultados das queries da Fase 1. `$vendasMes` (objetos Venda) contém `getLucroCalculado()`. `$vendasMensais` (array dos últimos 6 meses) contém mês anterior para comparação.
+
+7. **Chart.resize() é obrigatório em collapses:** Chart.js renderiza com tamanho 0 dentro de `display:none`. Ao reabrir o collapse, é necessário chamar `Chart.instances.forEach(chart => chart.resize())` no evento `shown.bs.collapse`.
+
+8. **setupCollapse() como padrão DRY:** Ao invés de repetir 3 blocos de addEventListener, uma função genérica `setupCollapse(collapseId, iconId, hasCharts)` cobre todos os cenários com o parâmetro booleano `hasCharts` controlando se faz resize.
+
+9. **Ícones responsivos com d-none d-sm-block:** Os ícones decorativos dos cards (display-6) ocupam espaço valioso em telas pequenas. Ocultá-los abaixo de 576px mantém a informação numérica legível.
+
+---
+
+## 📋 MELHORIAS PLANEJADAS (M3–M6)
+
+### Visão Geral
+
+| # | Melhoria | Complexidade | Descrição | Status |
+|---|----------|-------------|-----------|--------|
+| M1 | Cards aprimorados | Baixa | +3 cards + indicadores de tendência (↑↓) | ✅ **COMPLETA** (05/03/2026) |
+| M2 | Layout e responsividade | Média | 3 seções colapsáveis + tooltips + mobile-first | ✅ **COMPLETA** (05/03/2026) |
+| M3 | Seção Atividades Recentes | Média | Timeline visual das últimas ações (vendas, artes, metas, clientes) | 🔲 Pendente |
+| M4 | KPIs e métricas avançadas | Média | Insights inteligentes: R$/h médio, projeção, melhor dia, forma pgto | 🔲 Pendente |
+| M5 | Período selecionável | Média | Dropdown: Mês Atual / 3 Meses / 6 Meses / Ano / Tudo | 🔲 Pendente |
+| M6 | Auto-refresh e polish | Baixa | Polling AJAX opcional, animações, estados vazios, timestamp | 🔲 Pendente |
 
 ---
 
@@ -413,10 +550,10 @@ Card com 3-4 insights textuais automáticos:
 | Método | Service | Retorno Real | Adaptação no Dashboard | Usado em |
 |--------|---------|-------------|----------------------|----------|
 | `getEstatisticas()` | ArteService | `['disponivel', 'em_producao', 'vendida', 'reservada']` | `adaptarArtesStats()` → `['total', 'disponiveis', 'vendidas', ...]` | Cards + Doughnut |
-| `getDisponiveisParaVenda()` | ArteService | Array de Arte objects (disponivel + em_producao) | Nenhuma | Card + Lista |
-| `getVendasMesAtual()` | VendaService | Array de Venda objects | Nenhuma | Card (count) |
+| `getDisponiveisParaVenda()` | ArteService | Array de Arte objects (disponivel + em_producao) | Nenhuma | Subtexto card + Lista |
+| `getVendasMesAtual()` | VendaService | Array de Venda objects | M1: `calcularLucroMes()` itera p/ lucro | Cards (count + lucro) |
 | `getTotalMes(?mesAno)` | VendaService | float | Nenhuma | Card faturamento |
-| `getVendasMensais(6)` | VendaService | `[['mes', 'quantidade', 'total', 'lucro'], ...]` | Nenhuma | Gráficos |
+| `getVendasMensais(6)` | VendaService | `[['mes', 'quantidade', 'total', 'lucro'], ...]` | M1: `calcularTendencias()` usa para comparar meses | Gráficos + Tendências |
 | `getRankingRentabilidade(5)` | VendaService | `[['arte_nome', 'valor', 'rentabilidade_hora'], ...]` | Nenhuma | Lista ranking |
 | `getResumoDashboard()` | MetaService | `['valor_meta', 'valor_realizado', 'porcentagem', 'status']` | Nenhuma | Card + Semi-doughnut |
 | `getMetasEmRisco()` | MetaService | `['alerta' => bool, 'projecao' => float, ...]` | Nenhuma | Alerta condicional |
@@ -460,9 +597,9 @@ ESTABILIZAÇÃO
 ├── ✅ Fase 1: Testes browser T1-T12 + correção de bugs (03/03/2026)
 
 MELHORIAS (sequência recomendada)
-├── M1: Cards aprimorados (base para tudo — +2 cards + tendências)
-├── M2: Layout e responsividade (reorganiza visual, collapse)
-├── M3: Atividades recentes (timeline — independente)
+├── ✅ M1: Cards aprimorados (+3 cards + tendências ↑↓%) — 05/03/2026
+├── ✅ M2: Layout e responsividade (3 collapses + tooltips + mobile) — 05/03/2026
+├── 🎯 M3: Atividades recentes (timeline — independente) ← PRÓXIMA
 ├── M4: KPIs avançados (insights inteligentes — depende de M1)
 ├── M5: Período selecionável (filtro global — depende de M1+M2)
 └── M6: Auto-refresh e polish (final — depende de M2)
@@ -480,7 +617,7 @@ Ordem de estabilização (menor → maior acoplamento):
 3. ✅ Metas        — independente (atualizado por Vendas)      → COMPLETO (Fase 1 + 6/6)
 4. ✅ Artes        — depende de Tags (✅)                       → COMPLETO (Fase 1 + 6/6)
 5. ✅ Vendas       — depende de Artes + Clientes + Metas       → COMPLETO (Fase 1 + 6/6)
-6. ✅ DASHBOARD   — depende de TODOS (Artes+Vendas+Metas+Clientes) → FASE 1 COMPLETA ★
+6. ✅ DASHBOARD   — depende de TODOS (Artes+Vendas+Metas+Clientes) → FASE 1 + M1 + M2 ★
 ```
 
 ### Por que Dashboard foi o último?
@@ -504,9 +641,22 @@ Ordem de estabilização (menor → maior acoplamento):
 | index.php | `views/metas/` | D2 (removido `<script>` Chart.js duplicado) |
 | index.php | `views/tags/` | D2 (removido `<script>` Chart.js duplicado) |
 
+### Melhoria M1
+
+| Arquivo | Caminho | Alterações |
+|---------|---------|-----------|
+| DashboardController.php | `src/Controllers/` | +3 métodos privados (calcularLucroMes, calcularTendencias, calcularVariacao), index() ampliado, refresh() ampliado |
+| index.php | `views/dashboard/` | Cards 4→6, 1 linha→2 linhas, helper renderTendencia(), badges ↑↓% |
+
+### Melhoria M2
+
+| Arquivo | Caminho | Alterações |
+|---------|---------|-----------|
+| index.php | `views/dashboard/` | 3 seções colapsáveis (graficosCollapse, rankingsCollapse, detalhesCollapse), tooltips nos 6 cards, setupCollapse() DRY, Chart.resize(), responsividade col-6/col-lg-4 |
+
 ---
 
-**Última atualização:** 03/03/2026  
-**Status:** ✅ Fase 1 completa — Melhorias M1-M6 pendentes  
-**Próxima ação:** Melhoria M1 (Cards Aprimorados)  
+**Última atualização:** 05/03/2026  
+**Status:** ✅ Fase 1 + M1 + M2 completas — M3-M6 pendentes  
+**Próxima ação:** Melhoria M3 (Atividades Recentes)  
 **Dependências satisfeitas:** Tags ✅, Clientes ✅, Metas ✅, Artes ✅, Vendas ✅
