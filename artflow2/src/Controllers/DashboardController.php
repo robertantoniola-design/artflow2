@@ -20,15 +20,20 @@ use App\Services\ClienteService;
  * FASE 1 — CORREÇÕES APLICADAS (03/03/2026):
  * - D1: limparDadosFormulario() adicionado (privado, padrão dos outros controllers)
  * - D8: refresh() otimizado — variáveis locais evitam queries duplicadas
- * - FIX CHAVES: ArteService::getEstatisticas() retorna formato countByStatus()
- *   com chaves ['disponivel','em_producao','vendida','reservada'].
- *   Dashboard precisa de ['total','disponiveis','em_producao','vendidas','reservadas'].
- *   Adaptação feita via método privado adaptarArtesStats() para não alterar
- *   ArteService/Repository (que já funcionam para o módulo Artes).
+ * - FIX CHAVES: adaptarArtesStats() converte formato countByStatus → Dashboard
  * 
  * MELHORIA 4 (06/02/2026):
- * - index() agora passa $metaEmRisco para exibir alerta
- *   quando projeção indica que meta não será batida
+ * - index() passa $metaEmRisco para alerta de meta em risco
+ * 
+ * MELHORIA M1 — CARDS APRIMORADOS (05/03/2026):
+ * - +Card Faturamento do Mês (separado do card Vendas)
+ * - +Card Lucro do Mês (com margem %)
+ * - +Card Ticket Médio
+ * - Indicadores de tendência (↑↓%) comparando mês atual vs anterior
+ * - Subtextos informativos com contexto
+ * - Layout: 6 cards em 2 linhas de 3 (antes: 4 cards em 1 linha)
+ * - Card "À Venda" absorvido como subtexto de "Total Artes"
+ * - Nenhum Service/Repository/Model alterado — dados já existiam
  */
 class DashboardController extends BaseController
 {
@@ -77,13 +82,6 @@ class DashboardController extends BaseController
      * Dashboard precisa de:
      *   ['total' => N, 'disponiveis' => N, 'em_producao' => N, 'vendidas' => N, 'reservadas' => N]
      * 
-     * Diferenças:
-     *   - Falta campo 'total' (soma de todos)
-     *   - 'disponivel' → 'disponiveis' (plural)
-     *   - 'vendida' → 'vendidas' (plural)
-     *   - 'reservada' → 'reservadas' (plural)
-     * 
-     * Centralizado aqui para evitar duplicação em index(), refresh() e estatisticasArtes().
      * NÃO alteramos ArteService/Repository para não afetar o módulo Artes que está estável.
      * 
      * @param array $raw Dados crus do ArteService::getEstatisticas()
@@ -97,6 +95,126 @@ class DashboardController extends BaseController
             'em_producao' => $raw['em_producao'] ?? 0,
             'vendidas'    => $raw['vendida'] ?? 0,
             'reservadas'  => $raw['reservada'] ?? 0,
+        ];
+    }
+
+    /**
+     * M1: Calcula lucro do mês a partir das vendas (objetos Venda)
+     * 
+     * Itera os objetos Venda do mês atual e soma lucro_calculado.
+     * Defensivo: suporta tanto objetos com getLucroCalculado() quanto arrays.
+     * 
+     * @param array $vendasMes Array de Venda objects (do getVendasMesAtual)
+     * @return float Lucro total do mês
+     */
+    private function calcularLucroMes(array $vendasMes): float
+    {
+        $lucro = 0;
+        foreach ($vendasMes as $v) {
+            if (is_object($v)) {
+                // Venda object — usa getter
+                $lucro += $v->getLucroCalculado() ?? 0;
+            } else {
+                // Array fallback (segurança)
+                $lucro += (float)($v['lucro_calculado'] ?? 0);
+            }
+        }
+        return round($lucro, 2);
+    }
+
+    /**
+     * M1: Calcula tendências comparando mês atual vs mês anterior
+     * 
+     * Busca os dados do mês anterior no array $vendasMensais (retornado por
+     * getVendasMensais(6)) e compara com os valores atuais calculados diretamente.
+     * 
+     * Usa dados do mês atual calculados diretamente ($faturamentoMes, $lucroMes, etc.)
+     * como fonte autoritativa — não depende de $vendasMensais conter o mês atual.
+     * 
+     * @param array $vendasMensais Dados dos últimos 6 meses (getVendasMensais)
+     * @param float $faturamentoAtual Faturamento do mês atual (getTotalMes)
+     * @param float $lucroAtual Lucro do mês atual (calculado de vendasMes)
+     * @param int   $qtdAtual Quantidade de vendas do mês atual
+     * @param float $ticketAtual Ticket médio atual
+     * @return array Tendências com percentual e valor anterior para cada métrica
+     */
+    private function calcularTendencias(
+        array $vendasMensais,
+        float $faturamentoAtual,
+        float $lucroAtual,
+        int   $qtdAtual,
+        float $ticketAtual
+    ): array {
+        // Identifica o mês anterior (YYYY-MM)
+        $mesAnteriorStr = date('Y-m', strtotime('first day of last month'));
+        
+        // Procura dados do mês anterior no array de vendasMensais
+        // Cada item tem chave 'mes' no formato 'YYYY-MM'
+        $dadosAnterior = null;
+        foreach ($vendasMensais as $mes) {
+            if (($mes['mes'] ?? '') === $mesAnteriorStr) {
+                $dadosAnterior = $mes;
+                break;
+            }
+        }
+        
+        // Se não encontrou dados do mês anterior, retorna null em todas as tendências
+        // (ex: primeiro mês de uso do sistema, ou mês anterior sem vendas)
+        if (!$dadosAnterior) {
+            return [
+                'faturamento' => null,
+                'lucro'       => null,
+                'quantidade'  => null,
+                'ticket'      => null,
+            ];
+        }
+        
+        // Extrai valores do mês anterior
+        $fatAnt   = (float)($dadosAnterior['total'] ?? 0);
+        $lucroAnt = (float)($dadosAnterior['lucro'] ?? 0);
+        $qtdAnt   = (int)($dadosAnterior['quantidade'] ?? 0);
+        $ticketAnt = $qtdAnt > 0 ? round($fatAnt / $qtdAnt, 2) : 0;
+        
+        // Calcula variação percentual para cada métrica
+        return [
+            'faturamento' => $this->calcularVariacao($faturamentoAtual, $fatAnt),
+            'lucro'       => $this->calcularVariacao($lucroAtual, $lucroAnt),
+            'quantidade'  => $this->calcularVariacao((float)$qtdAtual, (float)$qtdAnt),
+            'ticket'      => $this->calcularVariacao($ticketAtual, $ticketAnt),
+        ];
+    }
+
+    /**
+     * M1: Calcula variação percentual entre valor atual e anterior
+     * 
+     * Retorna array com:
+     * - 'percentual': variação em % (positivo = crescimento, negativo = queda)
+     * - 'anterior': valor absoluto do mês anterior (para exibir no subtexto)
+     * 
+     * Caso especial: se anterior = 0 e atual > 0, retorna +100% (novo).
+     * Se ambos = 0, retorna 0%.
+     * 
+     * @param float $atual Valor do mês atual
+     * @param float $anterior Valor do mês anterior
+     * @return array ['percentual' => float, 'anterior' => float]
+     */
+    private function calcularVariacao(float $atual, float $anterior): array
+    {
+        if ($anterior == 0) {
+            // Evita divisão por zero
+            // Se atual > 0, é 100% de crescimento (veio do zero)
+            // Se atual = 0, não houve variação
+            return [
+                'percentual' => $atual > 0 ? 100.0 : 0.0,
+                'anterior'   => 0.0
+            ];
+        }
+        
+        $percentual = round((($atual - $anterior) / $anterior) * 100, 1);
+        
+        return [
+            'percentual' => $percentual,
+            'anterior'   => $anterior
         ];
     }
 
@@ -134,19 +252,49 @@ class DashboardController extends BaseController
         // Artes disponíveis para venda
         $artesDisponiveis = $this->arteService->getDisponiveisParaVenda();
         
-        // Vendas dos últimos 6 meses (para gráfico)
+        // Vendas dos últimos 6 meses (para gráfico + tendências M1)
         $vendasMensais = $this->vendaService->getVendasMensais(6);
         
         // Artes mais rentáveis
         $maisRentaveis = $this->vendaService->getRankingRentabilidade(5);
+        
+        // =====================================================
+        // M1: CÁLCULOS PARA NOVOS CARDS E TENDÊNCIAS
+        // Nenhuma query extra — usa dados já buscados acima.
+        // =====================================================
+        
+        // Quantidade de vendas do mês (defensivo com is_array)
+        $qtdVendasMes = is_array($vendasMes) ? count($vendasMes) : 0;
+        
+        // Lucro do mês: soma lucro_calculado de todos os objetos Venda
+        $lucroMes = is_array($vendasMes) ? $this->calcularLucroMes($vendasMes) : 0;
+        
+        // Ticket médio: faturamento / quantidade (evita divisão por zero)
+        $ticketMedio = $qtdVendasMes > 0 ? round($faturamentoMes / $qtdVendasMes, 2) : 0;
+        
+        // Margem de lucro %: (lucro / faturamento) * 100
+        $margemMes = $faturamentoMes > 0 ? round(($lucroMes / $faturamentoMes) * 100, 1) : 0;
+        
+        // Tendências: compara mês atual vs mês anterior (usa $vendasMensais)
+        $tendencias = $this->calcularTendencias(
+            $vendasMensais,
+            $faturamentoMes,
+            $lucroMes,
+            $qtdVendasMes,
+            $ticketMedio
+        );
         
         if ($request->wantsJson()) {
             return $this->json([
                 'success' => true,
                 'data' => [
                     'artes' => $artesStats,
-                    'vendas_mes' => count($vendasMes),
+                    'vendas_mes' => $qtdVendasMes,
                     'faturamento_mes' => $faturamentoMes,
+                    'lucro_mes' => $lucroMes,           // M1: novo
+                    'ticket_medio' => $ticketMedio,      // M1: novo
+                    'margem_mes' => $margemMes,          // M1: novo
+                    'tendencias' => $tendencias,         // M1: novo
                     'meta' => $metaAtual,
                     'meta_em_risco' => $metaEmRisco,
                     'top_clientes' => $topClientes,
@@ -158,16 +306,21 @@ class DashboardController extends BaseController
         }
         
         return $this->view('dashboard/index', [
-            'titulo' => 'Dashboard',
-            'artesStats' => $artesStats,
-            'vendasMes' => $vendasMes,
-            'faturamentoMes' => $faturamentoMes,
-            'metaAtual' => $metaAtual,
-            'metaEmRisco' => $metaEmRisco,
-            'topClientes' => $topClientes,
+            'titulo'           => 'Dashboard',
+            'artesStats'       => $artesStats,
+            'vendasMes'        => $vendasMes,
+            'faturamentoMes'   => $faturamentoMes,
+            'metaAtual'        => $metaAtual,
+            'metaEmRisco'      => $metaEmRisco,
+            'topClientes'      => $topClientes,
             'artesDisponiveis' => $artesDisponiveis,
-            'vendasMensais' => $vendasMensais,
-            'maisRentaveis' => $maisRentaveis
+            'vendasMensais'    => $vendasMensais,
+            'maisRentaveis'    => $maisRentaveis,
+            // M1: Novos dados para cards aprimorados
+            'lucroMes'         => $lucroMes,
+            'ticketMedio'      => $ticketMedio,
+            'margemMes'        => $margemMes,
+            'tendencias'       => $tendencias,
         ]);
     }
     
@@ -180,9 +333,7 @@ class DashboardController extends BaseController
      * GET /dashboard/refresh
      * 
      * FIX D8: Variáveis locais evitam chamadas duplicadas aos Services.
-     * Antes: getEstatisticas() chamado 2x, getResumoDashboard() chamado 2x
-     *        = 4 queries SQL desnecessárias a cada refresh AJAX.
-     * Depois: 1 chamada cada = 4 queries eliminadas por request.
+     * M1: Inclui novos cards (faturamento, lucro, ticket) no refresh.
      */
     public function refresh(Request $request): Response
     {
@@ -192,15 +343,27 @@ class DashboardController extends BaseController
         );
         $metaResumo = $this->metaService->getResumoDashboard();
         
+        // M1: Busca vendas do mês para calcular lucro e ticket
+        $vendasMes = $this->vendaService->getVendasMesAtual();
+        $faturamentoMes = $this->vendaService->getTotalMes();
+        $qtdVendasMes = count($vendasMes);
+        $lucroMes = $this->calcularLucroMes($vendasMes);
+        $ticketMedio = $qtdVendasMes > 0 ? round($faturamentoMes / $qtdVendasMes, 2) : 0;
+        $margemMes = $faturamentoMes > 0 ? round(($lucroMes / $faturamentoMes) * 100, 1) : 0;
+        
         return $this->json([
             'success' => true,
             'timestamp' => date('Y-m-d H:i:s'),
             'data' => [
-                // Cards principais
+                // Cards principais (chaves = data-stat attributes na view)
                 'cards' => [
                     'total_artes'       => $artesStats['total'],
                     'artes_disponiveis' => $artesStats['disponiveis'],
-                    'vendas_mes'        => $this->vendaService->getTotalMes(),
+                    'qtd_vendas_mes'    => $qtdVendasMes,
+                    'faturamento_mes'   => $faturamentoMes,
+                    'lucro_mes'         => $lucroMes,          // M1: novo
+                    'ticket_medio'      => $ticketMedio,        // M1: novo
+                    'margem_mes'        => $margemMes,          // M1: novo
                     'meta_progresso'    => $metaResumo['porcentagem'] ?? 0
                 ],
                 
