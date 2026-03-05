@@ -355,6 +355,53 @@ class ArteRepository extends BaseRepository
         return $result;
     }
     
+    /**
+     * Retorna estatísticas gerais das artes (query única)
+     * 
+     * RESTAURADO: Este método foi removido acidentalmente na refatoração M6
+     * (substituído por countByStatus + getResumoFinanceiro separados).
+     * 
+     * Porém, ArteService::getEstatisticas() delega para cá, e é usado por:
+     * - DashboardController::index()     → cards + gráfico doughnut
+     * - DashboardController::refresh()   → atualização AJAX
+     * - DashboardController::estatisticasArtes() → endpoint AJAX
+     * - ArteController::index()          → cards de resumo na listagem
+     * 
+     * Retorna array com chaves que a view do Dashboard espera:
+     * 'total', 'disponiveis', 'em_producao', 'vendidas', 'reservadas',
+     * 'media_horas', 'custo_total', 'custo_medio'
+     * 
+     * @return array Estatísticas consolidadas
+     */
+    public function getEstatisticas(): array
+    {
+        $sql = "SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'disponivel' THEN 1 ELSE 0 END) as disponiveis,
+                    SUM(CASE WHEN status = 'em_producao' THEN 1 ELSE 0 END) as em_producao,
+                    SUM(CASE WHEN status = 'vendida' THEN 1 ELSE 0 END) as vendidas,
+                    SUM(CASE WHEN status = 'reservada' THEN 1 ELSE 0 END) as reservadas,
+                    AVG(horas_trabalhadas) as media_horas,
+                    SUM(preco_custo) as custo_total,
+                    AVG(preco_custo) as custo_medio
+                FROM {$this->table}";
+        
+        $result = $this->getConnection()->query($sql)->fetch(PDO::FETCH_ASSOC);
+        
+        // Garante valores numéricos (PDO retorna strings)
+        return [
+            'total'       => (int)   ($result['total'] ?? 0),
+            'disponiveis' => (int)   ($result['disponiveis'] ?? 0),
+            'em_producao' => (int)   ($result['em_producao'] ?? 0),
+            'vendidas'    => (int)   ($result['vendidas'] ?? 0),
+            'reservadas'  => (int)   ($result['reservadas'] ?? 0),
+            'media_horas' => round((float) ($result['media_horas'] ?? 0), 2),
+            'custo_total' => (float) ($result['custo_total'] ?? 0),
+            'custo_medio' => round((float) ($result['custo_medio'] ?? 0), 2),
+        ];
+    }
+
+
     // ========================================
     // [MELHORIA 6] ESTATÍSTICAS PARA GRÁFICOS
     // ========================================

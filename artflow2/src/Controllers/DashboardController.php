@@ -17,6 +17,15 @@ use App\Services\ClienteService;
  * Controller responsável pela página inicial do sistema.
  * Agrega estatísticas de todos os módulos.
  * 
+ * FASE 1 — CORREÇÕES APLICADAS (03/03/2026):
+ * - D1: limparDadosFormulario() adicionado (privado, padrão dos outros controllers)
+ * - D8: refresh() otimizado — variáveis locais evitam queries duplicadas
+ * - FIX CHAVES: ArteService::getEstatisticas() retorna formato countByStatus()
+ *   com chaves ['disponivel','em_producao','vendida','reservada'].
+ *   Dashboard precisa de ['total','disponiveis','em_producao','vendidas','reservadas'].
+ *   Adaptação feita via método privado adaptarArtesStats() para não alterar
+ *   ArteService/Repository (que já funcionam para o módulo Artes).
+ * 
  * MELHORIA 4 (06/02/2026):
  * - index() agora passa $metaEmRisco para exibir alerta
  *   quando projeção indica que meta não será batida
@@ -40,14 +49,74 @@ class DashboardController extends BaseController
         $this->clienteService = $clienteService;
     }
     
+    // ==========================================
+    // MÉTODOS AUXILIARES
+    // ==========================================
+    
+    /**
+     * FIX D1: Limpa dados residuais de formulários anteriores
+     * 
+     * Dashboard não tem forms, mas funciona como "ponto de limpeza":
+     * se o usuário navegou Criar Venda → Erro validação → Dashboard,
+     * os dados de $_SESSION persistiriam e contaminariam outro módulo.
+     * 
+     * Padrão dos outros Controllers (ArteController, ClienteController, etc.)
+     * onde é definido como private em cada controller individualmente.
+     */
+    private function limparDadosFormulario(): void
+    {
+        unset($_SESSION['_old_input'], $_SESSION['_errors']);
+    }
+    
+    /**
+     * Adapta formato de ArteService::getEstatisticas() para o Dashboard
+     * 
+     * ArteService retorna formato countByStatus():
+     *   ['disponivel' => N, 'em_producao' => N, 'vendida' => N, 'reservada' => N]
+     * 
+     * Dashboard precisa de:
+     *   ['total' => N, 'disponiveis' => N, 'em_producao' => N, 'vendidas' => N, 'reservadas' => N]
+     * 
+     * Diferenças:
+     *   - Falta campo 'total' (soma de todos)
+     *   - 'disponivel' → 'disponiveis' (plural)
+     *   - 'vendida' → 'vendidas' (plural)
+     *   - 'reservada' → 'reservadas' (plural)
+     * 
+     * Centralizado aqui para evitar duplicação em index(), refresh() e estatisticasArtes().
+     * NÃO alteramos ArteService/Repository para não afetar o módulo Artes que está estável.
+     * 
+     * @param array $raw Dados crus do ArteService::getEstatisticas()
+     * @return array Dados adaptados para uso no Dashboard
+     */
+    private function adaptarArtesStats(array $raw): array
+    {
+        return [
+            'total'       => array_sum($raw),
+            'disponiveis' => $raw['disponivel'] ?? 0,
+            'em_producao' => $raw['em_producao'] ?? 0,
+            'vendidas'    => $raw['vendida'] ?? 0,
+            'reservadas'  => $raw['reservada'] ?? 0,
+        ];
+    }
+
+    // ==========================================
+    // PÁGINA PRINCIPAL
+    // ==========================================
+
     /**
      * Página inicial do dashboard
      * GET /
      */
     public function index(Request $request): Response
     {
-        // Estatísticas de Artes
-        $artesStats = $this->arteService->getEstatisticas();
+        // FIX D1: Limpa dados residuais de formulários
+        $this->limparDadosFormulario();
+
+        // Estatísticas de Artes (adapta chaves para formato Dashboard)
+        $artesStats = $this->adaptarArtesStats(
+            $this->arteService->getEstatisticas()
+        );
         
         // Estatísticas de Vendas do mês atual
         $vendasMes = $this->vendaService->getVendasMesAtual();
@@ -56,13 +125,7 @@ class DashboardController extends BaseController
         // Meta do mês atual
         $metaAtual = $this->metaService->getResumoDashboard();
         
-        // =====================================================
         // MELHORIA 4: Verificar se meta está em risco
-        // Usa calcularProjecao() para detectar se a projeção
-        // do mês corrente indica que a meta não será batida.
-        // Retorna ['alerta' => true/false, ...] — seguro para
-        // uso na view com verificação simples.
-        // =====================================================
         $metaEmRisco = $this->metaService->getMetasEmRisco();
         
         // Top clientes
@@ -85,7 +148,7 @@ class DashboardController extends BaseController
                     'vendas_mes' => count($vendasMes),
                     'faturamento_mes' => $faturamentoMes,
                     'meta' => $metaAtual,
-                    'meta_em_risco' => $metaEmRisco, // MELHORIA 4: inclui no JSON
+                    'meta_em_risco' => $metaEmRisco,
                     'top_clientes' => $topClientes,
                     'artes_disponiveis' => count($artesDisponiveis),
                     'vendas_mensais' => $vendasMensais,
@@ -100,7 +163,7 @@ class DashboardController extends BaseController
             'vendasMes' => $vendasMes,
             'faturamentoMes' => $faturamentoMes,
             'metaAtual' => $metaAtual,
-            'metaEmRisco' => $metaEmRisco, // MELHORIA 4: passa para a view
+            'metaEmRisco' => $metaEmRisco,
             'topClientes' => $topClientes,
             'artesDisponiveis' => $artesDisponiveis,
             'vendasMensais' => $vendasMensais,
@@ -108,26 +171,41 @@ class DashboardController extends BaseController
         ]);
     }
     
+    // ==========================================
+    // ENDPOINTS AJAX
+    // ==========================================
+    
     /**
      * Retorna dados para atualização AJAX
      * GET /dashboard/refresh
+     * 
+     * FIX D8: Variáveis locais evitam chamadas duplicadas aos Services.
+     * Antes: getEstatisticas() chamado 2x, getResumoDashboard() chamado 2x
+     *        = 4 queries SQL desnecessárias a cada refresh AJAX.
+     * Depois: 1 chamada cada = 4 queries eliminadas por request.
      */
     public function refresh(Request $request): Response
     {
+        // Busca dados UMA vez e reutiliza (FIX D8)
+        $artesStats = $this->adaptarArtesStats(
+            $this->arteService->getEstatisticas()
+        );
+        $metaResumo = $this->metaService->getResumoDashboard();
+        
         return $this->json([
             'success' => true,
             'timestamp' => date('Y-m-d H:i:s'),
             'data' => [
                 // Cards principais
                 'cards' => [
-                    'total_artes' => $this->arteService->getEstatisticas()['total'] ?? 0,
-                    'artes_disponiveis' => $this->arteService->getEstatisticas()['disponiveis'] ?? 0,
-                    'vendas_mes' => $this->vendaService->getTotalMes(),
-                    'meta_progresso' => $this->metaService->getResumoDashboard()['porcentagem'] ?? 0
+                    'total_artes'       => $artesStats['total'],
+                    'artes_disponiveis' => $artesStats['disponiveis'],
+                    'vendas_mes'        => $this->vendaService->getTotalMes(),
+                    'meta_progresso'    => $metaResumo['porcentagem'] ?? 0
                 ],
                 
-                // Meta atual
-                'meta' => $this->metaService->getResumoDashboard(),
+                // Meta atual (reutiliza variável local)
+                'meta' => $metaResumo,
                 
                 // MELHORIA 4: Inclui status de risco no refresh
                 'meta_em_risco' => $this->metaService->getMetasEmRisco(),
@@ -137,14 +215,17 @@ class DashboardController extends BaseController
             ]
         ]);
     }
-    
+
     /**
      * Estatísticas detalhadas de artes
      * GET /dashboard/artes
      */
     public function estatisticasArtes(Request $request): Response
     {
-        $stats = $this->arteService->getEstatisticas();
+        // Usa adaptador para ter chaves corretas
+        $stats = $this->adaptarArtesStats(
+            $this->arteService->getEstatisticas()
+        );
         
         $porComplexidade = [
             'baixa' => 0,
@@ -152,17 +233,18 @@ class DashboardController extends BaseController
             'alta' => 0
         ];
         
+        // Agora as chaves batem: 'disponiveis', 'vendidas' (plural)
         $porStatus = [
-            'disponivel' => $stats['disponiveis'] ?? 0,
-            'em_producao' => $stats['em_producao'] ?? 0,
-            'vendida' => $stats['vendidas'] ?? 0
+            'disponivel'  => $stats['disponiveis'],
+            'em_producao' => $stats['em_producao'],
+            'vendida'     => $stats['vendidas']
         ];
         
         return $this->json([
             'success' => true,
             'data' => [
-                'total' => $stats['total'] ?? 0,
-                'media_horas' => $stats['media_horas'] ?? 0,
+                'total' => $stats['total'],
+                'media_horas' => 0, // TODO: implementar na fase de melhorias
                 'por_status' => $porStatus,
                 'por_complexidade' => $porComplexidade
             ]
@@ -226,7 +308,6 @@ class DashboardController extends BaseController
                 'dias_restantes' => $diasRestantes,
                 'falta_vender' => $faltaVender,
                 'falta_por_dia' => $faltaPorDia,
-                // MELHORIA 4: Inclui status de risco
                 'em_risco' => $this->metaService->getMetasEmRisco()
             ])
         ]);
